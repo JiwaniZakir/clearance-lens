@@ -557,3 +557,104 @@ describe("judging panel round 8: fragmented SSN across prepare_consented_card fi
     ).toHaveLength(0);
   });
 });
+
+// Found by a self-run red-team pass between judging panel rounds 8 and 9
+// (DECISIONS.md D-043), before any judge found them: 21 of 33 format
+// variations got through. Round 8's DOB fix covered only numeric dates, and
+// the guard had no category at all for DoD IDs, A-numbers, driver's
+// licenses, or street addresses.
+describe("D-043 red-team pass: format variations and missing identifier types, now rejected", () => {
+  const MUST_REJECT: [string, string][] = [
+    ["Available starting January 15, 1990", "dob"],
+    ["Jan 15 1990", "dob"],
+    ["15 January 1990", "dob"],
+    ["the 15th of January, 1990", "dob"],
+    ["01.15.1990", "dob"],
+    ["15.01.1990", "dob"],
+    ["01 15 1990", "dob"],
+    ["1/15/90", "dob"],
+    ["1 2 3 - 4 5 - 6 7 8 9", "ssn"],
+    ["my social is one two three four five six seven eight nine", "ssn"],
+    ["SSN ending 6789", "ssn"],
+    ["last 4 of my SSN: 6789", "ssn"],
+    ["XXX-XX-6789", "ssn"],
+    ["reach me at jane.doe [at] gmail [dot] com", "email"],
+    ["jane.doe (at) gmail.com", "email"],
+    ["jane at gmail dot com", "email"],
+    ["jane.doe @ gmail.com", "email"],
+    ["call me 5558675309", "phone"],
+    ["my EDIPI is 1234567890", "government_id"],
+    ["my A-number is A123456789", "government_id"],
+    ["USCIS# 123-456-789", "government_id"],
+    ["driver's license D1234567", "government_id"],
+    ["my receipt number is IOE0912345678", "case_number"],
+    ["I live at 1600 Pennsylvania Ave NW, Washington, DC 20500", "address"],
+    ["my address is 42 Elm Street", "address"],
+  ];
+  it.each(MUST_REJECT)("rejects %j as %s", (text, category) => {
+    expect(categoriesOf(text)).toContain(category);
+  });
+
+  it("deliberately still allows a bare 9-digit run with no SSN keyword, and a question about an SF-86 section", () => {
+    // Indistinguishable from an ordinary number / a legitimate question about the form.
+    expect(categoriesOf("123456789")).toEqual([]);
+    expect(categoriesOf("What goes in section 13A of the SF-86?")).toEqual([]);
+  });
+});
+
+describe("D-043: the new detectors don't block legitimate questions", () => {
+  // The full false-positive sweep run before shipping D-043 (0 of 87 blocked).
+  const MUST_ALLOW = [
+    "Do I need my home address history for 7 years on the SF-86?",
+    "How far back does the SF-86 ask where I've lived? I've had 3 addresses in 7 years",
+    "Python 3.12.10 and Node 22.19.0", "Executive Order 12968 of August 2, 1995", "EO 13526 signed December 29, 2009",
+    "Anduril was founded June 2017", "SpaceX founded March 14, 2002", "I work at google.com", "Do I need a DoD ID before day one?",
+    "What's a CAC card and when do I get one?", "phone screen next week for 2 roles", "Can I text the recruiter? I'm available 2026-12-01",
+    "What is an A-number and does a green card holder have one?", "Does this role require a driver's license? Comp is 150000",
+    "Does this role require a driver's license? I'm in 94105", "2-3 years experience", "posted 3/15/24", "start 1/5/27",
+    "I left my last job on 6/30/25", "Graduated 05/2015", "Available starting Jan 15, 2027", "Available 15 January 2027",
+    "SEAD 4 effective June 8, 2017", "ITAR 22 CFR 120.62 and 120.17", "the 2019 NDAA section 1634",
+    "I have 10 years experience, 5 at Lockheed, 3 at Anduril", "comp range $150,000 - $180,000", "salary 150k-180k, 401k match",
+    "Open to roles near 1 Rocket Road", "the office at 2000 Avenue of the Stars", "I live in Huntsville, AL", "I live on base right now",
+    "issued_at 2026-11-12T16:00:00Z", "role d2ad1e1d-61bf-4dcd-9d06-23f9a75ea5f2", "Q3 2026 start, 2 weeks notice",
+    "Can I start while my SSN card is being replaced?", "SSN requirements in 2026", "my social media is mostly GitHub",
+    "one or two roles, maybe three", "oh one more thing: is a 2 year gap ok?", "We need one, two, three, four, five, six, seven, eight, nine engineers",
+    "Timestamp 1731400000 for the posting", "text me about role 3", "IP 192.168.1.10", "10.15.2026 start date",
+    "I was at Raytheon 2005-2012", "From 01/2010 to 06/2015", "Worked 2008–2012 at a prime", "Clearance granted 2009",
+    "cleared since 03/2009", "Senior embedded engineer, 8 years, active Secret", "Available 2026-12-01; prefers hybrid in Huntsville",
+    "Open to relocation; reach me via the speedrun network", "What does 'last 4 years of employment' mean on the SF-86?",
+    "the 3 pillars: 1 2 3", "Version 1.2.3", "rated 4.5 out of 5", "ITAR §120.62(a)(1)", "Part 121 category XI(a)(3)",
+    "How long does a T5 take in 2026 vs 2019?", "FY2026 NDAA", "Built a 10-person team from 2015 to 2021", "Kubernetes 1.29.4",
+    "the 2nd of December works for an interview", "December 2nd, 2026 works for an interview", "interview on 12/2/26?",
+    "My green card was approved and I'm an LPR now", "Does a USCIS interview delay anything?", "do I need a DL for this role",
+    "reach me on the speedrun network", "call notes from 5 interviews", "Cosign profile @jane", "github.com/jane-doe",
+    "my address for the card: just say 'Bay Area'", "street address not needed?", "1-800 numbers aren't needed", "x.com/janedoe",
+    "e-QIP is due 2026-12-15", "F-35 and F/A-18 programs", "CH-47 and AH-64", "MQ-9 Reaper", "B-21 Raider", "SF-86 section 13A",
+    "XX-XX roles", "uses 3-2-1 backup strategy", "covers 5 4 3 2 1 countdown demos", "the 4th of July, 2026 launch",
+  ];
+  it.each(MUST_ALLOW)("allows %j", (text) => {
+    expect(categoriesOf(text)).toEqual([]);
+  });
+});
+
+describe("D-043: worst-case scan time stays linear at the real 20KB input limit", () => {
+  // Unbounded `[...]+` local parts in the email patterns made a 20KB run of
+  // "a.a.a." take ~700ms — present in the shipped guard, not only the new
+  // patterns. Bounded quantifiers brought it to ~18ms. The bound here is
+  // generous for CI variance but far below the quadratic case.
+  const N = 19_000;
+  const PATHOLOGICAL: [string, string][] = [
+    ["a.a.a.", "a.".repeat(N / 2)],
+    ["1-1-1-", "1-".repeat(N / 2)],
+    ["a at a at", "a at ".repeat(N / 5)],
+    ["x x x … @", "x ".repeat(N / 2 - 2) + "@"],
+    ["a [at] b", "a [at] b ".repeat(N / 9)],
+    ["1 Main St,", "1 Main St, ".repeat(N / 11)],
+    ["Jan 1 Jan 1", "Jan 1 ".repeat(N / 6)],
+  ];
+  it.each(PATHOLOGICAL)("scans %s in under 250ms", (_label, text) => {
+    const t0 = performance.now();
+    scanValueForPiiCui(text);
+    expect(performance.now() - t0).toBeLessThan(250);
+  });
+});

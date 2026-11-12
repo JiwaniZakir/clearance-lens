@@ -20,8 +20,8 @@ export const metadata: Metadata = {
 const REFUSAL_CATEGORIES: Record<PiiCategory, string> = {
   ssn: "Social Security numbers",
   dob: "Dates of birth",
-  passport: "Passport or other government ID document numbers",
-  case_number: "Investigation or case numbers (e.g. an OPM, e-QIP, or DCSA case ID)",
+  passport: "Passport numbers",
+  case_number: "Investigation or case numbers (e.g. an OPM, e-QIP, or DCSA case ID, or a USCIS receipt number)",
   clearance_record: "Clearance record or adjudication-system text (e.g. a DISS, JPAS, or NBIS record)",
   image_upload: "Image uploads or screenshots of any kind",
   binary_data: "Embedded files or other binary data",
@@ -30,6 +30,8 @@ const REFUSAL_CATEGORIES: Record<PiiCategory, string> = {
   classification_marking: "Classification or control markings (e.g. SECRET//NOFORN), real or described",
   email: "Email addresses",
   phone: "Phone numbers",
+  government_id: "Other government ID numbers (e.g. a DoD ID/EDIPI, USCIS A-number, or driver's license number)",
+  address: "Street addresses (home or mailing)",
 };
 
 // A real-shaped request to explain_rule's actual input field ("topic"),

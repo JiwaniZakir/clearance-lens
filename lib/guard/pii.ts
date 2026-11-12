@@ -25,7 +25,9 @@ export type PiiCategory =
   | "credit_card"
   | "classification_marking"
   | "email"
-  | "phone";
+  | "phone"
+  | "government_id"
+  | "address";
 
 export interface PiiFinding {
   category: PiiCategory;
@@ -46,13 +48,18 @@ const FRIENDLY_BY_CATEGORY: Record<PiiCategory, string> = {
   classification_marking: "This looks like it includes a classification marking (e.g. SECRET//NOFORN). Clearance Lens never accepts classified or export-controlled content, real or described — please remove it and describe your situation without quoting or paraphrasing any marked material.",
   email: "This looks like it includes an email address. Clearance Lens never accepts contact info — your own agent already knows how to reach you privately; please remove it and continue without it.",
   phone: "This looks like it includes a phone number. Clearance Lens never accepts contact info — your own agent already knows how to reach you privately; please remove it and continue without it.",
+  government_id: "This looks like it includes a government ID number (e.g. a DoD ID/EDIPI, a USCIS A-number, or a driver's license number). Clearance Lens never accepts ID numbers — please remove it. If your status matters, describe it in general terms (e.g. \"green card holder\").",
+  address: "This looks like it includes a street address. Clearance Lens never accepts home or mailing addresses — please remove it. If location matters, a city or region is enough (e.g. \"open to roles near Huntsville\").",
 };
 
 /** SSN-context keywords that gate the riskier bare-9-digit check. No trailing
  *  `\b`: a couple of alternatives end in `#`, and `\b` right after a non-word
  *  char that's followed by whitespace is never a boundary, which would silently
  *  fail the match (caught by tests/unit/pii.test.ts — "ss# 123456789"). */
-const SSN_CONTEXT = /\b(ssn|soc(?:ial)?[\s.-]*sec(?:urity)?|ss\s*#)/i;
+// "my social" / "social #" added after a self-run red-team pass between
+// judging panel rounds 8 and 9 (DECISIONS.md D-043): it's how people
+// actually refer to an SSN, and "my social is …" previously didn't register.
+const SSN_CONTEXT = /\b(ssn|soc(?:ial)?[\s.-]*sec(?:urity)?|ss\s*#|my\s+social\b|social\s*(?:#|no\.?|num(?:ber)?\b))/i;
 /** Strictly 3-2-4 digit groups joined by `-` or a space — the SSN print format.
  *  This grouping is not used by any other common identifier (US phone numbers are
  *  3-3-4), so it is rejected unconditionally, regardless of SSA area/group/serial
@@ -234,7 +241,10 @@ const CLASSIFICATION_MARKING =
  *  product's own "never receives... PII" claim. Not RFC-5322-complete —
  *  deliberately so; a looser, common-case pattern catches real emails
  *  without the edge cases a fully spec-compliant regex invites. */
-const EMAIL_SHAPE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+// Quantifiers bounded to RFC 5321's own limits (64-char local part, 253-char
+// domain): an unbounded `[...]+` here re-scans the rest of the input from
+// every word boundary, which made a 20KB run of "a.a.a." quadratic (D-043).
+const EMAIL_SHAPE = /\b[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,24}\b/;
 /** A US-phone-number shape WITH separators (dash/dot/space, optional
  *  parens around the area code, optional leading +1) — deliberately
  *  requires a separator, unlike SSN_DASHED's fixed grouping, so this
@@ -245,40 +255,154 @@ const EMAIL_SHAPE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
  *  legitimate reason to contain one anyway. */
 const PHONE_FORMATTED = /\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/;
 
-/** A full calendar date — day precision AND a 4-digit year — in either
- *  M/D/YYYY (or M-D-YYYY) or YYYY-M-D order. Found live via the spec §6
+/** A full calendar date with day precision. Found live via the spec §6
  *  judging panel round 8 (trust_skeptic, reproduced 3 times): the DOB
  *  detector above requires a birth keyword ("DOB"/"born") next to a date,
  *  so a bare birthdate typed the way people normally type one
  *  ("01/15/1990", "1990-01-15") passed every tool, and was echoed into
  *  prepare_consented_card's shareable card as "Available starting
- *  01/15/1990." */
-const FULL_NUMERIC_DATE = /\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b|\b(\d{4})[/-](\d{1,2})[/-](\d{1,2})\b/g;
+ *  01/15/1990." Round 8's fix covered only `/` and `-` with a 4-digit year;
+ *  a self-run red-team pass before round 9 (DECISIONS.md D-043) found the
+ *  same birthdate still passed written out ("January 15, 1990", "15th of
+ *  January, 1990"), dotted ("15.01.1990"), space-separated, or with a
+ *  2-digit year ("1/15/90") — all now covered. Dotted and spaced forms
+ *  require a 4-digit year: "Python 3.12.10" must never read as a date. */
+const NUMERIC_DMY_4 = /(?<![\d.])(\d{1,2})([/.\- ])(\d{1,2})\2(\d{4})(?![\d.]?\d)/g;
+const NUMERIC_DMY_2 = /(?<![\d./-])(\d{1,2})([/-])(\d{1,2})\2(\d{2})(?![\d/-]?\d)/g;
+const NUMERIC_YMD = /(?<![\d.])(\d{4})([/.-])(\d{1,2})\2(\d{1,2})(?!\d)/g;
+const WRITTEN_MDY = new RegExp(String.raw`\b(?:${MONTH_NAMES})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b`, "gi");
+const WRITTEN_DMY = new RegExp(String.raw`\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(?:${MONTH_NAMES})\.?,?\s+(\d{4})\b`, "gi");
 /** No legitimate input to this product has a reason to carry a day-precise
  *  date more than this many years in the past: availability and start
  *  dates are near-future, posting dates are recent, and work history on a
  *  card is expressed in years or month/year. A day-precise date this old
  *  is, overwhelmingly, someone's birthdate — 16 being a working-age floor,
- *  so every working adult's birth year falls at or before it. Deliberately
- *  NOT applied to month/year or 2-digit-year forms ("05/2015", "1/2/10"),
- *  which still require a birth keyword, as before — those shapes collide
- *  with ordinary non-date content too often to flag on structure alone. */
+ *  so every working adult's birth year falls at or before it. Month/year
+ *  forms ("05/2015") still require a birth keyword, as before. */
 const BIRTH_PLAUSIBLE_MIN_AGE_YEARS = 16;
 const BIRTH_PLAUSIBLE_MAX_AGE_YEARS = 100;
+/** The one real collision class: dates of laws and organizations, which this
+ *  product's own domain discusses ("Executive Order 12968 of August 2, 1995",
+ *  "founded March 14, 2002"). Exempt only when one of these words directly
+ *  precedes the date — none of them describes a person, and "born"/"DOB"
+ *  still fire through BIRTH_CONTEXT regardless. */
+const INSTITUTIONAL_DATE_LEAD =
+  /(?:\b(?:signed|issued|enacted|amended|founded|established|incorporated|promulgated|rescinded)\b|\b(?:executive\s+order|e\.?\s?o\.?)\s*\d{4,5}\b(?:\s+of)?)[\s,(:]*(?:on\s+|in\s+)?$/i;
+
+function isBirthPlausibleYear(year: number, currentYear: number): boolean {
+  const age = currentYear - year;
+  return age >= BIRTH_PLAUSIBLE_MIN_AGE_YEARS && age <= BIRTH_PLAUSIBLE_MAX_AGE_YEARS;
+}
 
 function hasBirthPlausibleFullDate(text: string): boolean {
   const currentYear = new Date().getUTCFullYear();
-  for (const m of text.matchAll(FULL_NUMERIC_DATE)) {
-    // Group 1-3: M/D/YYYY (or D/M/YYYY — either order is checked as
-    // plausible below); group 4-6: YYYY-M-D.
-    const [year, a, b] = m[3] ? [Number(m[3]), Number(m[1]), Number(m[2])] : [Number(m[4]), Number(m[5]), Number(m[6])];
-    const age = currentYear - year;
-    if (age < BIRTH_PLAUSIBLE_MIN_AGE_YEARS || age > BIRTH_PLAUSIBLE_MAX_AGE_YEARS) continue;
-    const isCalendarDate = (month: number, day: number) => month >= 1 && month <= 12 && day >= 1 && day <= 31;
-    if (isCalendarDate(a, b) || isCalendarDate(b, a)) return true;
+  const isCalendarDate = (month: number, day: number) => month >= 1 && month <= 12 && day >= 1 && day <= 31;
+  const institutional = (index: number) => INSTITUTIONAL_DATE_LEAD.test(text.slice(Math.max(0, index - 40), index));
+
+  for (const m of text.matchAll(NUMERIC_DMY_4)) {
+    const [a, b, year] = [Number(m[1]), Number(m[3]), Number(m[4])];
+    if (isBirthPlausibleYear(year, currentYear) && (isCalendarDate(a, b) || isCalendarDate(b, a)) && !institutional(m.index!)) return true;
+  }
+  for (const m of text.matchAll(NUMERIC_DMY_2)) {
+    const [a, b, yy] = [Number(m[1]), Number(m[3]), Number(m[4])];
+    // Read a 2-digit year the way people write one (the usual pivot rule):
+    // 20yy unless that's more than 10 years out, else 19yy. So "1/5/27" is
+    // 2027 — an upcoming start date — while "1/15/90" is 1990.
+    const year = 2000 + yy <= currentYear + 10 ? 2000 + yy : 1900 + yy;
+    if (isBirthPlausibleYear(year, currentYear) && (isCalendarDate(a, b) || isCalendarDate(b, a)) && !institutional(m.index!)) return true;
+  }
+  for (const m of text.matchAll(NUMERIC_YMD)) {
+    const [year, a, b] = [Number(m[1]), Number(m[3]), Number(m[4])];
+    if (isBirthPlausibleYear(year, currentYear) && (isCalendarDate(a, b) || isCalendarDate(b, a)) && !institutional(m.index!)) return true;
+  }
+  for (const re of [WRITTEN_MDY, WRITTEN_DMY]) {
+    for (const m of text.matchAll(re)) {
+      const [day, year] = [Number(m[1]), Number(m[2])];
+      if (isBirthPlausibleYear(year, currentYear) && day >= 1 && day <= 31 && !institutional(m.index!)) return true;
+    }
   }
   return false;
 }
+
+/* ------------------------------------------------------------------------ */
+/* Found by a self-run red-team pass between judging panel rounds 8 and 9     */
+/* (DECISIONS.md D-043): 21 of 33 format variations of already-covered       */
+/* categories slipped through, plus four identifier types the guard had no    */
+/* category for at all. Each detector below names what it closes.             */
+/* ------------------------------------------------------------------------ */
+
+/** A masked SSN ("XXX-XX-6789", "***-**-6789") — an unambiguous shape. */
+const SSN_MASKED = /(?<![\w*#•])[xX*#•]{3}[-.\s]?[xX*#•]{2}[-.\s]?\d{4}\b/;
+/** "SSN ending 6789", "last 4 of my SSN: 6789" — partial SSNs are still
+ *  identifying, and the guard's own copy says SSNs are never accepted. */
+const SSN_LAST_FOUR =
+  /\blast\s*(?:4|four)(?:\s*digits)?\s*of\s*(?:my\s*)?(?:ssn|social(?:\s*security)?(?:\s*number)?)\b\D{0,15}\d{4}\b|\b(?:ssn|social\s*security(?:\s*number)?|my\s+social)\b\D{0,20}?\b(?:last\s*(?:4|four)|ending|ends)\b\D{0,15}\d{4}\b/i;
+const DIGIT_WORDS: Record<string, string> = {
+  zero: "0", oh: "0", one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9",
+};
+/** A view of the text for SSN detection only: digit words become digits,
+ *  spaces around hyphens and between digits are dropped — so "1 2 3 - 4 5 -
+ *  6 7 8 9" and "one two three…" reduce to the same shape SSN_DASHED and the
+ *  keyword-gated 9-digit check already look for. Never shown or returned. */
+function ssnDetectionView(text: string): string {
+  return text
+    .replace(/\b(zero|oh|one|two|three|four|five|six|seven|eight|nine)\b/gi, (w) => DIGIT_WORDS[w.toLowerCase()])
+    .replace(/[ \t]*-[ \t]*/g, "-")
+    .replace(/(?<=\d)[ \t]+(?=\d)/g, "");
+}
+
+/** "jane.doe @ gmail.com" — spaces around the @. Subsumes EMAIL_SHAPE. */
+const EMAIL_SPACED = /\b[A-Za-z0-9._%+-]{1,64}[ \t]{0,3}@[ \t]{0,3}[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,8}\.[A-Za-z]{2,24}\b/;
+const OBF_AT_BRACKETED = String.raw`[ \t]{0,3}[\[({<][ \t]{0,3}at[ \t]{0,3}[\])}>][ \t]{0,3}`;
+const OBF_DOT = String.raw`(?:[ \t]{0,3}[\[({<][ \t]{0,3}dot[ \t]{0,3}[\])}>][ \t]{0,3}|[ \t]{1,3}dot[ \t]{1,3})`;
+/** Cheap precheck: the obfuscated-email pattern can only match text that
+ *  contains an "at" token at all, so most input skips it entirely. */
+const HAS_AT_TOKEN = /\bat\b/i;
+const EMAIL_TLDS = "com|org|net|edu|gov|mil|io|co|us|ai|dev|me|app|info|biz|xyz|tech";
+/** "jane [at] gmail [dot] com", "jane (at) gmail.com", "jane at gmail dot com".
+ *  A plain " at " counts only alongside an obfuscated " dot " — so "I work at
+ *  google.com" is never mistaken for an address. */
+const EMAIL_OBFUSCATED = new RegExp(
+  String.raw`\b[A-Za-z0-9._%+-]{1,64}(?:${OBF_AT_BRACKETED}[A-Za-z0-9-]{1,63}(?:(?:${OBF_DOT}|\.)[A-Za-z0-9-]{1,63}){0,8}(?:${OBF_DOT}|\.)(?:${EMAIL_TLDS})|\s+at\s+[A-Za-z0-9-]{1,63}(?:(?:${OBF_DOT}|\.)[A-Za-z0-9-]{1,63}){0,8}${OBF_DOT}(?:${EMAIL_TLDS}))\b`,
+  "i",
+);
+
+/** An unformatted 10-digit (or +1 11-digit) number next to a contact keyword:
+ *  "call me 5558675309". Keyword-gated, like BARE_9_DIGITS. */
+const PHONE_CONTEXT = /\b(?:call|text|phone|cell|mobile|tel|telephone|whatsapp|reach\s+me|contact\s+me)\b/i;
+const PHONE_BARE = /(?<![\d-])\+?1?\d{10}(?![\d-])/;
+
+/** DoD ID / EDIPI — the 10-digit number on a Common Access Card. */
+const EDIPI_CONTEXT = /\b(?:edipi|dod[\s-]*id|dod\s+(?:benefits\s+)?number|cac(?:\s*card)?\s*(?:number|no\b|#|id\b))/i;
+const TEN_DIGITS = /(?<!\d)\d{10}(?!\d)/;
+/** USCIS A-number / alien registration number / USCIS account number.
+ *  Deliberately requires the hyphenated "A-number" or "A#" form — the bare
+ *  phrase "a number" is ordinary English. */
+const A_NUMBER_CONTEXT =
+  /\bA-(?:number|no\b|#)|\bA#|\balien\s*(?:registration\s*)?(?:number|no\b|#)|\buscis\s*(?:#|number|no\b|account\s*number)|\bgreen\s*card\s*(?:number|no\b|#)/i;
+const A_NUMBER_SHAPE = /(?<!\w)A?-?\d{7,9}(?!\d)|(?<!\d)\d{3}[-\s]\d{3}[-\s]\d{3}(?!\d)/i;
+/** A USCIS receipt number (3-letter service-center code + 10 digits) — a
+ *  shape nothing else shares, so no keyword is required. */
+const USCIS_RECEIPT = /\b(?:EAC|WAC|LIN|SRC|NBC|MSC|IOE|YSC)[\s-]?\d{10}\b/i;
+const DRIVERS_LICENSE_CONTEXT = /\b(?:driver'?s?\s*licen[cs]e|driving\s*licen[cs]e|DL\s*(?:#|no\b|number))/i;
+/** 7–14 digits, optionally dash-separated, optionally after 1–2 letters.
+ *  7+ so a ZIP code or a salary figure in the same sentence doesn't count. */
+const DRIVERS_LICENSE_TOKEN = /\b[A-Za-z]{0,2}-?\d(?:-?\d){6,13}\b/;
+
+const STREET_SUFFIX =
+  "street|st|avenue|ave|road|rd|boulevard|blvd|drive|dr|lane|ln|way|court|ct|place|pl|terrace|ter|circle|cir|parkway|pkwy|highway|hwy|trail|trl";
+const STREET_ADDRESS = String.raw`\b\d{1,6}[ \t]{1,3}(?:[A-Za-z0-9.'-]{1,30}[ \t]{1,3}){0,4}(?:${STREET_SUFFIX})\b\.?(?:[ \t]{1,3}(?:n|s|e|w|ne|nw|se|sw)\b\.?)?`;
+/** A complete street address with city, state, and ZIP — specific enough to
+ *  flag on shape alone. */
+const FULL_ADDRESS = new RegExp(
+  String.raw`${STREET_ADDRESS}(?:,?[ \t]{1,3}(?:apt|unit|suite|ste|#)\.?[ \t]{0,3}[\w-]{1,10})?,?[ \t]{1,3}[A-Za-z][A-Za-z .'-]{0,40},?[ \t]{1,3}[A-Z]{2}[ \t]{1,3}\d{5}(?:-\d{4})?\b`,
+  "i",
+);
+/** A bare street address ("123 Main St") counts only next to a residence
+ *  keyword — "the 2 roles on Rocket Road" alone shouldn't. */
+const ADDRESS_CONTEXT =
+  /\b(?:i\s+live\s+at|i\s+live\s+on|my\s+(?:home\s+|mailing\s+|street\s+)?address|home\s+address|mailing\s+address|reside\s+at)\b/i;
+const STREET_ADDRESS_RE = new RegExp(STREET_ADDRESS, "i");
 
 /** The actual, un-obfuscated detectors. Operates on already-normalized,
  *  already-decoded plain text — see `scanTextForPiiCui` below, which is the
@@ -291,8 +415,9 @@ function scanPlainText(text: string): PiiFinding[] {
     }
   };
 
-  if (SSN_DASHED.test(text)) add("ssn");
-  else if (SSN_CONTEXT.test(text) && BARE_9_DIGITS.test(text)) add("ssn");
+  const ssnView = ssnDetectionView(text);
+  if (SSN_DASHED.test(text) || SSN_DASHED.test(ssnView) || SSN_MASKED.test(text) || SSN_LAST_FOUR.test(text)) add("ssn");
+  else if (SSN_CONTEXT.test(text) && (BARE_9_DIGITS.test(text) || BARE_9_DIGITS.test(ssnView))) add("ssn");
 
   if (
     BIRTH_CONTEXT.test(text) &&
@@ -323,8 +448,22 @@ function scanPlainText(text: string): PiiFinding[] {
 
   if (CLASSIFICATION_MARKING.test(text)) add("classification_marking");
 
-  if (EMAIL_SHAPE.test(text)) add("email");
-  if (PHONE_FORMATTED.test(text)) add("phone");
+  if (EMAIL_SHAPE.test(text) || (text.includes("@") && EMAIL_SPACED.test(text)) || (HAS_AT_TOKEN.test(text) && EMAIL_OBFUSCATED.test(text))) {
+    add("email");
+  }
+  const noUuids = text.replace(UUID_SHAPE, "");
+  if (PHONE_FORMATTED.test(text) || (PHONE_CONTEXT.test(text) && PHONE_BARE.test(noUuids))) add("phone");
+
+  if (
+    (EDIPI_CONTEXT.test(text) && TEN_DIGITS.test(noUuids)) ||
+    (A_NUMBER_CONTEXT.test(text) && A_NUMBER_SHAPE.test(noUuids)) ||
+    (DRIVERS_LICENSE_CONTEXT.test(text) && DRIVERS_LICENSE_TOKEN.test(noUuids))
+  ) {
+    add("government_id");
+  }
+  if (USCIS_RECEIPT.test(text)) add("case_number");
+
+  if (FULL_ADDRESS.test(text) || (ADDRESS_CONTEXT.test(text) && STREET_ADDRESS_RE.test(text))) add("address");
 
   return findings;
 }
