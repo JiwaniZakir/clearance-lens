@@ -104,6 +104,21 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
         `Checked requirement signals on the first ${toDetail.length} of those; narrower or broader search terms may surface more matches than this single call checked.`,
       );
     }
+    // Found live via the spec §5 agent-in-the-loop eval (DECISIONS.md D-016):
+    // a specific company's own public name (e.g. "Shield AI", "Castelion")
+    // routinely returns zero hits even when that company is real and does
+    // post roles elsewhere on the board — the underlying search appears to
+    // match only a narrow set of indexed fields, not the full description
+    // body. With no guidance, a zero-result reads as "that company/role
+    // doesn't exist" rather than "this specific query didn't match." Say so
+    // explicitly rather than let an empty list speak for itself.
+    if (rolesScanned === 0 && query) {
+      notes.push(
+        `No postings matched "${query}" at all. A company name alone often won't match — try a role type instead (e.g. "autonomy engineer" or "manufacturing engineer"), drop the query to browse everything in this industry, or check get_company_profile for that company directly. A real company can still have zero live postings right now even when it's actively hiring elsewhere.`,
+      );
+    } else if (page.length === 0 && rolesScanned > 0) {
+      notes.push(`${rolesScanned} postings matched the search terms, but none passed the clearance/itar_only filter — try loosening or removing it.`);
+    }
 
     return {
       roles: page.map(({ summary, signals }) => ({

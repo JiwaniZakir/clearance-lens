@@ -127,4 +127,40 @@ describe("search_defense_roles", () => {
     const result = await searchDefenseRolesTool.handler({ limit: 10 });
     expect(result.roles.map((r) => r.id)).toEqual(["ok-job"]);
   });
+
+  it("a zero-result query gets actionable broadening guidance, not a bare empty list (regression for DECISIONS.md D-016 — a real company name routinely returns zero hits with no explanation)", async () => {
+    vi.mocked(searchJobs).mockResolvedValueOnce({
+      total: 0,
+      page: 0,
+      page_size: 50,
+      total_pages: 0,
+      has_more: false,
+      next_page: null,
+      jobs: [],
+    });
+
+    const result = await searchDefenseRolesTool.handler({ query: "Shield AI", limit: 10 });
+    expect(result.roles).toEqual([]);
+    expect(result.note).toContain('No postings matched "Shield AI"');
+    expect(result.note.toLowerCase()).toContain("role type");
+    expect(result.note).toContain("get_company_profile");
+  });
+
+  it("results that exist but are all filtered out by clearance/itar_only get their own distinct guidance (not the zero-match message)", async () => {
+    vi.mocked(searchJobs).mockResolvedValueOnce({
+      total: 1,
+      page: 0,
+      page_size: 50,
+      total_pages: 1,
+      has_more: false,
+      next_page: null,
+      jobs: [summary({ id: "no-clearance-job" })],
+    });
+    vi.mocked(getJob).mockResolvedValueOnce(detail("Build dashboards, no clearance needed.", { id: "no-clearance-job" }));
+
+    const result = await searchDefenseRolesTool.handler({ clearance: "ts_sci", limit: 10 });
+    expect(result.roles).toEqual([]);
+    expect(result.note).not.toContain("No postings matched");
+    expect(result.note.toLowerCase()).toContain("loosening or removing it");
+  });
 });
