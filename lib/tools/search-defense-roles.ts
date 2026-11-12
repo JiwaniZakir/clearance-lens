@@ -215,11 +215,17 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
     // whichever filter(s) are actually active rather than guessing which
     // one is at fault.
     if (rolesScanned === 0 && (query || location)) {
-      const activeFilters = [
-        query ? `the keyword "${query}"` : null,
-        location ? `the location filter "${location}"` : null,
-      ].filter((f): f is string => f !== null);
+      // Named, never echoed: round 9 sent a marking ("CUI//SP-EXPT …") as a
+      // query and got it back in this note (D-047). The caller already knows
+      // what it searched for.
+      const activeFilters = [query ? "your keyword" : null, location ? "your location filter" : null].filter(
+        (f): f is string => f !== null,
+      );
       const filterList = activeFilters.join(" and ");
+      const requirementWordNote =
+        query && /\b(?:itar|clearance|secret|ts\/?sci|polygraph|poly|citizen\w*|u\.?s\.? person|export)\b/i.test(query)
+          ? " Requirement words like ITAR, clearance levels, or polygraph aren't matched as keywords (the keyword search covers role titles and companies) — use the clearance or itar_only filters instead, with a role type as the keyword."
+          : "";
       const suggestion =
         query && location
           ? `Try removing one filter at a time to isolate which is causing the mismatch — a company name alone often won't match on keyword, and a state/region name (vs. an exact city) often won't match on location.`
@@ -234,7 +240,7 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
       // assert any specific company is absent from the network.
       const scopeNote =
         "This searches only companies in the a16z speedrun Talent Network — an employer outside that network won't appear here at all, however it's searched.";
-      notes.push(`No postings matched ${filterList} at all. ${suggestion} ${scopeNote}`);
+      notes.push(`No postings matched ${filterList} at all.${requirementWordNote} ${suggestion} ${scopeNote}`);
     } else if (page.length === 0 && rolesScanned > 0) {
       notes.push(`${rolesScanned} postings matched the search terms, but none passed the clearance/itar_only filter — try loosening or removing it.`);
     }

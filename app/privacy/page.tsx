@@ -8,7 +8,7 @@ import { scanValueForPiiCui, buildFriendlyRejectionMessage, type PiiCategory } f
 export const metadata: Metadata = {
   title: "Privacy",
   description:
-    "What Clearance Lens receives, stores, refuses, and logs. Stateless by design: no account, no database, no PII.",
+    "What Clearance Lens receives, stores, refuses, and logs. No account, no PII, and almost nothing stored — one opt-in, anonymous exception.",
 };
 
 /**
@@ -32,6 +32,10 @@ const REFUSAL_CATEGORIES: Record<PiiCategory, string> = {
   phone: "Phone numbers",
   government_id: "Other government ID numbers (e.g. a DoD ID/EDIPI, USCIS A-number, or driver's license number)",
   address: "Street addresses (home or mailing)",
+  personal_name: "Your name (when you state it, e.g. \u201cmy name is\u2026\u201d)",
+  sensitive_disclosure:
+    "Sensitive personal details stated about yourself \u2014 arrests, health or disability, finances, polygraph results, religion, or age",
+  secret_credential: "Access tokens, passwords, and private keys",
 };
 
 // A real-shaped request to explain_rule's actual input field ("topic"),
@@ -80,7 +84,7 @@ export default function PrivacyPage() {
       <main id="main-content" className="mx-auto w-full max-w-[680px] flex-1 px-6 py-16 sm:py-20">
         <h1 className="text-[1.875rem] leading-[1.25] font-semibold tracking-[-0.005em] text-neutral-12">Privacy</h1>
         <p className="mt-3 text-[1.125rem] leading-[1.6] text-neutral-11">
-          Stateless by design. No account, no database, no PII.
+          No account. No PII. Almost nothing stored — and the one exception is opt-in and anonymous.
         </p>
 
         <section className="mt-10">
@@ -89,7 +93,7 @@ export default function PrivacyPage() {
           </h2>
           <p className="mt-3 text-base leading-[1.6] text-neutral-11">
             {
-              "A role ID, a rule topic, or fields you explicitly listed to include on a share card (for example a headline, availability, or a self-reported clearance/citizenship status). Nothing else — each tool call sends exactly the one small, specific input that tool needs, never everything your agent happens to know about you."
+              "A role ID, a search keyword, a rule topic, or a general status you choose to share (for example \u201cgreen card holder\u201d or \u201cSecret\u201d). For an intro card, only the names of the fields you want on it \u2014 your agent fills in your answers locally, so they never reach the server. Nothing else: each tool call sends exactly the small, specific input that tool needs, never everything your agent happens to know about you."
             }
           </p>
         </section>

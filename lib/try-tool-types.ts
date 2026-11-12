@@ -378,15 +378,28 @@ export interface ConsentedFields {
   notes?: string;
 }
 
+/** D-047: the server receives field NAMES only; values stay local. */
+export type CardFieldName = keyof ConsentedFields;
+
 export interface PrepareConsentedCardInput {
   role_id: string;
-  fields_user_approved: ConsentedFields;
+  approved_fields: CardFieldName[];
+}
+
+export interface CardTemplateField {
+  name: CardFieldName;
+  label: string;
+  placeholder: string;
+  kind: "text" | "list";
+  guidance: string;
 }
 
 export interface PrepareConsentedCardOutput {
   roleTitle: string;
   company: string;
-  card: { markdown: string; json: Record<string, unknown> };
+  cardTemplate: { markdown: string; fields: CardTemplateField[]; neverInclude: string };
+  evaluate_locally: true;
+  instructionsForAgent: string;
   notVerifiedNote: string;
   applyLink: { url: string; label: string } | null;
   sources: SourceRef[];
@@ -466,7 +479,8 @@ export interface GetAggregatedSignalInput {
 
 export interface GetAggregatedSignalOutput {
   scope: { type: "role" | "company"; label: string };
-  totalContributions: number;
+  /** Null until at least 5 people have contributed (D-048). */
+  totalContributions: number | null;
   meetsFloor: boolean;
   percentages: {
     clearanceLevel: Record<string, number> | null;

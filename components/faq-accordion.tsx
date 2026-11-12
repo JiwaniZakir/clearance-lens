@@ -18,7 +18,7 @@ const FAQ_ITEMS = [
   {
     question: "Does Clearance Lens store my data?",
     answer:
-      "No. The server is stateless — no account, no database, no query log of what you asked. It also rejects SSNs, dates of birth, and other identifying numbers outright rather than storing or forwarding them anywhere.",
+      "Almost nothing, and nothing about who you are. There are no accounts and no log of what you asked. The one exception is opt-in: if you explicitly choose to contribute to the anonymous signal pool, it stores the few general answers you picked (like a clearance level), with no name, contact, or identifier attached, and only ever shows them as rounded percentages once at least 5 people have contributed. Every request is scanned, and identifying details — SSNs, dates of birth, ID numbers, contact details, clearance records — are rejected outright, never stored or forwarded.",
   },
   {
     question: "How do agents actually use it?",

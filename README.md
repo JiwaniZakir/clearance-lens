@@ -2,7 +2,7 @@
 
 A stateless remote **MCP server** + web app that helps people pursue US defense-tech roles **from inside the AI agent they already use** — Claude, Cursor, ChatGPT, Grok, VS Code — instead of joining yet another platform.
 
-**Your agent does the private reasoning. The server is an almost entirely stateless, public-knowledge toolbox.** It never receives, stores, or logs PII, clearance details, or screenshots — it gives your agent rubrics, rules, timelines, and templates, and your agent evaluates them locally against what it already knows about you. (The one opt-in exception, and exactly what it does and doesn't store: see Architecture below.)
+**Your agent does the private reasoning. The server is an almost entirely stateless, public-knowledge toolbox.** It never asks for, stores, or logs PII, clearance records, or screenshots — and rejects them when they're sent. It takes only general statuses you choose to share (e.g. "green card holder"), and gives your agent rubrics, rules, timelines, and templates to evaluate locally against what it already knows about you. (The one opt-in exception, and exactly what it does and doesn't store: see Architecture below.)
 
 - **Production:** https://clearance-lens.vercel.app
 - **MCP endpoint:** `https://clearance-lens.vercel.app/mcp`
@@ -55,7 +55,7 @@ No agent handy? Try every tool directly at **[/try](https://clearance-lens.verce
 | `run_job_preview` | A 6-scene "first week" realistic simulation — played straight, not sanitized |
 | `fit_debrief` | Loved/disliked work-style tags → a summary template and questions to ask the company. Never a score. |
 | `get_company_profile` | Published facts + computed work realities — returns *gaps*, not a guess, when no sourced criteria exist |
-| `prepare_consented_card` | A shareable intro card from **only** the fields you explicitly approved |
+| `prepare_consented_card` | A fill-in intro card for **only** the fields you approve — your agent fills in your answers locally, so they never reach the server |
 | `prepare_signed_attestation` | Wraps a self-asserted claim (clearance level, citizenship status, or availability) in a credential your own agent signs locally — proves who signed it and when, never that the claim itself is true |
 | `contribute_anonymous_signal` | Opts one role-interest into an anonymous, aggregated signal pool — no name, contact info, or identifier of any kind |
 | `get_aggregated_signal` | Reads that pool back as rounded percentages for a role or company — never an individual record, never before at least 5 people have contributed |

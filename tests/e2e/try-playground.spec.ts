@@ -410,6 +410,30 @@ test.describe("/try — Consented card", () => {
     // as if they were — nothing invented beyond what was actually typed.
     await expect(page.getByText(/clearance_status_self_reported/)).toHaveCount(0);
   });
+
+  // D-047: the card is filled in locally. What reaches the server must be the
+  // field NAMES only — checked on the real network request, not assumed.
+  test("sends only the names of the filled-in fields — never what the user typed", async ({ page }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Consented card");
+    const picker = page.locator("div").filter({ hasText: "Pick a role to build an intro card for" }).first();
+    await pickFirstRole(picker);
+
+    const secretHeadline = "ZQX-local-only-headline";
+    await page.getByLabel("Headline").fill(secretHeadline);
+    await page.getByLabel("Notes").fill("ZQX-local-only-notes");
+
+    const requestPromise = page.waitForRequest((r) => r.url().includes("/api/tools/prepare_consented_card") && r.method() === "POST");
+    await page.getByRole("button", { name: "Build card" }).click();
+    const request = await requestPromise;
+    const body = request.postData() ?? "";
+    expect(body).not.toContain("ZQX-local-only");
+    expect(JSON.parse(body).approved_fields.sort()).toEqual(["headline", "notes"]);
+
+    // …and yet the finished card shows what was typed, filled in on this side.
+    await expect(page.getByText(secretHeadline).first()).toBeVisible({ timeout: LONG_TIMEOUT });
+    await expect(page.getByText(/\{\{/)).toHaveCount(0);
+  });
 });
 
 // Regression for DECISIONS.md D-029 (judging panel rounds 1 and 3): these

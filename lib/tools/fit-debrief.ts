@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { resolveRole, SPEEDRUN_SOURCE } from "@/lib/tools/role-shared";
+import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema } from "@/lib/tools/role-shared";
 import { FIT_TAGS, FIT_TAG_LABELS, FIT_TAG_QUESTIONS, type FitTag } from "@/data/fit-tags";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
@@ -7,7 +7,7 @@ import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 const TagEnum = z.enum(FIT_TAGS);
 
 const InputSchema = z.object({
-  role_id: z.string().min(1),
+  role_id: RoleIdSchema,
   loved: z.array(TagEnum).max(FIT_TAGS.length).default([]),
   disliked: z.array(TagEnum).max(FIT_TAGS.length).default([]),
 });

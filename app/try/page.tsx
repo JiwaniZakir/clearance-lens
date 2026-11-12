@@ -64,6 +64,7 @@ import {
 
 import { useToolCall } from "@/lib/use-tool-call";
 import { cn } from "@/lib/cn";
+import { fillCardTemplate, parseCard } from "@/lib/card-template";
 import { FIT_TAGS, FIT_TAG_LABELS } from "@/data/fit-tags";
 import type {
   SearchDefenseRolesInput,
@@ -95,6 +96,7 @@ import type {
   VerifyEvidenceOutput,
   PrepareConsentedCardInput,
   PrepareConsentedCardOutput,
+  CardFieldName,
   ConsentedFields,
   PickedRole,
   AttestationClearanceLevel,
@@ -1256,6 +1258,59 @@ function VerifyEvidenceTab() {
 /* Consented card                                                           */
 /* ------------------------------------------------------------------------ */
 
+/** Renders a filled intro card as formatted text — round 9 found raw
+ *  markdown (literal ** and #) shown to people. Values are text nodes only. */
+function CardPreview({ markdown }: { markdown: string }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-md bg-neutral-2 p-4 text-sm leading-[1.5] text-neutral-12">
+      {parseCard(markdown).map((b, i) => {
+        switch (b.type) {
+          case "heading":
+            return (
+              <p key={i} className="text-[1rem] font-semibold">
+                {b.text}
+              </p>
+            );
+          case "field":
+            return (
+              <p key={i} className="break-words">
+                <span className="font-medium">{b.label}:</span> {b.value}
+              </p>
+            );
+          case "list":
+            return (
+              <div key={i}>
+                <p className="font-medium">{b.label}:</p>
+                <ul className="ml-5 list-disc">
+                  {b.items.map((item, j) => (
+                    <li key={j} className="break-words">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          case "link":
+            return (
+              <p key={i}>
+                {b.prefix}
+                <a href={b.url} target="_blank" rel="noopener noreferrer" className="text-accent-11 underline-offset-2 hover:underline">
+                  {b.text}
+                </a>
+              </p>
+            );
+          default:
+            return (
+              <p key={i} className="break-words">
+                {b.text}
+              </p>
+            );
+        }
+      })}
+    </div>
+  );
+}
+
 function ConsentedCardTab() {
   const { data, error, loading, call } = useToolCall<PrepareConsentedCardInput, PrepareConsentedCardOutput>(
     "prepare_consented_card",
@@ -1269,17 +1324,24 @@ function ConsentedCardTab() {
     setFields((prev) => ({ ...prev, [key]: value || undefined }));
   }
 
+  // D-047: only the NAMES of the filled-in fields are sent; the values stay
+  // in this browser and are filled into the returned template right here —
+  // exactly what a user's own agent does locally.
+  const highlights = highlightsDraft
+    .split("\n")
+    .map((h) => h.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  const localValues: ConsentedFields = { ...fields, highlights: highlights.length > 0 ? highlights : undefined };
+  const approvedFields = (Object.keys(localValues) as CardFieldName[]).filter((k) => {
+    const v = localValues[k];
+    return Array.isArray(v) ? v.length > 0 : typeof v === "string" && v.trim() !== "";
+  });
+  const filledMarkdown = data ? fillCardTemplate(data.cardTemplate.markdown, data.cardTemplate.fields, localValues) : "";
+
   function buildCard() {
-    if (!selectedRole) return;
-    const highlights = highlightsDraft
-      .split("\n")
-      .map((h) => h.trim())
-      .filter(Boolean)
-      .slice(0, 5);
-    void call({
-      role_id: selectedRole.id,
-      fields_user_approved: { ...fields, highlights: highlights.length > 0 ? highlights : undefined },
-    });
+    if (!selectedRole || approvedFields.length === 0) return;
+    void call({ role_id: selectedRole.id, approved_fields: approvedFields });
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -1290,7 +1352,7 @@ function ConsentedCardTab() {
   async function handleCopy() {
     if (!data) return;
     try {
-      await navigator.clipboard.writeText(data.card.markdown);
+      await navigator.clipboard.writeText(filledMarkdown);
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch {
@@ -1305,8 +1367,8 @@ function ConsentedCardTab() {
 
       {selectedRole && (
         <DisclaimerBanner>
-          Only the fields you fill in below, exactly as you type them, are sent — nothing else about you, and
-          nothing is ever auto-shared or submitted on your behalf.
+          What you type stays in this browser. Only the names of the fields you fill in are sent, so Clearance Lens
+          never sees your answers — and nothing is ever auto-shared or submitted on your behalf.
         </DisclaimerBanner>
       )}
 
@@ -1373,7 +1435,7 @@ function ConsentedCardTab() {
               className="w-full rounded-sm border border-neutral-7 bg-neutral-1 px-3 py-2 text-sm text-neutral-12 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-8"
             />
           </div>
-          <Button type="submit" className="self-start">
+          <Button type="submit" className="self-start" disabled={approvedFields.length === 0}>
             Build card
           </Button>
         </form>
@@ -1396,9 +1458,8 @@ function ConsentedCardTab() {
               {copied ? "Copied" : "Copy"}
             </Button>
           </div>
-          <pre className="whitespace-pre-wrap rounded-md bg-neutral-2 p-3 font-mono text-[0.8125rem] leading-[1.5] text-neutral-12">
-            {data.card.markdown}
-          </pre>
+          <CardPreview markdown={filledMarkdown} />
+          <p className="text-[0.8125rem] leading-[1.4] text-neutral-10">{data.cardTemplate.neverInclude}</p>
           <p className="text-[0.8125rem] leading-[1.4] text-neutral-10">{data.notVerifiedNote}</p>
           {data.applyLink && (
             <a href={data.applyLink.url} target="_blank" rel="noopener noreferrer" className="text-sm text-accent-11 hover:text-accent-10">
@@ -1894,7 +1955,7 @@ function AggregateSignalTab() {
             <EmptyState
               icon={SearchX}
               title="Not enough contributions yet"
-              description={`Only ${data.totalContributions} so far — at least 5 are needed before any breakdown is shown, so a reader could never single out an early contributor.`}
+              description="Fewer than 5 so far. Until at least 5 people contribute, neither a breakdown nor an exact count is shown, so no one can single out an early contributor."
             />
           )}
           {data.meetsFloor && data.percentages && (

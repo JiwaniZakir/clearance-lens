@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { resolveRole, SPEEDRUN_SOURCE } from "@/lib/tools/role-shared";
+import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema, CompanySlugSchema } from "@/lib/tools/role-shared";
 import { getCompany } from "@/lib/speedrun/client";
 import { getSignalStore, getAggregate, MIN_CONTRIBUTORS, type AggregateBreakdown } from "@/lib/signal/store";
 import { DISCLAIMERS } from "@/lib/disclaimers";
@@ -21,8 +21,8 @@ import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 
 const InputSchema = z
   .object({
-    role_id: z.string().min(1).optional(),
-    company_slug: z.string().min(1).optional(),
+    role_id: RoleIdSchema.optional(),
+    company_slug: CompanySlugSchema.optional(),
   })
   .strict()
   .refine((obj) => (obj.role_id ? 1 : 0) + (obj.company_slug ? 1 : 0) === 1, {
@@ -33,7 +33,10 @@ const BreakdownFieldSchema = z.record(z.string(), z.number()).nullable();
 
 const OutputSchema = z.object({
   scope: z.object({ type: z.enum(["role", "company"]), label: z.string() }),
-  totalContributions: z.number(),
+  // Null below the floor. Round 9: exact counts under 5 (1, 2, 3) were
+  // returned, which lets a reader diff before/after their own call and pick
+  // out a single contributor's answer once the breakdown appears (D-048).
+  totalContributions: z.number().nullable(),
   meetsFloor: z.boolean(),
   percentages: z
     .object({
@@ -92,7 +95,7 @@ export const getAggregatedSignalTool: ToolDef<z.infer<typeof InputSchema>, z.inf
 
     return {
       scope: { type: scopeType, label },
-      totalContributions: breakdown.totalContributions,
+      totalContributions: breakdown.meetsFloor ? breakdown.totalContributions : null,
       meetsFloor: breakdown.meetsFloor,
       percentages: breakdown.meetsFloor
         ? {

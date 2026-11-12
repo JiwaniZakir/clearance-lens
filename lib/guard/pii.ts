@@ -27,7 +27,10 @@ export type PiiCategory =
   | "email"
   | "phone"
   | "government_id"
-  | "address";
+  | "address"
+  | "personal_name"
+  | "sensitive_disclosure"
+  | "secret_credential";
 
 export interface PiiFinding {
   category: PiiCategory;
@@ -49,6 +52,9 @@ const FRIENDLY_BY_CATEGORY: Record<PiiCategory, string> = {
   email: "This looks like it includes an email address. Clearance Lens never accepts contact info — your own agent already knows how to reach you privately; please remove it and continue without it.",
   phone: "This looks like it includes a phone number. Clearance Lens never accepts contact info — your own agent already knows how to reach you privately; please remove it and continue without it.",
   government_id: "This looks like it includes a government ID number (e.g. a DoD ID/EDIPI, a USCIS A-number, or a driver's license number). Clearance Lens never accepts ID numbers — please remove it. If your status matters, describe it in general terms (e.g. \"green card holder\").",
+  personal_name: "This looks like it includes your name. Clearance Lens never accepts names — your own agent knows who you are, and none of these tools needs it. Please remove it and continue.",
+  sensitive_disclosure: "This looks like it includes sensitive personal details — the kind a clearance investigation or an employer must handle carefully (e.g. arrests, health or disability, finances, polygraph results, religion, or age). Clearance Lens never accepts these; your own agent can weigh them privately. To ask how something is treated, ask in general terms (e.g. \"how does SEAD 4 treat a past DUI?\").",
+  secret_credential: "This looks like it includes an access token, password, or private key. Clearance Lens never accepts credentials — none of these tools needs one. Remove it, and rotate it if it was real.",
   address: "This looks like it includes a street address. Clearance Lens never accepts home or mailing addresses — please remove it. If location matters, a city or region is enough (e.g. \"open to roles near Huntsville\").",
 };
 
@@ -69,7 +75,7 @@ const SSN_CONTEXT = /\b(ssn|soc(?:ial)?[\s.-]*sec(?:urity)?|ss\s*#|my\s+social\b
 // Includes "." as a separator alongside "-"/space: confirmed against
 // Presidio's SSN5 pattern (research/R1-leverage.md §3.2) that a dotted SSN
 // (123.45.6789) is a real format in the wild this was missing.
-const SSN_DASHED = /\b\d{3}[-.\s]\d{2}[-.\s]\d{4}\b/;
+const SSN_DASHED = /\b\d{3}[-.\s/]\d{2}[-.\s/]\d{4}\b/;
 /** An isolated 9-digit run, only treated as an SSN when an SSN keyword is present
  *  somewhere in the same field. */
 const BARE_9_DIGITS = /\b\d{9}\b/;
@@ -347,8 +353,8 @@ const DIGIT_WORDS: Record<string, string> = {
 function ssnDetectionView(text: string): string {
   return text
     .replace(/\b(zero|oh|one|two|three|four|five|six|seven|eight|nine)\b/gi, (w) => DIGIT_WORDS[w.toLowerCase()])
-    .replace(/[ \t]*-[ \t]*/g, "-")
-    .replace(/(?<=\d)[ \t]+(?=\d)/g, "");
+    .replace(/\s*-\s*/g, "-")
+    .replace(/(?<=\d)\s+(?=\d)/g, "");
 }
 
 /** "jane.doe @ gmail.com" — spaces around the @. Subsumes EMAIL_SHAPE. */
@@ -404,6 +410,107 @@ const ADDRESS_CONTEXT =
   /\b(?:i\s+live\s+at|i\s+live\s+on|my\s+(?:home\s+|mailing\s+|street\s+)?address|home\s+address|mailing\s+address|reside\s+at)\b/i;
 const STREET_ADDRESS_RE = new RegExp(STREET_ADDRESS, "i");
 
+/* ------------------------------------------------------------------------ */
+/* Judging panel round 9 (D-047): 38 of 80 refuse-list payloads got through.  */
+/* ------------------------------------------------------------------------ */
+
+/** A bare 9-digit run with a valid SSN structure (area 001–899 except 666,
+ *  group 01–99, serial 0001–9999). D-014 required an SSN keyword for this,
+ *  but round 9 showed an unlabeled SSN ("software 078051120") accepted and
+ *  echoed. No legitimate input here carries a bare 9-digit run — role ids
+ *  are UUIDs (removed before this check), comp figures and years are shorter.
+ *  The stated cost: a 9-digit order or tracking number is rejected too. */
+const BARE_9 = /(?<![\d-])(\d{3})(\d{2})(\d{4})(?![\d-])/g;
+function hasBareValidSsnShape(text: string): boolean {
+  for (const m of text.matchAll(BARE_9)) {
+    const area = Number(m[1]);
+    if (area === 0 || area === 666 || area >= 900) continue;
+    if (Number(m[2]) === 0 || Number(m[3]) === 0) continue;
+    return true;
+  }
+  return false;
+}
+
+/** "birthdate 19880314" — compact YYYYMMDD; keyword-gated (8-digit runs are common). */
+const DATE_COMPACT = /\b(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\b/;
+
+/** I-94 admission record numbers (11 characters). */
+const I94 = /\bI-?94\b[^.\n]{0,30}?\b[0-9A-Z]{11}\b/i;
+
+/** "+44 7700 900123", "+15125550143" — a leading "+" and 8–15 digits is a
+ *  phone number in any country's format. */
+const INTL_PHONE = /(?<![\w+])\+\d[\d\s().-]{6,20}\d(?!\d)/g;
+function hasIntlPhone(text: string): boolean {
+  for (const m of text.matchAll(INTL_PHONE)) {
+    const digits = m[0].replace(/\D/g, "").length;
+    if (digits >= 8 && digits <= 15) return true;
+  }
+  return false;
+}
+
+/** Marking SYNTAX, not marking vocabulary: "what does FOUO mean?" is a
+ *  legitimate question, "CUI//SP-EXPT" is a marking. Banners and portion
+ *  marks use "//"; legends are recognizable sentences. Round 9 found
+ *  "TOP SECRET//SCI" ("SCI" wasn't in the old list), "S//REL TO USA, FVEY"
+ *  (abbreviated level, no parentheses), and every CUI form passing. */
+const MARKING_BANNER =
+  /\b(?:top\s+secret|secret|confidential|unclassified|controlled|cui)\s*\/\/\s*[a-z0-9]/i;
+const MARKING_ABBREVIATED = /(?<![\w/])(?:TS|S|C|U)\s*\/\/\s*(?:[A-Z]{2,}|REL\b)/;
+const MARKING_PORTION = /\(\s*(?:TS|S|C|U|CUI)\s*\/\/[^)]{1,40}\)|(?<!information\s)\(\s*CUI\s*\)/i;
+/** All-caps banner lines (a question uses normal case). */
+const MARKING_ALLCAPS_PHRASE =
+  /\b(?:ITAR|EXPORT)[ -]CONTROLLED\b|\bCONTROLLED UNCLASSIFIED INFORMATION\b|\bFOR OFFICIAL USE ONLY\b|\bREL TO (?:USA|FVEY|[A-Z]{3})\b|\bNOFORN\b(?=[\s,;/)]*(?:$|\n|[A-Z]{2,}))|\bDISTRIBUTION STATEMENT [B-F]\b/;
+/** Legend text — the sentences printed on controlled documents. */
+const MARKING_LEGEND =
+  /\bdistribution authorized to\b|\bexport (?:of (?:this|these)[^.]{0,40}|is )restricted by the arms export control act\b|\barms export control act\b[^.]{0,80}\b(?:title 22|criminal penalties|severe penalties)\b|\bwarning\s*[-:–—]\s*this document contains technical data\b|\bdestruction notice\b[^.]{0,40}\bdestroy\b/i;
+/** Described controlled technical data being handed over: a label plus a
+ *  colon introducing content ("ITAR-controlled technical data: …"), or a
+ *  tolerance spec alongside an ITAR/export-control label. A question about
+ *  ITAR data ("will I handle ITAR-controlled data?") has neither. */
+const CONTROLLED_DATA_CONTENT =
+  /\b(?:itar|export)[- ]controlled\b[^.\n]{0,40}?\b(?:technical data|drawings?|schematics?|specs?|specifications?|blueprints?|tolerances?|source code)\s*[:=]\s*\S|\b(?:itar|export)[- ]controlled\b[^.\n]{0,80}[±]\s*\d|\bitar[- ]controlled (?:schematics?|drawings?|blueprints?)\b/i;
+
+/** Adjudication history and record fields — round 9: "My TS was granted …
+ *  after SOR for Guideline H", "An incident report was filed in DISS",
+ *  "Eligibility: TS; Access: SCI; Investigation Type: SSBI". A general
+ *  question ("what is a Statement of Reasons?") names no outcome. */
+const ADJUDICATION_HISTORY =
+  /\b(?:sor|statement of reasons|letter of denial|letter of revocation|lod|lor)\b[^.]{0,60}\bguideline\s+[a-m]\b|\bincident report\b[^.]{0,40}\b(?:filed|entered|submitted|recorded|logged)\b[^.]{0,30}\b(?:diss|jpas|nbis|e-?qip)\b|\b(?:my|i|i've|i was|we)\b[^.]{0,30}\b(?:received|got|was issued|was sent)\b[^.]{0,20}\b(?:an? )?(?:sor|statement of reasons|letter of denial|letter of revocation)\b/i;
+const RECORD_FIELD =
+  /\b(?:eligibility|access|investigation(?:\s+type)?|adjudication(?:\s+date)?|closed date|ce enrollment|sii)\s*:\s*(?:ts\b|sci\b|s\b|secret|top secret|confidential|t[1-5]r?\b|ssbi|sbpr|naclc|anaci|pr\b|favorabl|enrolled|denied|revoked)/gi;
+
+/** First-person sensitive disclosures. Round 9: a failed polygraph, a DUI,
+ *  mental-health history, religion, age, and disability put on an
+ *  employer-facing card. Asking in general terms ("does a DUI disqualify
+ *  someone?") passes; stating it about yourself doesn't. */
+const SENSITIVE_DISCLOSURE =
+  /\b(?:i|i've|i have|i had|i was|i'm|i am|my)\b[^.]{0,30}?\b(?:failed (?:a |my |the )?poly(?:graph)?|dui|dwi|arrested|convicted|felony|misdemeanou?r|bankrupt\w*|foreclos\w*|rehab\b|in treatment for|psychiatric|hospitali[sz]ed for|diagnosed with|adhd|ptsd|bipolar|schizophreni\w*|on probation|on parole)\b|\bi(?:'m| am)\s+(?:\d{2}|[a-z]+(?:-[a-z]+)?)\s+years?\s+old\b|\b(?:i(?:'m| am)|as)\s+an?\s+(?:practicing\s+|devout\s+)?(?:muslim|christian|jew|jewish|hindu|buddhist|sikh|catholic|mormon|atheist)\b|\bi(?:'m| am)\s+(?:pregnant|disabled|deaf|blind)\b|\bmy (?:religion|race|ethnicity|disability|age|national origin|nationality|diagnosis) is\b/i;
+
+/** "CA DL D1234567" — a state code or "DL" directly followed by a license-shaped
+ *  token (round 9), with no "#"/"number" between them. Case-sensitive. */
+const DL_INLINE = /\bDL\s+[A-Z]{0,2}\d{5,13}\b/;
+
+/** "Jane Q. Doe, 1600 Pennsylvania Ave NW" (round 9): a full name directly
+ *  followed by a street address. Either alone stays allowed — "the office at
+ *  2000 Avenue of the Stars" is a company address. */
+const NAME_COMMA_BEFORE_DIGIT = /\b[A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+,\s*(?=\d)/g;
+const STREET_AT_START = new RegExp(`^${STREET_ADDRESS}`, "i");
+function hasNameThenStreet(text: string): boolean {
+  for (const m of text.matchAll(NAME_COMMA_BEFORE_DIGIT)) {
+    if (STREET_AT_START.test(text.slice(m.index! + m[0].length))) return true;
+  }
+  return false;
+}
+
+/** "My name is Jane Doe" / "Name: Jane Doe" — explicit self-identification only. */
+const PERSONAL_NAME = /\b[Mm][Yy] [Nn][Aa][Mm][Ee] [Ii][Ss]\s+[A-Z][a-z]+(?:\s+[A-Z]\.?)?(?:\s+[A-Z][a-z]+)?|\b[Nn]ame\s*:\s*[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-z]+/;
+
+/** Tokens and private keys. Round 9: a GitHub token (ghp_…) was accepted
+ *  and echoed. The Ed25519 PKCS#8 prefix catches a private key pasted where
+ *  prepare_signed_attestation's public key belongs. */
+const SECRET_CREDENTIAL =
+  /\bgh[pousr]_[A-Za-z0-9]{36,}\b|\bgithub_pat_[A-Za-z0-9_]{22,}\b|\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}\b|\bAKIA[0-9A-Z]{16}\b|\bxox[baprs]-[A-Za-z0-9-]{10,}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----|\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b|\bMC4CAQAwBQYDK2VwBCIEI[A-Za-z0-9+/]{20,}={0,2}|\bpassword\s*[:=]\s*\S{4,}/i;
+
 /** The actual, un-obfuscated detectors. Operates on already-normalized,
  *  already-decoded plain text — see `scanTextForPiiCui` below, which is the
  *  only caller and the thing that actually runs against raw user input. */
@@ -416,8 +523,10 @@ function scanPlainText(text: string): PiiFinding[] {
   };
 
   const ssnView = ssnDetectionView(text);
+  const noUuidsForSsn = text.replace(UUID_SHAPE, "");
   if (SSN_DASHED.test(text) || SSN_DASHED.test(ssnView) || SSN_MASKED.test(text) || SSN_LAST_FOUR.test(text)) add("ssn");
   else if (SSN_CONTEXT.test(text) && (BARE_9_DIGITS.test(text) || BARE_9_DIGITS.test(ssnView))) add("ssn");
+  else if (hasBareValidSsnShape(noUuidsForSsn)) add("ssn");
 
   if (
     BIRTH_CONTEXT.test(text) &&
@@ -426,6 +535,7 @@ function scanPlainText(text: string): PiiFinding[] {
       DATE_MONTH_DAY_YEAR.test(text) ||
       DATE_DAY_MONTH_YEAR.test(text) ||
       BARE_YEAR.test(text) ||
+      DATE_COMPACT.test(text) ||
       SPELLED_OUT_DATE.test(text))
   ) {
     add("dob");
@@ -446,24 +556,40 @@ function scanPlainText(text: string): PiiFinding[] {
 
   if (CREDIT_CARD_SHAPE.test(text.replace(UUID_SHAPE, ""))) add("credit_card");
 
-  if (CLASSIFICATION_MARKING.test(text)) add("classification_marking");
+  if (
+    CLASSIFICATION_MARKING.test(text) ||
+    MARKING_BANNER.test(text) ||
+    MARKING_ABBREVIATED.test(text) ||
+    MARKING_PORTION.test(text) ||
+    MARKING_ALLCAPS_PHRASE.test(text) ||
+    MARKING_LEGEND.test(text) ||
+    CONTROLLED_DATA_CONTENT.test(text)
+  ) {
+    add("classification_marking");
+  }
+  if (ADJUDICATION_HISTORY.test(text) || (text.match(RECORD_FIELD) ?? []).length >= 2) add("clearance_record");
+  if (SENSITIVE_DISCLOSURE.test(text)) add("sensitive_disclosure");
+  if (PERSONAL_NAME.test(text)) add("personal_name");
+  if (SECRET_CREDENTIAL.test(text)) add("secret_credential");
 
   if (EMAIL_SHAPE.test(text) || (text.includes("@") && EMAIL_SPACED.test(text)) || (HAS_AT_TOKEN.test(text) && EMAIL_OBFUSCATED.test(text))) {
     add("email");
   }
   const noUuids = text.replace(UUID_SHAPE, "");
-  if (PHONE_FORMATTED.test(text) || (PHONE_CONTEXT.test(text) && PHONE_BARE.test(noUuids))) add("phone");
+  if (PHONE_FORMATTED.test(text) || (PHONE_CONTEXT.test(text) && PHONE_BARE.test(noUuids)) || hasIntlPhone(noUuids)) add("phone");
 
   if (
     (EDIPI_CONTEXT.test(text) && TEN_DIGITS.test(noUuids)) ||
     (A_NUMBER_CONTEXT.test(text) && A_NUMBER_SHAPE.test(noUuids)) ||
-    (DRIVERS_LICENSE_CONTEXT.test(text) && DRIVERS_LICENSE_TOKEN.test(noUuids))
+    (DRIVERS_LICENSE_CONTEXT.test(text) && DRIVERS_LICENSE_TOKEN.test(noUuids)) ||
+    I94.test(text) ||
+    DL_INLINE.test(text)
   ) {
     add("government_id");
   }
   if (USCIS_RECEIPT.test(text)) add("case_number");
 
-  if (FULL_ADDRESS.test(text) || (ADDRESS_CONTEXT.test(text) && STREET_ADDRESS_RE.test(text))) add("address");
+  if (FULL_ADDRESS.test(text) || (ADDRESS_CONTEXT.test(text) && STREET_ADDRESS_RE.test(text)) || hasNameThenStreet(text)) add("address");
 
   return findings;
 }
@@ -486,8 +612,44 @@ const DASH_LOOKALIKES = /[‐‑‒–—−]/g;
 /** Normalizes text before any detector runs: NFKC folds full-width digits and
  *  FULLWIDTH HYPHEN-MINUS to standard ASCII; the two replace()s close the
  *  remaining gaps NFKC doesn't cover (verified empirically — see above). */
+/** Zero code points of the decimal-digit blocks NFKC leaves alone (round 9:
+ *  an SSN in Arabic-Indic digits passed). Fullwidth/mathematical digits are
+ *  already folded by NFKC. */
+const DIGIT_ZEROS = [0x0660, 0x06f0, 0x07c0, 0x0966, 0x09e6, 0x0a66, 0x0ae6, 0x0b66, 0x0be6, 0x0c66, 0x0ce6, 0x0d66, 0x0de6, 0x0e50, 0x0ed0, 0x0f20, 0x1040, 0x1090, 0x17e0, 0x1810, 0x1946, 0x19d0, 0x1a80, 0x1a90, 0x1b50, 0x1bb0, 0x1c40, 0x1c50, 0xa620, 0xa8d0, 0xa900, 0xa9d0, 0xaa50, 0xabf0];
+function foldDigits(text: string): string {
+  return text.replace(/\p{Nd}/gu, (ch) => {
+    const cp = ch.codePointAt(0)!;
+    if (cp <= 0x39) return ch;
+    const zero = DIGIT_ZEROS.find((z) => cp >= z && cp <= z + 9);
+    return zero === undefined ? ch : String(cp - zero);
+  });
+}
+
+/** Cyrillic/Greek letters that render identically to Latin ones (round 9: a
+ *  homoglyph "SECRET//NOFORN" passed). Detection-only view, never shown. */
+const CONFUSABLES: Record<string, string> = {
+  А: "A", В: "B", С: "C", Е: "E", Н: "H", І: "I", Ј: "J", К: "K", М: "M", О: "O", Р: "P", Ѕ: "S", Т: "T", Х: "X", У: "Y",
+  а: "a", с: "c", е: "e", і: "i", ј: "j", о: "o", р: "p", ѕ: "s", х: "x", у: "y", ԁ: "d", ԛ: "q", ԝ: "w",
+  Α: "A", Β: "B", Ε: "E", Ζ: "Z", Η: "H", Ι: "I", Κ: "K", Μ: "M", Ν: "N", Ο: "O", Ρ: "P", Τ: "T", Υ: "Y", Χ: "X",
+  ο: "o", ν: "v", ρ: "p", ι: "i", κ: "k", τ: "t", υ: "u", χ: "x",
+};
+const CONFUSABLE_RE = new RegExp(`[${Object.keys(CONFUSABLES).join("")}]`, "g");
+
 function normalizeForScan(text: string): string {
-  return text.normalize("NFKC").replace(INVISIBLE_CHARS, "").replace(DASH_LOOKALIKES, "-");
+  return foldDigits(text.normalize("NFKC"))
+    .replace(INVISIBLE_CHARS, "")
+    .replace(DASH_LOOKALIKES, "-")
+    .replace(CONFUSABLE_RE, (ch) => CONFUSABLES[ch]);
+}
+
+/** "&#53;36-22-8790" (round 9) — decode numeric and the common named HTML
+ *  entities as one more view of the text, like the URI-decode passes. */
+function tryHtmlEntityDecode(text: string): string | null {
+  if (!/&(?:#\d{1,7}|#x[0-9a-f]{1,6}|amp|lt|gt|quot|apos|nbsp);/i.test(text)) return null;
+  return text
+    .replace(/&#(\d{1,7});/g, (_, d) => String.fromCodePoint(Math.min(Number(d), 0x10ffff)))
+    .replace(/&#x([0-9a-f]{1,6});/gi, (_, h) => String.fromCodePoint(Math.min(parseInt(h, 16), 0x10ffff)))
+    .replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&apos;/gi, "'").replace(/&nbsp;/gi, " ");
 }
 
 /** Self-inverse: rot13(rot13(x)) === x. Digits/punctuation pass through
@@ -581,6 +743,9 @@ function scanTextForPiiCui(text: string): PiiFinding[] {
 
   merge(scanPlainText(rot13(normalized)));
 
+  const entityDecoded = tryHtmlEntityDecode(normalized);
+  if (entityDecoded !== null) merge(scanPlainText(normalizeForScan(entityDecoded)));
+
   let current = normalized;
   for (let i = 0; i < MAX_URI_DECODE_PASSES; i++) {
     const decoded = tryUriDecode(current);
@@ -594,90 +759,6 @@ function scanTextForPiiCui(text: string): PiiFinding[] {
     if (decodedToken) merge(scanPlainText(decodedToken));
   }
 
-  return findings;
-}
-
-/**
- * Scans a flat record's string/string[] values JOINED TOGETHER in a fixed,
- * caller-specified key order, in addition to (never instead of) the normal
- * per-field scan every tool already gets via `scanValueForPiiCui`. This
- * exists for one documented, narrow case: a tool whose output deliberately
- * echoes the raw input verbatim (`prepare_consented_card`) is worth the
- * false-positive cost of catching PII a user split across two sibling
- * fields (e.g. "123-45" in one field, "6789" in another) specifically
- * because that output is about to be shared externally — see
- * BLOCKERS.md B-001 / DECISIONS.md for why this is NOT applied globally
- * (demonstrated false positive: an ordinary search query plus an ordinary
- * street address can concatenate into an SSN shape; most tools' fields
- * don't describe one person's identity the way a share-card's do).
- * `keyOrder` should be the field order from a real published schema, fixed,
- * not derived from object insertion order (which a client controls).
- */
-export function scanConcatenatedFields(
-  fields: Record<string, unknown>,
-  keyOrder: string[],
-): PiiFinding[] {
-  const parts: string[] = [];
-  for (const key of keyOrder) {
-    const value = fields[key];
-    if (typeof value === "string") parts.push(value);
-    else if (Array.isArray(value)) {
-      for (const item of value) if (typeof item === "string") parts.push(item);
-    }
-  }
-  const joined = parts.join(" ");
-  const findings = scanTextForPiiCui(joined);
-
-  // Found live via the spec §6 judging panel round 8 (trust_skeptic):
-  // splitting an SSN across fields WITH filler text between the digit
-  // groups (headline "SSN part A 123-45", notes "SSN part B 6789 thanks")
-  // defeated the contiguous-pattern scan of the joined text above, and
-  // both fragments were echoed into the shareable card. Pattern matching
-  // on the digit groups' shapes can always be defeated by inserting more
-  // filler or decoy digits, so this keys on what can't be removed: an
-  // explicit SSN reference plus at least 9 digits anywhere in the card —
-  // inserting decoy digits only makes it MORE likely to fire. Scoped to
-  // this shareable card only: elsewhere, a question like "do I need an
-  // SSN for a clearance?" is legitimate, but an intro card meant for an
-  // employer has no reason to mention an SSN at all, so the false-positive
-  // cost (asking someone to drop an SSN mention) is the right remedy anyway.
-  const digitCount = (joined.match(/\d/g) ?? []).length;
-  if (SSN_CONTEXT.test(normalizeForScan(joined)) && digitCount >= 9 && !findings.some((f) => f.category === "ssn")) {
-    findings.push({ category: "ssn", message: FRIENDLY_BY_CATEGORY.ssn });
-  }
-  return findings;
-}
-
-/** A bare, isolated 9-digit run with NO keyword context at all — the normal
- * scanner's `BARE_9_DIGITS` deliberately requires `SSN_CONTEXT` nearby
- * (see that const's own comment) because applied globally, a context-free
- * 9-digit check would false-positive on ordinary numeric content elsewhere
- * in this product (a role_id fragment, a comp figure, a zip+4). Found live
- * via the spec §6 judging panel round 2: `prepare_consented_card` — the one
- * tool that echoes raw input into a shareable, externally-facing card — was
- * bypassed by a bare SSN-shaped number ("123456789") and a bare passport-
- * shaped "ID number" ("912345678"), each entirely unlabeled. For this one
- * tool specifically, the false-positive cost of flagging ANY bare 9-digit
- * run is worth paying (same reasoning BLOCKERS.md B-001/DECISIONS.md D-014
- * already used to justify this tool's own stricter `extraGuard`): a
- * legitimate card field (headline, highlights, notes, availability) has no
- * ordinary reason to contain 9 consecutive digits with nothing else
- * explaining them. Reported under the "ssn" category — not perfectly
- * precise (it could be a passport/other ID), but directionally correct and
- * the recommended fix (restate in general terms) applies either way. */
-export function scanForBareIdentifierShapes(fields: Record<string, unknown>): PiiFinding[] {
-  const findings: PiiFinding[] = [];
-  const checkString = (s: string) => {
-    if (BARE_9_DIGITS.test(s) && findings.length === 0) {
-      findings.push({ category: "ssn", message: FRIENDLY_BY_CATEGORY.ssn });
-    }
-  };
-  for (const value of Object.values(fields)) {
-    if (typeof value === "string") checkString(value);
-    else if (Array.isArray(value)) {
-      for (const item of value) if (typeof item === "string") checkString(item);
-    }
-  }
   return findings;
 }
 
@@ -703,9 +784,12 @@ export function scanValueForPiiCui(value: unknown, depth = 0): PiiFinding[] {
     return value.flatMap((item) => scanValueForPiiCui(item, depth + 1));
   }
   if (value && typeof value === "object") {
-    return Object.values(value as Record<string, unknown>).flatMap((v) =>
-      scanValueForPiiCui(v, depth + 1),
-    );
+    // Keys too: round 9 sent an SSN as a JSON key, and zod's
+    // "Unrecognized key" error echoed it back (D-047).
+    return Object.entries(value as Record<string, unknown>).flatMap(([k, v]) => [
+      ...scanTextForPiiCui(k),
+      ...scanValueForPiiCui(v, depth + 1),
+    ]);
   }
   return [];
 }

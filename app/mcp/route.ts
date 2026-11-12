@@ -7,6 +7,15 @@ import { RULES, RULES_LAST_VERIFIED } from "@/lib/rules-data";
 import { TIMELINES, TIMELINES_LAST_VERIFIED } from "@/lib/timelines-data";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 
+const SERVER_INSTRUCTIONS = [
+  "Clearance Lens helps someone pursue defense-tech roles at a16z speedrun companies — and helps those startups hire — from inside their own agent.",
+  "Start with search_defense_roles; its roles[].id is the role_id and roles[].companySlug the company_slug every other tool takes.",
+  "Everything about the user stays with you: get_role_rubric and readiness_brief are for you to evaluate privately; prepare_consented_card returns a template you fill in locally. Never send names, contact details, ID numbers, dates of birth, or clearance records — every input is scanned and rejected if it contains them. Pass status only in general terms (e.g. citizenship_status: \"green_card\").",
+  "A U.S. security clearance requires U.S. citizenship; a green card satisfies ITAR's U.S.-person test, not a clearance (explain_rule \"clearance-citizenship\").",
+  "contribute_anonymous_signal writes to a shared anonymous pool: call it only after the user explicitly agrees, every time.",
+  "For a hiring team: generate_interview_guide, build_trial_assessment, and run_job_preview are built from the posting alone; verify_signed_attestation checks a credential a candidate shares. Nothing here scores or ranks people.",
+].join(" ");
+
 function promptMessage(text: string) {
   return { messages: [{ role: "user" as const, content: { type: "text" as const, text } }] };
 }
@@ -37,8 +46,9 @@ const handler = createMcpHandler(
           // never calls its express_interest tool). Declared here, not just
           // in prose, so a calling agent's own tool-use policy can rely on
           // it structurally. Flagged as missing by the spec's own plan and
-          // independently by the judging panel (round 3).
-          annotations: { readOnlyHint: true },
+          // independently by the judging panel (round 3). The one exception,
+          // contribute_anonymous_signal, declares its own (D-048).
+          annotations: def.annotations ?? { readOnlyHint: true },
         },
         async (input: unknown) => {
           const result = await callTool(def, input);
@@ -167,17 +177,21 @@ const handler = createMcpHandler(
       {
         title: "Share an intro card with a new company",
         description:
-          "Builds (or re-shares) a consented intro card for a role -- fast the 2nd+ time, since nothing is stored here between calls.",
+          "Builds (or re-shares) a consented intro card for a role, filled in by your agent locally -- fast the 2nd+ time, since nothing is stored here between calls.",
         argsSchema: z.object({ role_id: z.string().describe("A role id from search_defense_roles.") }),
       },
       ({ role_id }) =>
         promptMessage(
-          `I want to share an intro card for role_id="${role_id}". If you already know what I'm comfortable sharing (clearance_status_self_reported, citizenship_status_self_reported, headline, highlights, github_username, availability, notes) from earlier in this conversation, don't re-run the whole interview -- just read back what you'd use, let me quickly say "yes" or tell you what to change for this specific company, then call prepare_consented_card with role_id="${role_id}" and only the fields I've actually approved for THIS company. If this is the first time, ask me which of those fields I want to share, then call it the same way. Every call needs my explicit approval again, even if the values are identical to last time -- this server never remembers a prior answer itself (see DECISIONS.md D-034), so re-confirming quickly is the fast path here, not a workaround to skip.`,
+          `I want to share an intro card for role_id="${role_id}". If you already know what I'm comfortable sharing (clearance_status_self_reported, citizenship_status_self_reported, headline, highlights, github_username, availability, notes) from earlier in this conversation, don't re-run the whole interview -- just read back what you'd use, let me quickly say "yes" or tell you what to change for this specific company. Then call prepare_consented_card with role_id="${role_id}" and approved_fields set to the NAMES of the fields I approved for THIS company (never their values), fill in the template it returns yourself, locally, show me the finished card, and get my final yes before I send it. If this is the first time, ask me which of those fields I want to share first. Every card needs my explicit approval again, even if the values are identical to last time -- this server never sees or remembers my answers (see DECISIONS.md D-034, D-047).`,
         ),
     );
   },
   {
     serverInfo: { name: "clearance-lens", version: "0.1.0" },
+    // Connector research (D-048): grok.com, Grok Bot, and the Muse app don't
+    // surface MCP prompts, so the workflow they encode has to reach the agent
+    // here too, or nothing tells it to search first.
+    instructions: SERVER_INSTRUCTIONS,
   },
 );
 
@@ -242,45 +256,63 @@ function withCors(response: Response): Response {
  * the body stream so the original request, consumed by `handler()` below,
  * is unaffected.
  */
-async function rejectPiiInRawToolCall(request: Request): Promise<Response | null> {
+/** Round 9 (D-047) found the rest of the MCP surface unguarded: prompts/get
+ *  echoed an SSN passed as role_id into its prompt text, and unknown-tool and
+ *  resource-not-found errors echoed whatever name or URI was sent. Every
+ *  request's params — tool names, arguments, prompt arguments, resource URIs,
+ *  and key names — are now scanned before the SDK sees any of it. */
+async function rejectPiiInRawRequest(request: Request): Promise<Response | null> {
   let body: unknown;
   try {
     body = await request.clone().json();
   } catch {
     return null; // Not JSON (or no body) — nothing to pre-scan; the SDK's own parser reports this.
   }
-  if (!body || typeof body !== "object" || (body as { method?: unknown }).method !== "tools/call") return null;
-  const params = (body as { params?: { arguments?: unknown } }).params;
-  try {
-    assertNoPiiCui(params?.arguments);
-  } catch (err) {
-    if (!(err instanceof PiiCuiError)) throw err;
-    const id = (body as { id?: unknown }).id ?? null;
-    // A JSON-RPC SUCCESS wrapping an isError:true CallToolResult — the same
-    // shape the per-tool handler below produces for an in-schema PII
-    // rejection — not a top-level JSON-RPC `error`. The two read very
-    // differently to a calling agent: `result.isError` is a normal,
-    // expected tool outcome its own error-handling code already deals with,
-    // while a protocol-level `error` is a transport failure most MCP
-    // client SDKs throw as an exception instead of returning (confirmed:
-    // this exact mismatch broke this project's own existing protocol-suite
-    // test on the first version of this fix).
-    return Response.json({
-      jsonrpc: "2.0",
-      id,
-      result: { content: [{ type: "text", text: err.message }], isError: true },
-    });
+  const messages = Array.isArray(body) ? body : [body];
+  for (const message of messages) {
+    if (!message || typeof message !== "object") continue;
+    const { method, params, id } = message as { method?: unknown; params?: unknown; id?: unknown };
+    try {
+      assertNoPiiCui(params);
+    } catch (err) {
+      if (!(err instanceof PiiCuiError)) throw err;
+      // A notification has no id and expects no reply: drop it unprocessed.
+      if (id === undefined) return new Response(null, { status: 202 });
+      if (method === "tools/call") {
+        // A JSON-RPC SUCCESS wrapping an isError:true CallToolResult — the
+        // same shape the per-tool handler produces for an in-schema PII
+        // rejection. A protocol-level `error` reads as a transport failure
+        // most MCP client SDKs throw instead of returning (confirmed: that
+        // mismatch broke this project's own protocol suite once).
+        return Response.json({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: err.message }], isError: true } });
+      }
+      return Response.json({ jsonrpc: "2.0", id, error: { code: -32602, message: err.message } });
+    }
   }
   return null;
+}
+
+/** The Streamable HTTP spec has clients accept both JSON and SSE; this server
+ *  answers 406 otherwise. An agent that writes its own client (Muse builds
+ *  custom connectors itself) may send just one, or none, so the header is
+ *  normalized rather than rejected (D-048). */
+async function withAcceptNormalized(request: Request): Promise<Request> {
+  const accept = request.headers.get("accept") ?? "";
+  if (/application\/json/i.test(accept) && /text\/event-stream/i.test(accept)) return request;
+  const headers = new Headers(request.headers);
+  headers.set("accept", "application/json, text/event-stream");
+  // A fresh Request, not `new Request(request, …)`: re-wrapping Next's own
+  // request object throws on its private fields (found in a local build).
+  return new Request(request.url, { method: request.method, headers, body: await request.arrayBuffer() });
 }
 
 async function corsGET(request: Request) {
   return withCors(await handler(request));
 }
 async function corsPOST(request: Request) {
-  const rejected = await rejectPiiInRawToolCall(request);
+  const rejected = await rejectPiiInRawRequest(request);
   if (rejected) return withCors(rejected);
-  return withCors(await handler(request));
+  return withCors(await handler(await withAcceptNormalized(request)));
 }
 function OPTIONS() {
   return withCors(new Response(null, { status: 204 }));

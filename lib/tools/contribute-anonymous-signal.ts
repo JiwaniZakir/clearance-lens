@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { resolveRole, SPEEDRUN_SOURCE } from "@/lib/tools/role-shared";
+import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema } from "@/lib/tools/role-shared";
 import { getSignalStore, MIN_CONTRIBUTORS, COOLDOWN_MS, type SignalContribution } from "@/lib/signal/store";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
@@ -26,7 +26,7 @@ const ContributionSchema = z
   .refine((obj) => Object.keys(obj).length > 0, { message: "At least one bucket is required" });
 
 const InputSchema = z.object({
-  role_id: z.string().min(1),
+  role_id: RoleIdSchema,
   contribution: ContributionSchema,
 });
 
@@ -43,6 +43,10 @@ export const contributeAnonymousSignalTool: ToolDef<z.infer<typeof InputSchema>,
   title: "Contribute to a role's anonymous aggregate signal",
   description:
     "Opts this one role-interest into an anonymous, aggregated signal pool other tools (get_aggregated_signal) can read back as a rounded percentage once enough people have contributed — never as an individual record. Carries no name, contact info, or identifier of any kind, only closed-enum buckets (clearance_level, citizenship_status, years_experience_bucket) you explicitly choose to include. Call this only when the candidate has explicitly agreed to contribute — it is never implied by calling any other tool.",
+  // Writes to the shared pool, so it must not claim to be read-only — a
+  // client that auto-approves read-only tools would skip the user's consent
+  // (judging panel round 9; DECISIONS.md D-048).
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
   handler: async ({ role_id, contribution }) => {

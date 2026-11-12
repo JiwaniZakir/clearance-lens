@@ -119,21 +119,18 @@ describe("fit_debrief", () => {
 });
 
 describe("prepare_consented_card", () => {
-  it("includes ONLY the fields the user explicitly approved — nothing added", async () => {
+  it("templates ONLY the fields the user explicitly approved — nothing added (D-047: names only, never values)", async () => {
     mockJob("desc");
-    const result = await prepareConsentedCardTool.handler({
-      role_id: "job-1",
-      fields_user_approved: { headline: "Engineer" },
-    });
-    expect(result.card.json).toEqual({ headline: "Engineer" });
-    expect(result.card.markdown).not.toMatch(/clearance/i);
+    const result = await prepareConsentedCardTool.handler({ role_id: "job-1", approved_fields: ["headline"] });
+    expect(result.cardTemplate.fields.map((f) => f.name)).toEqual(["headline"]);
+    expect(result.cardTemplate.markdown).not.toMatch(/clearance/i);
   });
 
   it("flags self-reported fields as explicitly not verified, naming FSO verification as the real path", async () => {
     mockJob("desc");
     const result = await prepareConsentedCardTool.handler({
       role_id: "job-1",
-      fields_user_approved: { clearance_status_self_reported: "Active Secret" },
+      approved_fields: ["clearance_status_self_reported"],
     });
     expect(result.notVerifiedNote).toMatch(/not verified/i);
     expect(result.notVerifiedNote).toMatch(/FSO/);
@@ -143,7 +140,7 @@ describe("prepare_consented_card", () => {
     mockJob("desc");
     const result = await prepareConsentedCardTool.handler({
       role_id: "job-1",
-      fields_user_approved: {},
+      approved_fields: ["availability"],
     });
     expect(result.applyLink?.url).toBe("https://speedrun-talent-network.com/jobs/job-1");
     expect(result.disclaimer).toMatch(/never submits/i);
@@ -153,31 +150,30 @@ describe("prepare_consented_card", () => {
     await expect(
       prepareConsentedCardTool.inputSchema.parseAsync({
         role_id: "job-1",
-        fields_user_approved: { not_a_real_field: "x" },
+        approved_fields: ["not_a_real_field"],
       }),
     ).rejects.toBeTruthy();
   });
 });
 
-describe("prepare_consented_card — cross-field PII evasion (BLOCKERS.md B-001)", () => {
-  it("catches an SSN deliberately split across two sibling fields", async () => {
+// BLOCKERS.md B-001 / D-042 guarded against PII split across sibling card
+// fields. Since D-047 the card receives field NAMES only, so there are no
+// values to split: the old shape is refused outright and never echoed.
+describe("prepare_consented_card — no values accepted, so nothing to split across fields (D-047)", () => {
+  it("refuses field values sent the old way, without echoing any of them", async () => {
     mockJob("desc");
     const result = await callTool(prepareConsentedCardTool, {
       role_id: "job-1",
       fields_user_approved: { headline: "call me at 123-45", notes: "6789 thanks" },
     });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("pii_cui_rejected");
+    expect(JSON.stringify(result)).not.toContain("123-45");
+    expect(JSON.stringify(result)).not.toContain("6789");
   });
 
-  it("does not flag ordinary, unrelated field values that merely concatenate into something SSN-shaped only under forced adjacency it would never otherwise see", async () => {
+  it("accepts the new contract — field names only", async () => {
     mockJob("desc");
-    // headline/notes are the two fields actually joined; an ordinary
-    // headline and an ordinary availability note must still pass.
-    const result = await callTool(prepareConsentedCardTool, {
-      role_id: "job-1",
-      fields_user_approved: { headline: "Senior SDET", availability: "Available in 2 weeks" },
-    });
+    const result = await callTool(prepareConsentedCardTool, { role_id: "job-1", approved_fields: ["headline", "availability"] });
     expect(result.ok).toBe(true);
   });
 });

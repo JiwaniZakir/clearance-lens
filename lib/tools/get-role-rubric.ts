@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { resolveRole, SPEEDRUN_SOURCE } from "@/lib/tools/role-shared";
+import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema } from "@/lib/tools/role-shared";
 import { extractSections } from "@/lib/speedrun/extract-sections";
 import { findRule } from "@/lib/rules-data";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 import type { RequirementSignal } from "@/lib/speedrun/infer";
 
-const InputSchema = z.object({ role_id: z.string().min(1) });
+const InputSchema = z.object({ role_id: RoleIdSchema });
 
 const ChecklistItemSchema = z.object({
   question: z.string(),

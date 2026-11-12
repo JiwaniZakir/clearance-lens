@@ -32,9 +32,11 @@ describe("SSN detection", () => {
     "+1 415 555 0199",
     "phone: 415.555.0199",
     "my number is 4155550199",
-    "order number 123456789", // bare 9 digits, NO ssn keyword
     "tracking id 123456789012",
-    "confirmation code: 987654321", // bare 9 digits, no keyword
+    // Bare 9 digits, no keyword — still allowed because area 987 can't be a
+    // real SSN. (A valid-structure run like "order number 123456789" is
+    // rejected since D-047; see the bare-9-digit block below.)
+    "confirmation code: 987654321",
   ])("does NOT flag ordinary phone/number input: %s", (text) => {
     expect(categoriesOf(text)).not.toContain("ssn");
   });
@@ -429,20 +431,24 @@ describe("judging panel round 3: credit-card false positive on UUID-shaped ident
   });
 });
 
-describe("judging panel round 2: prepare_consented_card's stricter bare-identifier check (scanForBareIdentifierShapes)", () => {
-  it("rejects a bare, unlabeled 9-digit SSN-shaped number with no keyword context at all", async () => {
-    const { scanForBareIdentifierShapes } = await import("@/lib/guard/pii");
-    expect(scanForBareIdentifierShapes({ notes: "123456789" })).toHaveLength(1);
-  });
+// Round 2 found a bare, unlabeled SSN on prepare_consented_card; that tool
+// had its own stricter check. Round 9 found one accepted elsewhere
+// ("software 078051120", echoed in a search note), so since D-047 a bare
+// 9-digit run with a valid SSN structure is rejected everywhere.
+describe("bare 9-digit SSN-shaped runs (D-047, rounds 2 and 9)", () => {
+  it.each(["123456789", "software 078051120", "order number 123456789", "My ID number is 212345678"])(
+    "rejects %j even with no SSN keyword",
+    (text) => expect(categoriesOf(text)).toContain("ssn"),
+  );
 
-  it("rejects a bare, unlabeled 9-digit ID-shaped number with no keyword context at all", async () => {
-    const { scanForBareIdentifierShapes } = await import("@/lib/guard/pii");
-    expect(scanForBareIdentifierShapes({ headline: "My ID number is 912345678" })).toHaveLength(1);
-  });
+  it.each(["987654321", "000123456", "666123456", "123006789", "123450000"])(
+    "allows %j — no real SSN has that area, group, or serial",
+    (text) => expect(categoriesOf(text)).not.toContain("ssn"),
+  );
 
-  it("does not flag an ordinary field with no 9-digit run", async () => {
-    const { scanForBareIdentifierShapes } = await import("@/lib/guard/pii");
-    expect(scanForBareIdentifierShapes({ headline: "Backend engineer, 6 yrs", availability: "Now" })).toHaveLength(0);
+  it("doesn't read a UUID's digit groups or a longer number as an SSN", () => {
+    expect(categoriesOf("role d2ad1e1d-61bf-4dcd-9d06-23f9a75ea5f2")).toEqual([]);
+    expect(categoriesOf("Timestamp 1731400000 for the posting")).toEqual([]);
   });
 });
 
@@ -520,43 +526,10 @@ describe("judging panel round 8: hard-constraint findings, now fixed", () => {
   });
 });
 
-describe("judging panel round 8: fragmented SSN across prepare_consented_card fields", () => {
-  const ORDER = [
-    "headline",
-    "clearance_status_self_reported",
-    "citizenship_status_self_reported",
-    "highlights",
-    "github_username",
-    "availability",
-    "notes",
-  ];
-
-  it("rejects an SSN split across two fields with filler text between the digit groups (the reported bypass)", async () => {
-    const { scanConcatenatedFields } = await import("@/lib/guard/pii");
-    const cats = scanConcatenatedFields({ headline: "SSN part A 123-45", notes: "SSN part B 6789 thanks" }, ORDER).map(
-      (f) => f.category,
-    );
-    expect(cats).toContain("ssn");
-  });
-
-  it("is not defeated by inserting decoy digits between the fragments", async () => {
-    const { scanConcatenatedFields } = await import("@/lib/guard/pii");
-    const cats = scanConcatenatedFields({ headline: "SSN part 1: 123-45", notes: "part 2 (of 2): 6789" }, ORDER).map(
-      (f) => f.category,
-    );
-    expect(cats).toContain("ssn");
-  });
-
-  it("does not flag an ordinary card with no SSN reference, regardless of how many digits it has", async () => {
-    const { scanConcatenatedFields } = await import("@/lib/guard/pii");
-    expect(
-      scanConcatenatedFields(
-        { headline: "Backend engineer, 6 yrs", availability: "Available 2026-12-01", notes: "Led a 12-person team" },
-        ORDER,
-      ),
-    ).toHaveLength(0);
-  });
-});
+// Round 8 found an SSN split across two prepare_consented_card fields with
+// filler between the digit groups; D-042 added a cross-field check. Since
+// D-047 that tool receives field NAMES only — never values — so there are
+// no fields to split anything across (tests/unit/prepare-consented-card.test.ts).
 
 // Found by a self-run red-team pass between judging panel rounds 8 and 9
 // (DECISIONS.md D-043), before any judge found them: 21 of 33 format
@@ -595,9 +568,7 @@ describe("D-043 red-team pass: format variations and missing identifier types, n
     expect(categoriesOf(text)).toContain(category);
   });
 
-  it("deliberately still allows a bare 9-digit run with no SSN keyword, and a question about an SF-86 section", () => {
-    // Indistinguishable from an ordinary number / a legitimate question about the form.
-    expect(categoriesOf("123456789")).toEqual([]);
+  it("still allows a question about an SF-86 section", () => {
     expect(categoriesOf("What goes in section 13A of the SF-86?")).toEqual([]);
   });
 });
@@ -656,5 +627,107 @@ describe("D-043: worst-case scan time stays linear at the real 20KB input limit"
     const t0 = performance.now();
     scanValueForPiiCui(text);
     expect(performance.now() - t0).toBeLessThan(250);
+  });
+});
+
+// DECISIONS.md D-047 — judging panel round 9: 38 of 80 refuse-list payloads
+// were accepted (and, via prepare_consented_card, echoed). Every payload the
+// judges quoted is here. Markings are matched by SYNTAX (banners, portion
+// marks, legends), not vocabulary, so questions about them still pass below.
+describe("D-047: round 9's accepted payloads, now rejected", () => {
+  const MUST_REJECT: [string, string][] = [
+    ["CUI//SP-EXPT", "classification_marking"],
+    ["CUI//BASIC", "classification_marking"],
+    ["CUI//SP-CTI", "classification_marking"],
+    ["CUI//ITAR", "classification_marking"],
+    ["(CUI) The propulsion design uses", "classification_marking"],
+    ["CONTROLLED UNCLASSIFIED INFORMATION", "classification_marking"],
+    ["FOR OFFICIAL USE ONLY", "classification_marking"],
+    ["DISTRIBUTION STATEMENT D. Distribution authorized to the Department of Defense and U.S. DoD contractors only.", "classification_marking"],
+    ["WARNING - This document contains technical data whose export is restricted by the Arms Export Control Act (Title 22, U.S.C., Sec 2751, et seq.)", "classification_marking"],
+    ["ITAR CONTROLLED - export controlled technical data", "classification_marking"],
+    ["ITAR-controlled technical data: bore tolerance 0.0005 in", "classification_marking"],
+    ["ITAR controlled schematics for the seeker", "classification_marking"],
+    ["TOP SECRET//SCI", "classification_marking"],
+    ["S//REL TO USA, FVEY", "classification_marking"],
+    ["NOFORN", "classification_marking"],
+    ["SЕCRЕT//NОFОRN", "classification_marking"], // Cyrillic Е and О
+    ["Alien Registration Number A-123-456-789", "government_id"],
+    ["USCIS # 123-456-789", "government_id"],
+    ["CA DL D1234567", "government_id"],
+    ["DoD ID EDIPI 1234567890", "government_id"],
+    ["my I-94 number is 12345678901", "government_id"],
+    ["SRC1234567890", "case_number"],
+    ["An incident report was filed in DISS on 2025-01-03 for a security violation", "clearance_record"],
+    ["Eligibility: TS; Access: SCI; Investigation Type: SSBI", "clearance_record"],
+    ["My TS was granted in 2021 after an SOR for Guideline H", "clearance_record"],
+    ["536/22/8790 is my social", "ssn"],
+    ["٥٣٦-٢٢-٨٧٩٠", "ssn"], // Arabic-Indic digits
+    ["536-22-\n8790", "ssn"],
+    ["&#53;36-22-8790", "ssn"],
+    ["software 078051120", "ssn"],
+    ["b. 3/14/88", "dob"],
+    ["birthdate 19880314", "dob"],
+    ["+15125550143", "phone"],
+    ["+44 7700 900123", "phone"],
+    ["1234 Elm Street, Austin, TX 78701", "address"],
+    ["Jane Q. Doe, 1600 Pennsylvania Ave NW", "address"],
+    ["My name is Jane Doe", "personal_name"],
+    ["I am 52 years old and a practicing Muslim and have ADHD", "sensitive_disclosure"],
+    ["I failed a polygraph in 2019", "sensitive_disclosure"],
+    ["I had a DUI in 2015", "sensitive_disclosure"],
+    ["I'm pregnant and starting in March", "sensitive_disclosure"],
+    ["ghp_abcdefghijklmnopqrstuvwxyz0123456789AB", "secret_credential"],
+    ["-----BEGIN PRIVATE KEY-----", "secret_credential"],
+    ["MC4CAQAwBQYDK2VwBCIEIBzN3l0D7cXPu6wC5k8ZRpQ2vqJ9r0f7xTt9rFkx1aBc", "secret_credential"],
+  ];
+  it.each(MUST_REJECT)("rejects %j as %s", (text, category) => {
+    expect(categoriesOf(text)).toContain(category);
+  });
+
+  it("scans JSON keys too — an SSN used as a key is rejected, not echoed in a validation error", () => {
+    expect(scanValueForPiiCui({ "123-45-6789": "x" }).map((f) => f.category)).toContain("ssn");
+  });
+});
+
+describe("D-047: questions about the same subjects still pass", () => {
+  const MUST_ALLOW = [
+    "What does FOUO mean?",
+    "What is CUI and how do contractors handle it?",
+    "How do I handle CUI under NIST 800-171?",
+    "CUI handling SOP",
+    "What is Controlled Unclassified Information (CUI)?",
+    "What does NOFORN mean on a document?",
+    "Will I work with ITAR-controlled technical data in this role?",
+    "Is this role ITAR controlled?",
+    "What is distribution statement D?",
+    "Does the Arms Export Control Act apply to software?",
+    "TS/SCI with polygraph",
+    "SECRET-level program experience",
+    "What is a Statement of Reasons and how do I respond to one?",
+    "How does SEAD 4 Guideline H treat past drug use?",
+    "Does a DUI disqualify someone from a Secret clearance?",
+    "Can someone with ADHD get a clearance?",
+    "Is a past bankruptcy a problem for a clearance?",
+    "What religion questions are employers allowed to ask?",
+    "I have 5 years of experience in Rust",
+    "I am 3 years into my career",
+    "I'm a practicing engineer at a prime",
+    "The office is at 2000 Avenue of the Stars",
+    "Open to roles near 1 Rocket Road",
+    "Name the top three defense startups",
+    "What's my name supposed to look like on the SF-86?",
+    "Eligibility: open to new grads",
+    "Access: onsite only",
+    "+1 per year of experience",
+    "C++17 and C99",
+    "Ed25519 public key MCowBQYDK2VwAyEAFYSalQOp1dB/lreO+s7FeOa6yDrYE4HyVv+5zZw8ui0=",
+    "Python 3.12.10 and Node 22.19.0",
+    "I worked on S-band radios and C-band radar",
+    "My U.S. citizenship is the only status question I have",
+    "password managers are allowed on the work laptop?",
+  ];
+  it.each(MUST_ALLOW)("allows %j", (text) => {
+    expect(categoriesOf(text)).toEqual([]);
   });
 });

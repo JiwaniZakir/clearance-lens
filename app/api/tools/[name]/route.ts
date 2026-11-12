@@ -23,7 +23,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ nam
   const def = getToolByName(name);
   if (!def) {
     return NextResponse.json(
-      { ok: false, error: { code: "not_found", message: `Unknown tool "${name}".` } },
+      // Never echo the requested name — round 9 sent an SSN as one (D-047).
+      { ok: false, error: { code: "not_found", message: "Unknown tool. GET /api/tools lists the available tools." } },
       { status: 404 },
     );
   }
@@ -59,7 +60,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ nam
   const def = getToolByName(name);
   if (!def) {
     return NextResponse.json(
-      { ok: false, error: { code: "not_found", message: `Unknown tool "${name}".` } },
+      // Never echo the requested name — round 9 sent an SSN as one (D-047).
+      { ok: false, error: { code: "not_found", message: "Unknown tool. GET /api/tools lists the available tools." } },
       { status: 404 },
     );
   }

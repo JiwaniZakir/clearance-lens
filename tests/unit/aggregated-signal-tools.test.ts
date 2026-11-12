@@ -9,7 +9,7 @@ vi.mock("@/lib/signal/store", async (importActual) => {
 });
 
 import { getJob, getCompany } from "@/lib/speedrun/client";
-import { InMemorySignalStore, MIN_CONTRIBUTORS, COOLDOWN_MS } from "@/lib/signal/store";
+import { InMemorySignalStore, MIN_CONTRIBUTORS, COOLDOWN_MS, getAggregate } from "@/lib/signal/store";
 import { contributeAnonymousSignalTool } from "@/lib/tools/contribute-anonymous-signal";
 import { getAggregatedSignalTool } from "@/lib/tools/get-aggregated-signal";
 
@@ -93,9 +93,11 @@ describe("contribute_anonymous_signal", () => {
     expect(second.recorded).toBe(false);
     expect(second.disclaimer).toMatch(/not recorded/i);
 
-    // The rejected attempt must not have been silently counted anyway.
-    const agg = await getAggregatedSignalTool.handler({ role_id: "job-1" });
+    // The rejected attempt must not have been silently counted anyway — read
+    // from the store itself, since the tool reports no count below the floor (D-048).
+    const agg = await getAggregate(testStore, "role", "job-1");
     expect(agg.totalContributions).toBe(1);
+    expect((await getAggregatedSignalTool.handler({ role_id: "job-1" })).totalContributions).toBeNull();
   });
 
   it("allows a new contribution once the cooldown window has passed", async () => {

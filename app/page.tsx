@@ -61,8 +61,8 @@ const TOOL_CARD_META: Record<string, { blurb: string; fields: string[] }> = {
     fields: ["loved", "disliked", "shareDraft"],
   },
   prepare_consented_card: {
-    blurb: "Builds a shareable intro card from only the fields you explicitly approved — nothing added or inferred.",
-    fields: ["role_id", "fields_user_approved", "card"],
+    blurb: "A fill-in intro card for only the fields you approve — your agent fills in your answers locally, so they never reach the server.",
+    fields: ["role_id", "approved_fields", "cardTemplate"],
   },
   prepare_signed_attestation: {
     blurb:

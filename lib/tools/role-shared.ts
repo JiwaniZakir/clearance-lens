@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { getJob } from "@/lib/speedrun/client";
 import { extractRequirementSignals, looksNonUsLocation, type RequirementSignal } from "@/lib/speedrun/infer";
 import type { SpeedrunJobLabels } from "@/lib/speedrun/types";
@@ -5,6 +6,20 @@ import type { SourceRef } from "@/lib/tools/wrap";
 
 /** Every role/company-derived tool cites the platform data came from — not a
  * statistic, just provenance, but included in `sources[]` for consistency. */
+/** Every role-based tool's role_id. Described once so an agent learns where
+ *  ids come from even on clients that never surface MCP prompts (D-048). */
+export const RoleIdSchema = z
+  .string()
+  .min(1)
+  .max(100)
+  .describe("A role id from search_defense_roles (roles[].id). Search first if you don't have one.");
+
+export const CompanySlugSchema = z
+  .string()
+  .min(1)
+  .max(100)
+  .describe("A company slug from search_defense_roles (roles[].companySlug) — a guessed slug from a company's common name often won't match.");
+
 export const SPEEDRUN_SOURCE: SourceRef = {
   title: "a16z speedrun Talent Network",
   url: "https://speedrun-talent-network.com",

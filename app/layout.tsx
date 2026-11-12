@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     template: "%s · Clearance Lens",
   },
   description:
-    "A stateless MCP server that helps you pursue US defense-tech roles from inside your own AI agent — eligibility checklists, timeline estimates, trial work samples, and realistic job previews. No account, no database, no PII.",
+    "A stateless MCP server that helps you pursue US defense-tech roles from inside your own AI agent — eligibility checklists, timeline estimates, trial work samples, and realistic job previews. No account, no PII.",
   openGraph: {
     title: "Clearance Lens",
     description:

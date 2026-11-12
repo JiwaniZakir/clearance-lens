@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { resolveRole, SPEEDRUN_SOURCE } from "@/lib/tools/role-shared";
+import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema } from "@/lib/tools/role-shared";
 import { extractSections } from "@/lib/speedrun/extract-sections";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
@@ -19,7 +19,7 @@ import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
  */
 
 const InputSchema = z.object({
-  role_id: z.string().min(1),
+  role_id: RoleIdSchema,
   minutes: z.union([z.literal(30), z.literal(45), z.literal(60)], {
     error: "minutes must be one of 30, 45, or 60",
   }),

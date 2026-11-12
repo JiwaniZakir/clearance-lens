@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { resolveRole, SPEEDRUN_SOURCE } from "@/lib/tools/role-shared";
+import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema } from "@/lib/tools/role-shared";
 import { extractSections } from "@/lib/speedrun/extract-sections";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 
 const InputSchema = z.object({
-  role_id: z.string().min(1),
+  role_id: RoleIdSchema,
   // Explicit error message: found live via the spec §6 judging panel round
   // 4 — a numeric literal union's default error ("Invalid input") doesn't
   // name the allowed values the way a string z.enum's does elsewhere in

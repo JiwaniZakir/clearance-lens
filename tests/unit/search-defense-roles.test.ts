@@ -306,7 +306,9 @@ describe("search_defense_roles", () => {
 
     const result = await searchDefenseRolesTool.handler({ query: "Shield AI", limit: 10 });
     expect(result.roles).toEqual([]);
-    expect(result.note).toContain('the keyword "Shield AI"');
+    // Names the filter without echoing it back (D-047: a query can carry a marking or PII).
+    expect(result.note).toContain("your keyword");
+    expect(result.note).not.toContain("Shield AI");
     expect(result.note.toLowerCase()).toContain("role type");
     expect(result.note).toContain("get_company_profile");
   });
@@ -328,8 +330,9 @@ describe("search_defense_roles", () => {
     });
 
     const result = await searchDefenseRolesTool.handler({ location: "Texas", limit: 10 });
-    expect(result.note).toContain('the location filter "Texas"');
-    expect(result.note).not.toContain("the keyword");
+    expect(result.note).toContain("your location filter");
+    expect(result.note).not.toContain("Texas");
+    expect(result.note).not.toContain("your keyword");
     expect(result.note.toLowerCase()).toContain("exact city string");
   });
 
@@ -345,8 +348,7 @@ describe("search_defense_roles", () => {
     });
 
     const result = await searchDefenseRolesTool.handler({ query: "engineer", location: "Texas", limit: 10 });
-    expect(result.note).toContain('the keyword "engineer"');
-    expect(result.note).toContain('the location filter "Texas"');
+    expect(result.note).toContain("your keyword and your location filter");
     expect(result.note.toLowerCase()).toContain("one filter at a time");
   });
 
@@ -366,5 +368,11 @@ describe("search_defense_roles", () => {
     expect(result.roles).toEqual([]);
     expect(result.note).not.toContain("No postings matched");
     expect(result.note.toLowerCase()).toContain("loosening or removing it");
+  });
+
+  it("tells someone searching a requirement word (ITAR, polygraph) to use the filters instead (round 9)", async () => {
+    vi.mocked(searchJobs).mockResolvedValueOnce({ total: 0, page: 0, page_size: 50, total_pages: 0, has_more: false, next_page: null, jobs: [] });
+    const result = await searchDefenseRolesTool.handler({ query: "ITAR", limit: 10 });
+    expect(result.note).toMatch(/use the clearance or itar_only filters/);
   });
 });

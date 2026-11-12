@@ -17,6 +17,10 @@ export interface ToolDef<TInput = unknown, TOutput = unknown> {
   name: string;
   title: string;
   description: string;
+  /** MCP tool annotations. Omitted = read-only (every tool but one). D-048:
+   *  contribute_anonymous_signal writes to a shared store, and some clients
+   *  (Muse Code) run any tool declared read-only without asking first. */
+  annotations?: { readOnlyHint: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };
   inputSchema: z.ZodType<TInput>;
   outputSchema: z.ZodType<TOutput>;
   handler: (input: TInput) => Promise<TOutput>;
