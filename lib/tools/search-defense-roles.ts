@@ -73,6 +73,17 @@ const MAX_DETAIL_FETCHES = 25; // bounds latency: at most this many parallel per
 // total is close enough to common MCP-client tool-call timeout budgets that
 // an un-bounded worst case would read as a hang.
 const PAGE_SCAN_DEADLINE_MS = 8000;
+// The deadline above was only checked between pages, so it couldn't stop a
+// page already in flight, and nothing bounded the detail-fetch phase at all
+// — found by a self-run probe between judging panel rounds 8 and 9
+// (DECISIONS.md D-045), with the upstream slow (4-6s per page, a 5.7s median
+// and 24.7s max per detail fetch): a plain "rust" search took 15.6s and an
+// empty one 32s. Now every request carries the deadline down to the fetch
+// itself (lib/speedrun/client.ts), and the whole call has one budget. When
+// the upstream is healthy (sub-second) none of this engages.
+const SEARCH_BUDGET_MS = 13000;
+/** The detail phase always gets at least this long, even after a slow page scan. */
+const MIN_DETAIL_PHASE_MS = 3000;
 
 // Found live via the spec §6 judging panel round 8 (function_engineer,
 // reproduced 3 times; root-caused directly against the upstream): the
@@ -85,10 +96,10 @@ const PAGE_SCAN_DEADLINE_MS = 8000;
 // still retries and still surfaces a real error if it fails (there's
 // nothing to return without it), but a later page gets one attempt, and
 // if it fails the scan stops and returns what it has, with a note saying so.
-async function fetchCandidateSummaries(query: string | undefined, location: string | undefined) {
+async function fetchCandidateSummaries(query: string | undefined, location: string | undefined, startedAt: number) {
   const all: SpeedrunJobSummary[] = [];
   let page = 0;
-  const deadline = Date.now() + PAGE_SCAN_DEADLINE_MS;
+  const deadline = startedAt + PAGE_SCAN_DEADLINE_MS;
   let truncatedByDeadline = false;
   let truncatedByUpstreamError = false;
   for (let i = 0; i < MAX_PAGES_SCANNED; i++) {
@@ -99,10 +110,13 @@ async function fetchCandidateSummaries(query: string | undefined, location: stri
     const params = { q: query, industry: "defense_space", loc: location, page, scope: "portfolio" } as const;
     let res: Awaited<ReturnType<typeof searchJobs>>;
     try {
-      res = i === 0 ? await searchJobs(params) : await searchJobs(params, { maxAttempts: 1 });
+      res = i === 0 ? await searchJobs(params, { deadline }) : await searchJobs(params, { maxAttempts: 1, deadline });
     } catch (err) {
       if (i === 0) throw err;
-      truncatedByUpstreamError = true;
+      // A later page that ran out of time is a slow upstream, not an error —
+      // say which, since the two notes give different advice.
+      if (Date.now() >= deadline - 1000) truncatedByDeadline = true;
+      else truncatedByUpstreamError = true;
       break;
     }
     all.push(...res.jobs);
@@ -120,9 +134,11 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
   handler: async ({ query, clearance, itar_only, location, remote, limit }) => {
+    const startedAt = Date.now();
     const { all: fetchedCandidates, truncatedByDeadline, truncatedByUpstreamError } = await fetchCandidateSummaries(
       query,
       location,
+      startedAt,
     );
     let candidates = fetchedCandidates;
 
@@ -132,9 +148,10 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
     const rolesScanned = candidates.length;
     const toDetail = candidates.slice(0, MAX_DETAIL_FETCHES);
 
+    const detailDeadline = Math.max(Date.now() + MIN_DETAIL_PHASE_MS, startedAt + SEARCH_BUDGET_MS);
     const detailed = await Promise.allSettled(
       toDetail.map(async (summary) => {
-        const { job } = await getJob(summary.id);
+        const { job } = await getJob(summary.id, { deadline: detailDeadline });
         const signals = extractRequirementSignals(job.description_text, {
           industry: "defense_space",
           location: job.location,
@@ -146,6 +163,10 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
     let results = detailed
       .filter((r): r is PromiseFulfilledResult<{ summary: SpeedrunJobSummary; signals: ReturnType<typeof extractRequirementSignals> }> => r.status === "fulfilled")
       .map((r) => r.value);
+    // Found alongside D-045: a detail fetch that failed used to drop its role
+    // silently while requirementSignalsCheckedCount still counted it as checked.
+    const signalsChecked = results.length;
+    const signalsMissing = toDetail.length - signalsChecked;
 
     if (clearance) results = results.filter((r) => matchesClearanceFilter(r.signals, clearance, r.summary.location));
     if (itar_only) results = results.filter((r) => looksItarRestricted(r.signals));
@@ -163,9 +184,14 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
         "The upstream job network returned an error partway through this scan, so results above cover only the postings it returned before that — they may be incomplete. Retrying often succeeds (these upstream errors are intermittent), as does a more specific search term.",
       );
     }
+    if (signalsMissing > 0) {
+      notes.push(
+        `Requirement signals couldn't be loaded in time for ${signalsMissing} of the ${toDetail.length} postings checked (the upstream job network was slow or returned errors), so ${signalsMissing === 1 ? "that posting isn't" : "those postings aren't"} in the results above — retrying usually fills them in.`,
+      );
+    }
     if (clearance || itar_only) {
       notes.push(
-        `Checked requirement signals on the first ${toDetail.length} of those; narrower or broader search terms may surface more matches than this single call checked.`,
+        `Checked requirement signals on ${signalsChecked} of those; narrower or broader search terms may surface more matches than this single call checked.`,
       );
     }
     // Found live via the spec §5 agent-in-the-loop eval (DECISIONS.md D-016):
@@ -227,7 +253,7 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
         requirementSignals: signals,
       })),
       rolesScanned,
-      requirementSignalsCheckedCount: toDetail.length,
+      requirementSignalsCheckedCount: signalsChecked,
       note: notes.join(" "),
       sources: [SPEEDRUN_SOURCE],
       disclaimer: DISCLAIMERS.statedVsInferred,

@@ -84,3 +84,48 @@ describe("speedrun client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+// Found by a self-run probe between judging panel rounds 8 and 9 (DECISIONS.md
+// D-045): there was no per-request timeout, so one stalled upstream request
+// held a whole tool call open (33s measured), and a network-level failure
+// escaped as a raw exception the pipeline reported as a generic internal error.
+describe("timeouts and deadlines (D-045)", () => {
+  // These measure real elapsed time against real deadlines; the file-level
+  // beforeEach installs fake timers for the retry-backoff tests above.
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A fetch that never answers — it only ever rejects when its signal aborts. */
+  function stallingFetch() {
+    return vi.fn((_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+      }),
+    );
+  }
+
+  it("cuts a stalled request off at the caller's deadline instead of waiting on it", async () => {
+    vi.stubGlobal("fetch", stallingFetch());
+    const t0 = Date.now();
+    await expect(getJob("job-1", { deadline: Date.now() + 1200 })).rejects.toBeInstanceOf(SpeedrunApiError);
+    expect(Date.now() - t0).toBeLessThan(2500);
+  });
+
+  it("never backs off into a retry that would run past the deadline", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const t0 = Date.now();
+    // The first backoff is 1s; with 1.2s left, a retry can't fit — so one attempt, then give up.
+    await expect(searchJobs({ q: "x" }, { deadline: Date.now() + 1200 })).rejects.toBeInstanceOf(SpeedrunApiError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(Date.now() - t0).toBeLessThan(1000);
+  });
+
+  it("surfaces a network-level failure as an upstream error, never a raw exception", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+    const err = await getJob("job-1", { maxAttempts: 1 }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SpeedrunApiError);
+    expect((err as SpeedrunApiError).status).toBe(504);
+  });
+});

@@ -117,10 +117,45 @@ describe("search_defense_roles", () => {
       });
     vi.mocked(getJob).mockResolvedValueOnce(detail("Build autonomy software."));
 
+    const before = Date.now();
     await searchDefenseRolesTool.handler({ limit: 10 });
     const calls = vi.mocked(searchJobs).mock.calls;
-    expect(calls.at(-2)?.[1]).toBeUndefined(); // first page: default retry budget
-    expect(calls.at(-1)?.[1]).toEqual({ maxAttempts: 1 }); // later page: one attempt
+    const first = calls.at(-2)?.[1];
+    const later = calls.at(-1)?.[1];
+    expect(first?.maxAttempts).toBeUndefined(); // first page: default retry budget
+    expect(later?.maxAttempts).toBe(1); // later page: one attempt
+    // D-045: both carry the same page-scan deadline down to the fetch itself.
+    expect(first?.deadline).toBe(later?.deadline);
+    expect(first!.deadline! - before).toBeGreaterThanOrEqual(7900);
+    expect(first!.deadline! - before).toBeLessThanOrEqual(8100);
+  });
+
+  it("counts only the roles whose requirement signals actually loaded, and says how many didn't (D-045)", async () => {
+    vi.mocked(searchJobs).mockResolvedValueOnce({
+      total: 3, page: 0, page_size: 50, total_pages: 1, has_more: false, next_page: null,
+      jobs: [summary({ id: "job-1" }), summary({ id: "job-2" }), summary({ id: "job-3" })],
+    });
+    vi.mocked(getJob).mockImplementation(async (id: string) => {
+      if (id === "job-2") throw new Error("Speedrun API unreachable or too slow to respond");
+      return detail("Build autonomy software.", { id });
+    });
+    const result = await searchDefenseRolesTool.handler({ limit: 10 });
+    expect(result.rolesScanned).toBe(3);
+    expect(result.requirementSignalsCheckedCount).toBe(2); // was 3 — counted the failure as checked
+    expect(result.roles.map((r) => r.id)).toEqual(["job-1", "job-3"]);
+    expect(result.note).toMatch(/couldn't be loaded in time for 1 of the 3 postings/);
+  });
+
+  it("passes the detail phase a deadline within the overall search budget (D-045)", async () => {
+    vi.mocked(searchJobs).mockResolvedValueOnce({
+      total: 1, page: 0, page_size: 50, total_pages: 1, has_more: false, next_page: null, jobs: [summary({ id: "job-1" })],
+    });
+    vi.mocked(getJob).mockResolvedValueOnce(detail("Build autonomy software."));
+    const before = Date.now();
+    await searchDefenseRolesTool.handler({ limit: 10 });
+    const options = vi.mocked(getJob).mock.calls.at(-1)?.[1];
+    expect(options?.deadline).toBeDefined();
+    expect(options!.deadline! - before).toBeLessThanOrEqual(13100);
   });
 
   it("still surfaces a real error when the FIRST page fails — there's nothing to return without it", async () => {
