@@ -20,8 +20,11 @@ export interface SpeedrunJobSummary {
   id: string;
   title: string;
   company: string;
-  company_slug: string;
-  company_url: string;
+  // Nullable: a stealth posting (stealth: true) has no public company page to
+  // link, so these come back null rather than a placeholder string — found
+  // live during the Gate R→B review (research/R1-leverage.md), not guessed.
+  company_slug: string | null;
+  company_url: string | null;
   url: string;
   location: string | null;
   workplace_type?: string | null;
@@ -55,7 +58,11 @@ export interface SpeedrunJobApply {
   url: string;
 }
 
-export interface SpeedrunJobDetail extends Omit<SpeedrunJobSummary, "function"> {
+// Omits "cohort" too: a live GET /jobs/{id} response genuinely does not
+// include it (confirmed by direct fetch, not assumed) — inheriting it from
+// SpeedrunJobSummary would type a field as always-present that is actually
+// always `undefined` here, a type lie caught during the Gate R→B review.
+export interface SpeedrunJobDetail extends Omit<SpeedrunJobSummary, "function" | "cohort"> {
   status: string;
   function: string | null;
   comp_summary?: string | null;

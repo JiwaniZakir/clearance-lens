@@ -1,0 +1,81 @@
+import { z } from "zod";
+import { resolveRole, SPEEDRUN_SOURCE } from "@/lib/tools/role-shared";
+import { JOB_PREVIEW_SCENES } from "@/data/job-preview-scenes";
+import { DISCLAIMERS } from "@/lib/disclaimers";
+import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
+
+const InputSchema = z.object({
+  role_id: z.string().min(1),
+  minutes: z.union([z.literal(20), z.literal(30)]),
+});
+
+const SceneOutputSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  setup: z.string(),
+  choices: z.array(z.object({ id: z.string(), label: z.string() })),
+  // Deliberately NOT included per choice up front — see instructionsForAgent.
+  // Keyed by choice id so the agent reveals it only after the user decides.
+  whatRealTeamsReportByChoice: z.record(z.string(), z.string()),
+  requiresStatedRationale: z.boolean(),
+  debriefPrompts: z.array(z.string()),
+});
+
+const OutputSchema = z.object({
+  roleTitle: z.string(),
+  company: z.string(),
+  minutes: z.number(),
+  instructionsForAgent: z.string(),
+  scenes: z.array(SceneOutputSchema),
+  aggregateDebriefPrompt: z.string(),
+  polygraphNote: z.string(),
+  itarSafetyNote: z.string(),
+  sources: z.array(SourceRefSchema),
+  disclaimer: z.string(),
+});
+
+export const runJobPreviewTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typeof OutputSchema>> = {
+  name: "run_job_preview",
+  title: "Run a first-week job preview",
+  description:
+    "Returns a complete 4-or-6-scene 'first week' realistic job preview script for the agent to run interactively with the user, one scene at a time — standup priorities, an ambiguous spec, (30-min only) an ethics tradeoff, an ITAR moment, a clearance-wait week, and (30-min only) SCIF/travel-reporting life. Scenes are played straight, not softened (research/R5-assessment-science.md §C2) — honest downsides don't meaningfully reduce acceptance in the evidence.",
+  inputSchema: InputSchema,
+  outputSchema: OutputSchema,
+  handler: async ({ role_id, minutes }) => {
+    const role = await resolveRole(role_id);
+    const scenePool =
+      minutes === 20 ? JOB_PREVIEW_SCENES.filter((s) => s.includedInShortVersion) : JOB_PREVIEW_SCENES;
+
+    const scenes = scenePool.map((scene) => ({
+      id: scene.id,
+      title: scene.title,
+      setup: scene.setup(role.title, role.company),
+      choices: scene.choices.map((c) => ({ id: c.id, label: c.label })),
+      whatRealTeamsReportByChoice: Object.fromEntries(scene.choices.map((c) => [c.id, c.whatRealTeamsReport])),
+      requiresStatedRationale: scene.requiresStatedRationale,
+      debriefPrompts: scene.debriefPrompts,
+    }));
+
+    return {
+      roleTitle: role.title,
+      company: role.company,
+      minutes,
+      instructionsForAgent:
+        "Run this as a conversation, one scene at a time, not as a quiz dump. For each scene: show the setup and the choice labels only (withhold whatRealTeamsReportByChoice), let the user actually pick one, THEN reveal that choice's whatRealTeamsReportByChoice, then ask the scene's debriefPrompts conversationally. If requiresStatedRationale is true, ask the user to state their one-sentence rationale before revealing the outcome. Never score or rank a choice as right/wrong — every choice has a real, differentiated consequence; the point is realistic texture, not a test. After the last scene, ask aggregateDebriefPrompt once.",
+      scenes,
+      aggregateDebriefPrompt:
+        "Across everything you just saw — including the parts that weren't flattering — did this feel like an honest picture of the job? That question matters more than whether you're still interested (research/R5-assessment-science.md §A2: perceived honesty was the only significant mediator of real-world realistic-job-preview effects on outcomes).",
+      polygraphNote:
+        "A polygraph may be part of some agencies'/programs' processes. This preview describes that fact; it never simulates or role-plays an actual polygraph exam.",
+      itarSafetyNote: DISCLAIMERS.itarSafeTrial,
+      sources: [
+        SPEEDRUN_SOURCE,
+        {
+          title: "Earnest, Allen & Landis (2011) — realistic job preview mechanisms meta-analysis",
+          url: "https://stevenmbrownportfolio.weebly.com/uploads/1/7/4/6/17469871/earnest_et_al._2011_rjp.pdf",
+        },
+      ],
+      disclaimer: DISCLAIMERS.itarSafeTrial,
+    };
+  },
+};

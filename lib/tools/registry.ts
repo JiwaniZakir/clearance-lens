@@ -4,6 +4,12 @@ import { estimateTimelineTool } from "@/lib/tools/estimate-timeline";
 import { searchDefenseRolesTool } from "@/lib/tools/search-defense-roles";
 import { verifyEvidenceTool } from "@/lib/tools/verify-evidence";
 import { getCompanyProfileTool } from "@/lib/tools/get-company-profile";
+import { buildTrialAssessmentTool } from "@/lib/tools/build-trial-assessment";
+import { runJobPreviewTool } from "@/lib/tools/run-job-preview";
+import { getRoleRubricTool } from "@/lib/tools/get-role-rubric";
+import { readinessBriefTool } from "@/lib/tools/readiness-brief";
+import { fitDebriefTool } from "@/lib/tools/fit-debrief";
+import { prepareConsentedCardTool } from "@/lib/tools/prepare-consented-card";
 
 /**
  * The single list of every tool this server exposes. Both app/mcp/route.ts
@@ -24,6 +30,12 @@ export const TOOL_REGISTRY: ToolDef<any, any>[] = [
   searchDefenseRolesTool,
   verifyEvidenceTool,
   getCompanyProfileTool,
+  buildTrialAssessmentTool,
+  runJobPreviewTool,
+  getRoleRubricTool,
+  readinessBriefTool,
+  fitDebriefTool,
+  prepareConsentedCardTool,
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -21,6 +21,7 @@ describe("SSN detection", () => {
     "SS# 345-67-8901",
     "soc sec 456789123", // keyword + bare 9 digits
     "ss# 123456789", // "#"-ending keyword + bare 9 digits, no dash pattern to mask a regression
+    "123.45.6789", // dotted separator (Presidio's SSN5 pattern; research/R1-leverage.md §3.2)
   ])("flags SSN-shaped input: %s", (text) => {
     expect(categoriesOf(text)).toContain("ssn");
   });

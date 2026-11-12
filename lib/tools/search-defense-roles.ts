@@ -30,7 +30,7 @@ const RoleResultSchema = z.object({
   id: z.string(),
   title: z.string(),
   company: z.string(),
-  companySlug: z.string(),
+  companySlug: z.string().nullable(), // null for a stealth posting — no public company page to slug
   url: z.string(),
   location: z.string().nullable(),
   remote: z.boolean(),

@@ -29,16 +29,20 @@ function summary(overrides: Partial<SpeedrunJobSummary> = {}): SpeedrunJobSummar
     comp_period: null,
     published_at: "2026-01-01T00:00:00Z",
     stealth: false,
-    cohort: null,
     tier: "a16z",
+    cohort: null,
     ...overrides,
   };
 }
 
 function detail(descriptionText: string, overrides: Partial<SpeedrunJobSummary> = {}): SpeedrunJobDetailResponse {
+  // SpeedrunJobDetail genuinely has no `cohort` field (see lib/speedrun/types.ts) —
+  // omit it explicitly when spreading from summary(), which does have one.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- discarded on purpose
+  const { cohort: _cohort, ...summaryWithoutCohort } = summary(overrides);
   return {
     job: {
-      ...summary(overrides),
+      ...summaryWithoutCohort,
       status: "open",
       apply: null,
       description_text: descriptionText,

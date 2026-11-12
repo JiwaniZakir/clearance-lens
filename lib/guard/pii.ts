@@ -49,7 +49,10 @@ const SSN_CONTEXT = /\b(ssn|soc(?:ial)?[\s.-]*sec(?:urity)?|ss\s*#)/i;
  *  validity — including well-known placeholder SSNs like 123-45-6789, which is the
  *  correct, safer behavior for a detector being red-teamed with "obviously fake" PII.
  */
-const SSN_DASHED = /\b\d{3}[-\s]\d{2}[-\s]\d{4}\b/;
+// Includes "." as a separator alongside "-"/space: confirmed against
+// Presidio's SSN5 pattern (research/R1-leverage.md §3.2) that a dotted SSN
+// (123.45.6789) is a real format in the wild this was missing.
+const SSN_DASHED = /\b\d{3}[-.\s]\d{2}[-.\s]\d{4}\b/;
 /** An isolated 9-digit run, only treated as an SSN when an SSN keyword is present
  *  somewhere in the same field. */
 const BARE_9_DIGITS = /\b\d{9}\b/;

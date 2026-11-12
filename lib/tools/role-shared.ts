@@ -14,7 +14,8 @@ export interface ResolvedRole {
   id: string;
   title: string;
   company: string;
-  companySlug: string;
+  // null for a stealth posting — there's no public company page to slug.
+  companySlug: string | null;
   url: string;
   location: string | null;
   remote: boolean;
