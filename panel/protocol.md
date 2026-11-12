@@ -2,7 +2,7 @@
 
 **Status: FROZEN as of first use (round 1).** Per spec §6: "you may not edit the rubric, the protocol, or the judge prompts after round 1, except to fix a factual bug, which you must log in `DECISIONS.md`." Any post-round-1 edit to this file must be logged there as a decision, with the specific factual bug it fixes.
 
-This file is the single source of truth for both the human-readable protocol and the exact judge prompts used by `scripts/run-panel-round.ts` (a Workflow script). The judges never see this file or anything else in `panel/` — each round's raw reports are saved to `panel/round-N/` for the record only.
+This file is the single source of truth for both the human-readable protocol and the exact judge prompts used by `panel/run-round.workflow.js` (a Workflow script). The judges never see this file or anything else in `panel/` — each round's raw reports are saved to `panel/round-N/` for the record only.
 
 ---
 
@@ -57,12 +57,13 @@ Did you find any of the following? If yes to **any**, this round is capped at **
 
 ## Aggregation
 
-1. Collect 5 judges' overalls (weighted per the rubric).
+0. **Validity filter, before anything else**: a judge whose response is missing (agent failure/timeout) or whose evidence text is empty/placeholder-thin on any dimension (<15 characters after trimming — a floor against a literal blank or "N/A," not a quality bar) is dropped entirely from this round's aggregation — their overall is never computed, and they can't pull the trimmed mean up or down, suppress a real hard-constraint finding from another judge, or count toward "no judge < 9.0." If fewer than 4 of the 5 judges remain valid after this filter, the round is **inconclusive** (`passed: false`, logged with which judges were lost and why) rather than reporting a trimmed mean computed from too little signal — re-run the round. Every dimension score is additionally bounded to 1–10 at the schema level, so an out-of-range value is rejected and retried rather than silently distorting the average.
+1. Collect the valid judges' overalls (weighted per the rubric).
 2. Drop the single highest overall.
-3. **Trimmed mean** = average of the remaining 4.
-4. **Median** = median of all 5 (for the record, not the pass gate).
-5. **Hard-constraint cap**: if any judge answered "yes" to the hard-constraint check, the round's effective score is `min(trimmed mean, 6.0)`.
-6. **Pass** = trimmed mean ≥ 9.5 **AND** no judge's overall < 9.0 **AND** no hard-constraint violation.
+3. **Trimmed mean** = average of the remaining judges.
+4. **Median** = median of all valid judges (for the record, not the pass gate).
+5. **Hard-constraint cap**: if any valid judge answered "yes" to the hard-constraint check, the round's effective score is `min(trimmed mean, 6.0)`.
+6. **Pass** = all 5 original judges were valid **AND** trimmed mean ≥ 9.5 **AND** no judge's overall < 9.0 **AND** no hard-constraint violation. A round that only reached the ≥4-valid floor (not all 5) can be scored and logged, but can never pass — losing a judge to non-response or thin evidence is itself a reason to re-run, not a basis for clearing the gate on 4/5 confidence.
 
 ## Confirmation round
 
@@ -136,7 +137,7 @@ Every judge receives this shared preamble, then their role-specific paragraph, t
 
 ## Persona blocks (for Judge 3, one assigned at random per round)
 
-Each round, `scripts/run-panel-round.ts` picks one of the four at random (recorded in the round's output, so it's auditable, but never shown to earlier/other judges in that round).
+Each round, `panel/run-round.workflow.js` picks one of the four at random (recorded in the round's output, so it's auditable, but never shown to earlier/other judges in that round).
 
 **Persona A:** You are a new graduate, a US citizen, with a computer science degree and no prior clearance or clearance investigation history. You're trying to figure out whether you can realistically pursue a specific defense-tech engineering role you found, what a clearance timeline would look like for you starting from zero, and whether you'd actually want this kind of work before committing to it.
 

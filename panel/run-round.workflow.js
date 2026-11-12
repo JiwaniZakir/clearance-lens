@@ -62,6 +62,16 @@ const ROLE_PARAGRAPHS = {
   skeptic: 'Your specific lens: you are actively trying to break this product\'s stated privacy and compliance promises. Try submitting things that look like a Social Security number, a date of birth, a passport number, a case/investigation number, or clearance-record-sounding text, through every input you can find (the web UI and direct MCP tool calls) and see what actually happens -- does it get rejected, and how? Try to get any tool to produce a score, a ranking, or a demographic inference about a person. Spot-check a few of the site\'s factual/legal claims against their cited sources, if sources are shown -- do the links work, do they say what the product claims they say?',
 }
 
+// minimum/maximum on every score: without these, an out-of-range value
+// (0, 11, a stray 100-point-scale number) would be silently accepted and
+// distort the weighted average instead of being rejected and retried by
+// the StructuredOutput validation layer.
+const DIMENSION_SCHEMA = {
+  type: 'object',
+  properties: { score: { type: 'number', minimum: 1, maximum: 10 }, evidence: { type: 'string' } },
+  required: ['score', 'evidence'],
+}
+
 const JUDGE_SCHEMA = {
   type: 'object',
   properties: {
@@ -69,11 +79,11 @@ const JUDGE_SCHEMA = {
     dimensions: {
       type: 'object',
       properties: {
-        function: { type: 'object', properties: { score: { type: 'number' }, evidence: { type: 'string' } }, required: ['score', 'evidence'] },
-        trueUserValue: { type: 'object', properties: { score: { type: 'number' }, evidence: { type: 'string' } }, required: ['score', 'evidence'] },
-        aestheticsUx: { type: 'object', properties: { score: { type: 'number' }, evidence: { type: 'string' } }, required: ['score', 'evidence'] },
-        trustPrivacyCompliance: { type: 'object', properties: { score: { type: 'number' }, evidence: { type: 'string' } }, required: ['score', 'evidence'] },
-        engineeringQuality: { type: 'object', properties: { score: { type: 'number' }, evidence: { type: 'string' } }, required: ['score', 'evidence'] },
+        function: DIMENSION_SCHEMA,
+        trueUserValue: DIMENSION_SCHEMA,
+        aestheticsUx: DIMENSION_SCHEMA,
+        trustPrivacyCompliance: DIMENSION_SCHEMA,
+        engineeringQuality: DIMENSION_SCHEMA,
       },
       required: ['function', 'trueUserValue', 'aestheticsUx', 'trustPrivacyCompliance', 'engineeringQuality'],
     },
@@ -81,6 +91,19 @@ const JUDGE_SCHEMA = {
     overallNarrative: { type: 'string' },
   },
   required: ['topThreeProblems', 'dimensions', 'hardConstraintViolation', 'overallNarrative'],
+}
+
+// panel/protocol.md's anti-inflation rule: "A score given without
+// supporting evidence is discarded ... excludes that judge's overall from
+// aggregation, logging why." The schema's own `required: ['score',
+// 'evidence']` only guarantees the FIELD exists, not that it's substantive
+// -- a judge could still satisfy the schema with evidence: "" or "N/A".
+// 15 chars is a deliberately low bar (not a quality bar) that only catches
+// genuinely empty/placeholder evidence, not short-but-real evidence.
+const MIN_EVIDENCE_LENGTH = 15
+
+function hasSubstantiveEvidence(dimensions) {
+  return Object.values(dimensions).every((d) => typeof d.evidence === 'string' && d.evidence.trim().length >= MIN_EVIDENCE_LENGTH)
 }
 
 const WEIGHTS = {
@@ -125,7 +148,43 @@ const judgeResults = await parallel(
   ),
 )
 
-const validJudges = judgeResults.filter(Boolean)
+const respondedJudges = judgeResults.filter(Boolean)
+const nonRespondingJudges = judgeDefs.filter((j) => !respondedJudges.some((r) => r.judge === j.key)).map((j) => j.key)
+
+// Anti-inflation rule (panel/protocol.md): a dimension score with no
+// substantive evidence makes the WHOLE judge's overall unscored, not just
+// that one dimension -- discarded before computing anything downstream, so
+// a thin, unsupported response can't pull the trimmed mean up OR down, and
+// can't suppress a real hard-constraint signal from the other 4 judges.
+const validJudges = respondedJudges.filter((j) => hasSubstantiveEvidence(j.dimensions))
+const discardedForNoEvidence = respondedJudges.filter((j) => !hasSubstantiveEvidence(j.dimensions)).map((j) => j.judge)
+
+// Safety check: the protocol's aggregation (drop-highest-of-5, trimmed
+// mean of the remaining 4) assumes 5 real judges. Fewer than 4 valid
+// judges (an agent failure, or 2+ discarded for thin evidence) makes
+// "drop 1, average the rest" either meaningless (divide-by-zero/NaN at 0
+// left) or statistically unstable (averaging just 1-2 data points reads
+// as confident when it isn't) -- surface that explicitly as a failed,
+// non-conclusive round rather than silently reporting a number computed
+// from too little signal.
+const MIN_VALID_JUDGES = 4
+if (validJudges.length < MIN_VALID_JUDGES) {
+  log(
+    'Round ' + roundNumber + ': INCONCLUSIVE -- only ' + validJudges.length + ' of 5 judges produced a usable ' +
+    'response (non-responding: ' + JSON.stringify(nonRespondingJudges) + '; discarded for thin evidence: ' +
+    JSON.stringify(discardedForNoEvidence) + '). Re-run this round rather than trusting this aggregation.',
+  )
+  return {
+    roundNumber,
+    personaIndexUsed: personaIndex,
+    judges: validJudges,
+    nonRespondingJudges,
+    discardedForNoEvidence,
+    inconclusive: true,
+    passed: false,
+  }
+}
+
 const overalls = validJudges.map((j) => ({ judge: j.judge, overall: weightedOverall(j.dimensions) }))
 const sorted = [...overalls].sort((a, b) => a.overall - b.overall)
 const dropped = sorted[sorted.length - 1] // highest, dropped from the trimmed mean
@@ -138,11 +197,18 @@ const median =
 const anyHardConstraintViolation = validJudges.some((j) => j.hardConstraintViolation?.found)
 const anyJudgeBelow9 = overalls.some((o) => o.overall < 9.0)
 const effectiveScore = anyHardConstraintViolation ? Math.min(trimmedMean, 6.0) : trimmedMean
-const passed = effectiveScore >= 9.5 && !anyJudgeBelow9 && !anyHardConstraintViolation
+// A round with fewer than 5 valid judges (but still >= MIN_VALID_JUDGES)
+// can still be aggregated, but must never silently PASS on partial
+// evidence -- the protocol's "no judge < 9.0" and hard-constraint gates
+// still apply to whichever judges we have, but a pass additionally
+// requires all 5 original judges to have produced valid, countable input.
+const allFiveValid = validJudges.length === 5
+const passed = allFiveValid && effectiveScore >= 9.5 && !anyJudgeBelow9 && !anyHardConstraintViolation
 
 log(
   'Round ' + roundNumber + ': trimmed mean ' + trimmedMean.toFixed(2) +
   ', median ' + median.toFixed(2) +
+  ', valid judges ' + validJudges.length + '/5' +
   ', hard-constraint violation: ' + anyHardConstraintViolation +
   ', passed: ' + passed,
 )
@@ -151,6 +217,8 @@ return {
   roundNumber,
   personaIndexUsed: personaIndex,
   judges: validJudges,
+  nonRespondingJudges,
+  discardedForNoEvidence,
   overalls,
   droppedJudge: dropped,
   trimmedMean,
@@ -158,5 +226,7 @@ return {
   anyHardConstraintViolation,
   anyJudgeBelow9,
   effectiveScore,
+  allFiveValid,
+  inconclusive: false,
   passed,
 }
