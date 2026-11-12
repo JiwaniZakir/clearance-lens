@@ -33,10 +33,16 @@ export function FitDebriefSummary({
 }) {
   const [draft, setDraft] = React.useState(data.shareDraft.markdown);
   const [copied, setCopied] = React.useState(false);
-
-  React.useEffect(() => {
+  // Re-seed the editable draft when a new fit_debrief result arrives (e.g.
+  // the viewer picked different tags and regenerated). Adjusting state
+  // during render — rather than in a useEffect — is the pattern React's own
+  // docs recommend for "reset state when a prop changes": it avoids an
+  // extra commit+effect round-trip and the cascading-render lint warning.
+  const [lastSeenMarkdown, setLastSeenMarkdown] = React.useState(data.shareDraft.markdown);
+  if (data.shareDraft.markdown !== lastSeenMarkdown) {
+    setLastSeenMarkdown(data.shareDraft.markdown);
     setDraft(data.shareDraft.markdown);
-  }, [data.shareDraft.markdown]);
+  }
 
   async function handleCopy() {
     try {
@@ -132,8 +138,8 @@ export function FitDebriefSummary({
         </p>
         <p className="text-sm leading-[1.5] text-neutral-11">
           This tool hands your agent an instruction, not a finished summary — your own agent would turn it into a
-          short, personalized paragraph using what it already knows about you. There's no agent in this playground,
-          so here's the raw instruction it would act on:
+          short, personalized paragraph using what it already knows about you. There&rsquo;s no agent in this
+          playground, so here&rsquo;s the raw instruction it would act on:
         </p>
         <pre className="whitespace-pre-wrap rounded-sm bg-neutral-1 p-2.5 font-mono text-[0.75rem] leading-[1.5] text-neutral-11">
           {data.summaryTemplate}
