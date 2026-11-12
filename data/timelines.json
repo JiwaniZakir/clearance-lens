@@ -1,0 +1,75 @@
+{
+  "lastVerified": "2026-11-11",
+  "investigations": {
+    "secret": {
+      "medianDays": null,
+      "meanDays": 197,
+      "source": {
+        "title": "DCSA Inventory & Timeliness | Industry — NISPPAC Public Meeting Slides, September 2, 2026 (data as of Aug. 17, 2026)",
+        "url": "https://www.archives.gov/files/isoo/oversight-groups/nisppac/20260902-nisppac-public-meeting-slides.pdf",
+        "lastVerified": "2026-11-11"
+      },
+      "notes": "DCSA's own industry (contractor-population) average for an initial Secret clearance, FY2026 Q3: 21 days initiation + 59 days investigation + 117 days adjudication = 197 days end-to-end. DCSA changed its measurement methodology mid-reform to report averages across 100% of cases (replacing the older 'fastest 90% of cases' method), which tends to raise reported numbers but better reflects what an actual applicant experiences. No primary source gives a median, only quarterly averages, so medianDays is left null rather than estimated. A companion, government-wide (not industry-only) figure from the Performance Accountability Council's Trusted Workforce 2.0 QPR for the same quarter shows the investigation phase ALONE (not end-to-end) averaging 61 days for Moderate-Risk/Secret-tier cases under the new 100%-of-cases method (49 days under the legacy 'fastest 90%' method) — consistent with the 59-day industry investigation figure above once isolated from initiation/adjudication. Figures swing quarter to quarter (197 days follows 180, 209, and 183 in the prior three quarters) — treat as a snapshot, not a guarantee, and check for a newer DCSA/NISPPAC release."
+    },
+    "ts": {
+      "medianDays": null,
+      "meanDays": 243,
+      "source": {
+        "title": "DCSA Inventory & Timeliness | Industry — NISPPAC Public Meeting Slides, September 2, 2026 (data as of Aug. 17, 2026)",
+        "url": "https://www.archives.gov/files/isoo/oversight-groups/nisppac/20260902-nisppac-public-meeting-slides.pdf",
+        "lastVerified": "2026-11-11"
+      },
+      "notes": "DCSA's own industry (contractor-population) average for an initial Top Secret clearance, FY2026 Q3: 20 days initiation + 97 days investigation + 126 days adjudication = 243 days end-to-end. This exactly matches the figure the product brief carried forward from an earlier estimate — it is independently reconfirmed here as DCSA's current published number, not stale. No primary source gives a median, only quarterly averages, so medianDays is left null rather than estimated. A companion, government-wide (not industry-only) figure from the Performance Accountability Council's Trusted Workforce 2.0 QPR for the same quarter shows the investigation phase ALONE (not end-to-end) averaging 82 days for High-Risk/Top-Secret-tier cases under the new 100%-of-cases method (67 days under the legacy 'fastest 90%' method) — in the same range as the 97-day industry investigation figure above. The investigation phase has fallen sharply over the last year (234 days four quarters ago to 97 now) while the adjudication phase has risen just as sharply (40 days four quarters ago to 126 now), which is why end-to-end totals (333, 259, 221, 243 over the last four quarters) have not improved net and ticked back up this quarter. Treat as a snapshot, not a guarantee, and check for a newer DCSA/NISPPAC release."
+    }
+  },
+  "modifiers": [
+    {
+      "id": "interim",
+      "appliesTo": ["secret", "ts"],
+      "effectDescription": "An interim/temporary eligibility determination can let someone start Secret- or Top-Secret-level collateral work well before the full investigation and adjudication finish, if preliminary checks (citizenship, basic records) show no disqualifying information yet. It never covers Restricted Data, COMSEC, or NATO classified information (those always require a final determination), and SCI/Special Access Program access on an interim basis is discretionary, decided case by case. It is capped at one year by regulation and is fully revocable if the completed investigation turns up a problem. No current primary source publishes an average number of days to GRANT an interim, so no day range is given here — ask the sponsoring FSO for a case-specific estimate.",
+      "typicalDaysMin": null,
+      "typicalDaysMax": null,
+      "source": {
+        "title": "32 CFR § 117.10 — Determination of Eligibility for Access to Classified Information for Contractor Employees (Cornell LII)",
+        "url": "https://www.law.cornell.edu/cfr/text/32/117.10",
+        "lastVerified": "2026-11-11"
+      }
+    },
+    {
+      "id": "lapsed_lt_2y",
+      "appliesTo": ["secret", "ts"],
+      "effectDescription": "If the break in federal service or classified access is under 24 months AND the person's prior investigation is still within its 7-year validity window with no new derogatory information, SEAD 7 reciprocity generally applies: the new employer/agency should accept the existing eligibility rather than opening a brand-new investigation, and a reciprocity determination is supposed to be made in about 5 business days. Real-world administrative processing (routing the request, pulling records, re-verifying the position's access needs) commonly takes somewhat longer than that formal target.",
+      "typicalDaysMin": 5,
+      "typicalDaysMax": 20,
+      "source": {
+        "title": "SEAD 7 — Reciprocity of Background Investigations and National Security Adjudications (Federation of American Scientists mirror)",
+        "url": "https://sgp.fas.org/othergov/intel/sead-7.pdf",
+        "lastVerified": "2026-11-11"
+      }
+    },
+    {
+      "id": "lapsed_gt_2y",
+      "appliesTo": ["secret", "ts"],
+      "effectDescription": "Once the break in federal service or classified access exceeds 24 months, SEAD 7 reciprocity generally no longer applies, regardless of how clean the old investigation was. Expect the case to be processed essentially as a new initial investigation — same order of magnitude as the 'secret'/'ts' end-to-end figures above, not the fast reciprocity path.",
+      "typicalDaysMin": 180,
+      "typicalDaysMax": 270,
+      "source": {
+        "title": "SEAD 7 — Reciprocity of Background Investigations and National Security Adjudications (Federation of American Scientists mirror)",
+        "url": "https://sgp.fas.org/othergov/intel/sead-7.pdf",
+        "lastVerified": "2026-11-11"
+      }
+    },
+    {
+      "id": "no_fcl",
+      "appliesTo": ["secret", "ts"],
+      "effectDescription": "If the employer does not already hold a Facility Clearance, no employee investigation can even begin on that employer's behalf until a sponsor (a government contracting activity, or an already-cleared prime contractor needing to subcontract) requests an FCL for the company through DCSA, and DCSA approves it. This is highly variable and depends far more on finding a willing sponsor and submitting a clean package than on any fixed government processing time — DCSA itself declines to commit to a timeline, and first-time FCL packages are rejected on their first submission a majority of the time. Industry sources commonly describe 3-9 months from sponsorship to a granted FCL for a straightforward case; foreign ownership/control/influence (FOCI) issues or an incomplete package routinely push this to 6-18 months. This is in addition to, not instead of, the normal per-employee investigation/adjudication time above.",
+      "typicalDaysMin": 90,
+      "typicalDaysMax": 270,
+      "source": {
+        "title": "DCSA — Facility Clearance Orientation Handbook (August 2026)",
+        "url": "https://www.dcsa.mil/Portals/128/Documents/CTP/fc/DCSA%20FCL_Orientation_Handbook_20260828.pdf",
+        "lastVerified": "2026-11-11"
+      }
+    }
+  ]
+}

@@ -1,0 +1,244 @@
+{
+  "lastVerified": "2026-11-11",
+  "rules": [
+    {
+      "id": "itar-us-person",
+      "title": "ITAR \"U.S. Person\" Definition",
+      "category": "itar",
+      "summary": "Under ITAR (22 CFR 120.62), a \"U.S. person\" is a U.S. citizen, a lawful permanent resident (green card holder), or a \"protected individual\" under 8 U.S.C. 1324b(a)(3) (which also covers certain asylees/refugees who timely pursue naturalization). Anyone else — including H-1B, L-1, O-1, F-1/OPT, J-1, and TN visa holders — is a \"foreign person\" under 22 CFR 120.63, no matter how long they've lived or worked in the U.S. Most defense-tech roles touching USML-controlled technical data require the worker to be a U.S. person, or the employer to hold a specific DDTC license/exemption for that individual. This is strictly a citizenship/immigration-status test — it has nothing to do with whether someone already holds a security clearance.",
+      "keyPoints": [
+        "U.S. person = citizen, green card holder (LPR), or certain protected asylees/refugees (8 U.S.C. 1324b(a)(3))",
+        "Does NOT include H-1B, L-1, O-1, F-1/OPT, J-1, TN, or any other non-immigrant visa holder",
+        "Green card holders qualify directly as \"lawful permanent resident\" (8 U.S.C. 1101(a)(20)) — no naturalization-timing condition attached to that prong",
+        "Asylees/refugees without a green card qualify only if they applied for naturalization within the timeframes 8 U.S.C. 1324b(a)(3) requires",
+        "A company can still employ foreign persons under a specific DDTC license or exemption, but that's the exception, not the default"
+      ],
+      "sources": [
+        { "title": "22 CFR § 120.62 — U.S. Person (eCFR)", "url": "https://www.ecfr.gov/current/title-22/chapter-I/subchapter-M/part-120/subpart-C/section-120.62", "lastVerified": "2026-11-11" },
+        { "title": "22 CFR § 120.63 — Foreign Person (eCFR)", "url": "https://www.ecfr.gov/current/title-22/chapter-I/subchapter-M/part-120/subpart-C/section-120.63", "lastVerified": "2026-11-11" },
+        { "title": "8 U.S.C. § 1324b(a)(3) — \"Protected Individual\" Defined (Cornell LII)", "url": "https://www.law.cornell.edu/uscode/text/8/1324b", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "deemed-export",
+      "title": "EAR \"Deemed Export\" vs. ITAR",
+      "category": "itar",
+      "summary": "Under the Export Administration Regulations (EAR, 15 CFR 734.13), releasing controlled \"technology\" or source code to a foreign person inside the U.S. is legally treated as an export to that person's country of citizenship or permanent residency — a \"deemed export.\" EAR is administered by Commerce's Bureau of Industry and Security (BIS), a separate regime from ITAR's DDTC/State Department. Practically, EAR is more graduated than ITAR: it exempts U.S. dual citizens and green card holders outright, and allows case-by-case deemed-export licenses for other foreign nationals depending on their specific nationality and the technology involved. ITAR has no equivalent per-nationality licensing path for most defense articles — it is close to a binary U.S.-person/foreign-person test instead. For an engineering job: if the work touches USML-controlled defense technical data, expect an essentially all-U.S.-persons team; if it's \"dual-use\" tech controlled only under EAR, a foreign-national teammate may be workable with the right export license.",
+      "keyPoints": [
+        "Deemed export = releasing controlled technology or source code to a foreign person inside the U.S., treated as an export to their home country (15 CFR 734.13(b))",
+        "Administered by BIS/Commerce (EAR) — a distinct regime from DDTC/State (ITAR)",
+        "EAR explicitly exempts U.S. dual citizens and green card holders from deemed-export treatment",
+        "EAR licensing can be nationality-specific and case-by-case; ITAR generally cannot — ITAR is closer to all-or-nothing U.S.-person access",
+        "Which regime applies depends on whether the specific technology is on the USML (ITAR) or is dual-use/EAR-only"
+      ],
+      "sources": [
+        { "title": "15 CFR § 734.13 — Export, Reexport, and Release (eCFR)", "url": "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-734/section-734.13", "lastVerified": "2026-11-11" },
+        { "title": "BIS — Deemed Exports Policy Guidance", "url": "https://www.bis.doc.gov/index.php/enforcement/oee/14-policy-guidance/deemed-exports", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "sf86-eapp",
+      "title": "SF-86 and the eApp Filing System",
+      "category": "clearance-process",
+      "summary": "The SF-86 (\"Questionnaire for National Security Positions\") is the core background-investigation form behind any security clearance, and it is filed electronically, not on paper. The legacy e-QIP filing portal is being phased out in favor of \"eApp,\" and the underlying form itself is also changing: DCSA began an internal rollout of a new, consolidated \"Personnel Vetting Questionnaire\" (PVQ) in April 2026, intended to eventually replace the SF-86/SF-85/SF-85P forms outright. Only the updated (February 2024 edition) SF-86 filed through eApp has been accepted since mid-2025; older/legacy-form submissions stopped being accepted August 1, 2025. Candidates fill this out themselves once sponsored by an employer — it covers 10+ years of history, foreign contacts, and finances, and should never be filled out by, or shared with, a third party.",
+      "keyPoints": [
+        "SF-86 = the standard background-investigation questionnaire for national security positions",
+        "Filed electronically via \"eApp,\" which is replacing the older \"e-QIP\" portal",
+        "Pre-2024 paper/legacy SF-86 versions stopped being accepted August 1, 2025",
+        "A further-consolidated \"Personnel Vetting Questionnaire\" (PVQ) began internal DCSA rollout in April 2026 and is intended to eventually replace SF-86/85/85P",
+        "OPM has not proposed content changes to the SF-86 form itself pending this broader replacement"
+      ],
+      "sources": [
+        { "title": "Federal Register — OPM Notice on SF-86/SF-85 Information Collection", "url": "https://www.govinfo.gov/content/pkg/FR-2026-07-09/html/2026-13868.htm", "lastVerified": "2026-11-11" },
+        { "title": "DCSA — Electronic Questionnaires for Investigations Processing (e-QIP)", "url": "https://www.dcsa.mil/is/eqip", "lastVerified": "2026-11-11" },
+        { "title": "Trusted Workforce 2.0 Quarterly Progress Report, FY2026 Q3 (Performance Accountability Council)", "url": "https://assets.performance.gov/files/Personnel_Vetting_QPR_(FY26-Q3).pdf", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "nbis-diss",
+      "title": "NBIS vs. DISS: Current System of Record",
+      "category": "clearance-process",
+      "summary": "DISS (Defense Information System for Security) replaced the older JPAS as the system of record in 2021. The National Background Investigation Services (NBIS) program was meant to eventually replace DISS entirely, but as of November 2026 that full cutover has not happened — DCSA has actually pulled key case-management functions back toward an upgraded DISS. Industry case-initiation and review (\"IRA\") functionality moved into \"DISS-JVS\" on July 31, 2026; September 30, 2026 was the last day to start new cases in \"NBIS-Agency\"; and NBIS-Agency becomes fully read-only after November 30, 2026, with any unfinished case needing to be re-started in DISS-JVS. In short: DISS-JVS, not NBIS, is the live day-to-day system right now. Either way, access to these systems is restricted to vetted Facility Security Officers — individual candidates and recruiters cannot query them directly, which is exactly why self-attestation plus FSO verification at offer stage remain the only legitimate path.",
+      "keyPoints": [
+        "JPAS → DISS transition completed in 2021 (DISS became system of record March 31, 2021)",
+        "NBIS was meant to replace DISS, but as of Nov 2026 that full replacement has not happened",
+        "DCSA is moving case-initiation/review functions back into an upgraded \"DISS-JVS,\" not forward into NBIS",
+        "Key 2026 dates: DISS-JVS industry go-live July 31; last NBIS-Agency case-initiation Sept 30; NBIS-Agency read-only after Nov 30",
+        "Only FSOs can query DISS/NBIS/Scattered Castles — there is no way for a candidate or recruiter to self-verify a clearance in these systems"
+      ],
+      "sources": [
+        { "title": "DCSA News — Industry Transition to DISS for Initiate and Review (I/R) Functionality", "url": "https://www.dcsa.mil/About-Us/News/Article/Article/4563691/industry-transition-to-diss-for-initiate-and-review-ir-functionality/", "lastVerified": "2026-11-11" },
+        { "title": "National Background Investigation Services (NBIS) Portal", "url": "https://vetting.nbis.mil/authentication", "lastVerified": "2026-11-11" },
+        { "title": "Trusted Workforce 2.0 Quarterly Progress Report, FY2026 Q3 (Performance Accountability Council)", "url": "https://assets.performance.gov/files/Personnel_Vetting_QPR_(FY26-Q3).pdf", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "sead4",
+      "title": "SEAD 4: The 13 Adjudicative Guidelines",
+      "category": "eligibility",
+      "summary": "Security Executive Agent Directive 4 (signed by the Director of National Intelligence in December 2016, effective June 8, 2017) sets the single, government-wide set of criteria every agency uses to decide whether to grant or keep someone's security clearance eligibility. It defines 13 guidelines, lettered A through M, each evaluated together under a \"whole person\" concept — no single factor is automatically disqualifying, and every guideline lists both disqualifying and mitigating conditions. No superseding revision of SEAD 4 was found as of this research date; it remains the current, controlling version.",
+      "keyPoints": [
+        "A — Allegiance to the United States",
+        "B — Foreign Influence",
+        "C — Foreign Preference",
+        "D — Sexual Behavior",
+        "E — Personal Conduct",
+        "F — Financial Considerations",
+        "G — Alcohol Consumption",
+        "H — Drug Involvement and Substance Misuse",
+        "I — Psychological Conditions",
+        "J — Criminal Conduct",
+        "K — Handling Protected Information",
+        "L — Outside Activities",
+        "M — Use of Information Technology"
+      ],
+      "sources": [
+        { "title": "SEAD 4 — National Security Adjudicative Guidelines (June 8, 2017) — hosted by U.S. Department of Energy", "url": "https://www.energy.gov/sites/prod/files/2018/02/f48/SEAD4_20170608.pdf", "lastVerified": "2026-11-11" },
+        { "title": "SEAD 4 — National Security Adjudicative Guidelines (Federation of American Scientists mirror)", "url": "https://sgp.fas.org/othergov/intel/sead-4.pdf", "lastVerified": "2026-11-11" },
+        { "title": "DOD CAF — Whole Person Concept Fact Sheet", "url": "https://www.dcsa.mil/Portals/91/Documents/pv/DODCAF/DOD_CAF_Whole_Person_Factsheet_042021.pdf", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "sead7",
+      "title": "SEAD 7: Clearance Reciprocity",
+      "category": "reciprocity",
+      "summary": "Security Executive Agent Directive 7 (November 9, 2018) requires federal agencies to accept another authorized agency's existing background investigation and clearance-eligibility determination at the same or higher level, instead of re-investigating someone from scratch, as long as the investigation is still within scope. For industry/contractor employees specifically, this duty is implemented through 32 CFR 117.10 (the NISPOM rule). Reciprocity generally holds as long as the break in federal service or classified access does not exceed 24 months and the underlying investigation is not older than 7 years with no new derogatory information — within those bounds, a reciprocity determination is supposed to be made within about 5 business days. Only the Security Executive Agent (the DNI) may generally disallow reciprocal recognition, and only for specific national-security reasons.",
+      "keyPoints": [
+        "Agencies must accept another authorized agency's clearance eligibility at the same or higher level",
+        "Reciprocity generally applies only if the break in access/employment is under 24 months and the investigation is under 7 years old with no new adverse information",
+        "A reciprocity determination on a still-valid case is supposed to be made within about 5 business days",
+        "For NISP/contractor personnel, reciprocity is implemented via 32 CFR 117.10",
+        "Only the Security Executive Agent (DNI) can generally disallow reciprocal recognition, for specific national-security reasons"
+      ],
+      "sources": [
+        { "title": "SEAD 7 — Reciprocity of Background Investigations and National Security Adjudications (Federation of American Scientists mirror)", "url": "https://sgp.fas.org/othergov/intel/sead-7.pdf", "lastVerified": "2026-11-11" },
+        { "title": "ICPG 704.4 — Reciprocity of Personnel Security Clearance and Access Determinations (April 6, 2022)", "url": "https://archive.dni.gov/files/documents/ICPG/ICPG-704-4-Reciprocity-of-Personnel-Security-Clearance-and-Access-Determinations-20220406.pdf", "lastVerified": "2026-11-11" },
+        { "title": "32 CFR § 117.10 — Determination of Eligibility for Access to Classified Information for Contractor Employees (Cornell LII)", "url": "https://www.law.cornell.edu/cfr/text/32/117.10", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "continuous-vetting",
+      "title": "Continuous Vetting (Trusted Workforce 2.0)",
+      "category": "continuous-vetting",
+      "summary": "Continuous Vetting (CV) replaces the old model of one deep reinvestigation every 5-10 years with ongoing, automated record checks (criminal, terrorism, financial, public records, foreign travel, and more) that generate alerts for a human adjudicator to review as they occur. It is the centerpiece of the government's \"Trusted Workforce 2.0\" reform. As of the end of June 2026, DCSA formally retired legacy periodic reinvestigations for the national-security workforce (with only limited exceptions), making CV the default; the broader federal \"public trust\" population is still being enrolled (about 54% as of mid-2026, expected substantially complete by the end of 2026). Day to day, a cleared person generally no longer faces one big reinvestigation case every several years — instead they are expected to self-report qualifying life events between automated checks, and an alert can trigger a review at any time rather than only on a fixed schedule.",
+      "keyPoints": [
+        "Replaces periodic reinvestigation (previously every 5 years for TS/SCI, 5-10 years for Secret) with ongoing automated checks",
+        "Legacy periodic reinvestigations for the national-security population were formally retired at the end of June 2026",
+        "Automated alerts (financial, criminal, terrorism, travel, public records) are reviewed by adjudicators as they occur, not on a fixed cycle",
+        "NISP contractor personnel now get a simplified questionnaire every 5 years instead of a full reinvestigation case (announced May 19, 2026)",
+        "Non-sensitive public trust federal population enrollment is still ramping (~54% as of FY2026 Q3)"
+      ],
+      "sources": [
+        { "title": "Trusted Workforce 2.0 Quarterly Progress Report, FY2026 Q3 (Performance Accountability Council)", "url": "https://assets.performance.gov/files/Personnel_Vetting_QPR_(FY26-Q3).pdf", "lastVerified": "2026-11-11" },
+        { "title": "DCSA — Continuous Vetting", "url": "https://www.dcsa.mil/Personnel-Vetting/Continuous-Vetting/", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "interim-clearance",
+      "title": "Interim (Temporary) Clearance Eligibility",
+      "category": "clearance-process",
+      "summary": "An interim — officially \"temporary\" — eligibility determination lets someone start working at the Top Secret, Secret, or Confidential level before their full investigation and final adjudication are complete, based on preliminary checks showing no disqualifying information so far. It does not cover Restricted Data, COMSEC, or NATO classified information, which always require a final determination, and SCI/Special Access Program access on an interim basis is discretionary and decided case by case. Only U.S. citizens can receive temporary eligibility, and by regulation (32 CFR 117.10) it cannot last more than one year without specific extension approval. It is fully revocable if the completed investigation turns up a problem.",
+      "keyPoints": [
+        "Covers Top Secret/Secret/Confidential collateral work only — not RD, COMSEC, or NATO information",
+        "SCI/SAP access on an interim basis is case-by-case, not automatic",
+        "Only U.S. citizens are eligible for temporary/interim eligibility",
+        "Capped at one year by regulation (32 CFR 117.10) absent specific approval to extend",
+        "Fully revocable — it is a preliminary determination, not a guarantee"
+      ],
+      "sources": [
+        { "title": "32 CFR § 117.10 — Determination of Eligibility for Access to Classified Information for Contractor Employees (Cornell LII)", "url": "https://www.law.cornell.edu/cfr/text/32/117.10", "lastVerified": "2026-11-11" },
+        { "title": "DCSA — Interim Clearances", "url": "https://www.dcsa.mil/mc/pv/fso/interim_clearances", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "fcl-sponsorship",
+      "title": "Facility Clearance (FCL) Sponsorship for a New Company",
+      "category": "sponsorship",
+      "summary": "A Facility Clearance (FCL) lets a specific company location store, access, or work with classified information, and a company cannot apply for one on its own — it must be sponsored, either by a government contracting activity with a classified contract for that company or by an already-cleared prime contractor that needs to subcontract classified work to it. The sponsor submits a request through DCSA's National Industrial Security System, typically including a DD Form 254 and a sponsorship letter; DCSA's Facility Clearance Branch then reviews it, and if accepted, the company generally has about 20 days to return required paperwork once DCSA's processing clock starts. The government funds DCSA's own FCL processing; the company's real cost is building out compliant security processes and designating a Facility Security Officer (FSO) beforehand. For an early-stage startup with no FCL yet, the first real bottleneck is usually finding a willing sponsor, not DCSA's internal processing — and first-time FCL packages are rejected on their first submission a majority of the time, which routinely adds weeks to months.",
+      "keyPoints": [
+        "A company cannot self-apply for an FCL — it must be sponsored by a government contracting activity or an already-cleared prime contractor",
+        "Sponsorship request goes through DCSA's NISS, usually with a DD Form 254 and a sponsorship letter",
+        "The company should designate a Facility Security Officer (FSO) before or at sponsorship",
+        "No government fee for FCL processing itself — the company's cost is internal compliance and FSO time",
+        "Initial/upgrade FCL packages are rejected on first submission a majority of the time (DCSA-cited ~70% rejection rate, ~2.5 submission cycles on average), which adds real time",
+        "Industry sources commonly describe a 3-9 month range from sponsorship to a granted FCL for straightforward cases, and 6-18 months where foreign ownership/control/influence (FOCI) mitigation is involved; DCSA itself declines to commit to a fixed timeline"
+      ],
+      "sources": [
+        { "title": "DCSA — Facility Clearance Orientation Handbook (August 2026)", "url": "https://www.dcsa.mil/Portals/128/Documents/CTP/fc/DCSA%20FCL_Orientation_Handbook_20260828.pdf", "lastVerified": "2026-11-11" },
+        { "title": "DCSA — Small Business Guide to the Facility Clearance Process", "url": "https://www.dcsa.mil/Portals/91/Documents/about/business/DCSA_SB_Guide_Facility_Clearance_Process_Aug2019.pdf", "lastVerified": "2026-11-11" },
+        { "title": "Office of Naval Research — Roadmap to Getting a Facility Clearance/FCL Sponsorship", "url": "https://www.onr.navy.mil/media/document/roadmap-getting-facility-clearancefcl-sponsorship", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "dcsa-timeliness",
+      "title": "Current DCSA Clearance Timeliness (FY2026 Q3)",
+      "category": "clearance-process",
+      "summary": "DCSA's own FY2026 Q3 industry figures, presented at the September 2, 2026 NISPPAC public meeting, show an initial Top Secret clearance for industry averaging 243 days end-to-end (20 days initiation + 97 days investigation + 126 days adjudication), and an initial Secret clearance averaging 197 days end-to-end (21 + 59 + 117). These figures have moved a great deal over the past two years: the investigation phase itself has gotten much faster (Top Secret investigation time fell from 234 days a year earlier to 97 days), but the adjudication phase has gotten slower by nearly as much (40 to 126 days for Top Secret over the same period), so total end-to-end time has not improved much and ticked back up this quarter. A separate, government-wide (not industry-specific) measure from the Performance Accountability Council shows the investigation phase alone averaging 61 days for Secret-tier and 82 days for Top-Secret-tier cases in the same quarter, consistent with the industry figures once the investigation step is isolated.",
+      "keyPoints": [
+        "Initial TS (industry), FY2026 Q3: ~243 days end-to-end (20 initiate + 97 investigate + 126 adjudicate)",
+        "Initial Secret (industry), FY2026 Q3: ~197 days end-to-end (21 initiate + 59 investigate + 117 adjudicate)",
+        "Investigation time has dropped sharply since FY2024-2025; adjudication time has risen just as sharply — that is the current bottleneck",
+        "These are DCSA's own published figures (NISPPAC meeting, Sept. 2026), not a stale historical estimate",
+        "Figures move quarter to quarter; treat as a snapshot and check for a newer NISPPAC/DCSA release before relying on them long-term"
+      ],
+      "sources": [
+        { "title": "DCSA Inventory & Timeliness | Industry — NISPPAC Public Meeting Slides, September 2, 2026 (data as of Aug. 17, 2026)", "url": "https://www.archives.gov/files/isoo/oversight-groups/nisppac/20260902-nisppac-public-meeting-slides.pdf", "lastVerified": "2026-11-11" },
+        { "title": "Trusted Workforce 2.0 Quarterly Progress Report, FY2026 Q3 (Performance Accountability Council)", "url": "https://assets.performance.gov/files/Personnel_Vetting_QPR_(FY26-Q3).pdf", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "zkp-credentials",
+      "title": "Zero-Knowledge Passport Proofs (Self, zkPassport)",
+      "category": "verification-tech",
+      "summary": "Self Protocol and zkPassport are open-source systems that let someone scan their passport, national ID, or similar chip-based document with their phone and generate a zero-knowledge proof of a specific fact — like being over 18, a citizen of a given country, a unique human, or not on a sanctions list — without revealing the underlying document or any other personal data. Both generate the proof on the user's own device and explicitly avoid storing documents or raw data centrally. These are general-purpose identity/humanity tools (built for things like KYC, Sybil-resistant distribution, and age verification) — they have no connection to the U.S. personnel-security-clearance system and cannot prove, and do not claim to prove, that someone holds any level of security clearance.",
+      "keyPoints": [
+        "Both generate zero-knowledge proofs client-side from an NFC passport/ID chip scan",
+        "Can prove: age threshold, nationality/citizenship, personhood/uniqueness, sanctions-list status, document validity",
+        "Cannot prove, and are not designed to prove, security clearance status or classified-access eligibility",
+        "No integration with DISS, NBIS, Scattered Castles, or any DCSA system",
+        "The closest thing to a real-world analogy for a future \"prove a fact without showing the document\" clearance credential — but no such clearance credential exists today"
+      ],
+      "sources": [
+        { "title": "Self Protocol — Official Site", "url": "https://self.xyz/", "lastVerified": "2026-11-11" },
+        { "title": "zkPassport — Documentation", "url": "https://docs.zkpassport.id/intro", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "w3c-vc",
+      "title": "W3C Verifiable Credentials 2.0 and SD-JWT",
+      "category": "verification-tech",
+      "summary": "W3C Verifiable Credentials Data Model 2.0 became an official, finished W3C Recommendation on May 15, 2025 — the standard web format for cryptographically-signed, tamper-evident digital credentials (comparable to a digital diploma or ID card). It deliberately supports multiple ways of cryptographically \"securing\" a credential, including SD-JWT. SD-JWT itself (the selective-disclosure mechanism that lets a holder reveal only some fields of a credential) was finalized by the IETF as RFC 9901 in November 2025. A richer profile built on it, \"SD-JWT VC,\" is further along in standardization (draft revision -22 as of October 2026, in IESG review) but is not yet a final RFC. A VC 2.1 maintenance update is already in early draft (April 2026) under a new 2026-2028 working group charter. None of this is specific to clearances — it is general infrastructure for any digital credential.",
+      "keyPoints": [
+        "VC Data Model 2.0 = W3C Recommendation (finished standard) since May 15, 2025",
+        "VC 2.0 supports multiple credential-securing mechanisms, including SD-JWT, not just one",
+        "Base SD-JWT mechanism = finalized as RFC 9901 (IETF, November 2025)",
+        "SD-JWT VC (the verifiable-credential profile) is still an in-progress IETF draft (rev. -22, Oct. 2026), not yet a final RFC",
+        "A VC 2.1 maintenance revision is already in First Public Working Draft (April 2026)"
+      ],
+      "sources": [
+        { "title": "W3C — Verifiable Credentials Data Model v2.0 (Recommendation)", "url": "https://www.w3.org/TR/vc-data-model-2.0/", "lastVerified": "2026-11-11" },
+        { "title": "W3C News — The Verifiable Credentials 2.0 Family of Specifications Is Now a W3C Recommendation", "url": "https://www.w3.org/news/2025/the-verifiable-credentials-2-0-family-of-specifications-is-now-a-w3c-recommendation/", "lastVerified": "2026-11-11" },
+        { "title": "RFC 9901 — Selective Disclosure for JSON Web Tokens (SD-JWT)", "url": "https://www.rfc-editor.org/rfc/rfc9901.html", "lastVerified": "2026-11-11" },
+        { "title": "IETF — draft-ietf-oauth-sd-jwt-vc-22 (SD-JWT-based Verifiable Digital Credentials)", "url": "https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/22/", "lastVerified": "2026-11-11" },
+        { "title": "W3C Verifiable Credentials Working Group Charter (2026-2028)", "url": "https://w3c.github.io/vc-charter-2026/", "lastVerified": "2026-11-11" }
+      ]
+    },
+    {
+      "id": "mdl-iso18013",
+      "title": "Mobile Driver's License (mDL) / ISO 18013-5",
+      "category": "verification-tech",
+      "summary": "ISO/IEC 18013-5:2021 is the international standard defining how a phone-based mobile driver's license works and how it is presented to a verifier (for example, at an airport security checkpoint); it was approved in August 2021 and remains the currently-published edition, though a second edition is already in development (committee-draft stage as of 2026, not yet published). In the U.S., AAMVA layers additional implementation guidance on top of it for state DMV mDL programs, several states (including California, Colorado, Arizona, and Maryland) have live mDL programs built on it, and TSA's CAT-2 readers at 250+ airport checkpoints already accept an 18013-5-compliant mDL. Like the zero-knowledge passport tools above, this proves identity/age-type facts from a state-issued credential — it has no relationship to security clearance status.",
+      "keyPoints": [
+        "ISO/IEC 18013-5:2021 defines the mDL data model and verifier-presentation protocol; approved August 2021",
+        "A companion standard, ISO/IEC 18013-7, covering remote/online presentation, was published in 2024",
+        "A second edition of 18013-5 is in development (committee-draft stage) but not yet published",
+        "AAMVA adds U.S.-specific implementation guidance for state DMV programs",
+        "TSA's CAT-2 readers already accept 18013-5-compliant mDLs at 250+ U.S. airport checkpoints",
+        "Proves identity/age facts from a driver's-license-grade credential — unrelated to clearance status"
+      ],
+      "sources": [
+        { "title": "ISO/IEC 18013-5:2021 — Personal Identification — ISO-compliant Driving Licence — Part 5: Mobile Driving Licence (mDL) Application", "url": "https://www.iso.org/standard/69084.html", "lastVerified": "2026-11-11" }
+      ]
+    }
+  ]
+}

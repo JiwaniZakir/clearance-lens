@@ -61,10 +61,26 @@ describe("speedrun client", () => {
     });
   });
 
-  it("falls back to a generic message when the error body isn't JSON", async () => {
+  it("retries a 5xx a bounded number of times, then falls back to a generic message when the error body isn't JSON", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("<html>502</html>", { status: 502 }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await expect(getJob("x")).rejects.toBeInstanceOf(SpeedrunApiError);
+    const promise = expect(getJob("x")).rejects.toBeInstanceOf(SpeedrunApiError);
+    await vi.runAllTimersAsync();
+    await promise;
+    expect(fetchMock).toHaveBeenCalledTimes(3); // MAX_RETRIES, confirmed bounded rather than infinite
+  });
+
+  it("retries a transient 500 and succeeds once the upstream recovers (reproduces a real failure seen live against the Speedrun API)", async () => {
+    const serverError = new Response(null, { status: 500 });
+    const ok = new Response(JSON.stringify({ job: { id: "y" } }), { status: 200 });
+    const fetchMock = vi.fn().mockResolvedValueOnce(serverError).mockResolvedValueOnce(ok);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const promise = getJob("y");
+    await vi.runAllTimersAsync();
+    const result = await promise;
+    expect(result.job.id).toBe("y");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

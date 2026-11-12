@@ -1,0 +1,133 @@
+import { z } from "zod";
+import { TIMELINES, findModifier } from "@/lib/timelines-data";
+import { findRule } from "@/lib/rules-data";
+import { DISCLAIMERS } from "@/lib/disclaimers";
+import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
+
+const InputSchema = z.object({
+  target_level: z.enum(["secret", "ts", "ts_sci"]),
+  current_status: z.enum(["none", "interim", "active", "lapsed_lt_2y", "lapsed_gt_2y"]),
+  employer_has_fcl: z.enum(["yes", "no", "unknown"]).default("unknown"),
+});
+
+const OutputSchema = z.object({
+  estimate: z.object({
+    minDays: z.number().nullable(),
+    maxDays: z.number().nullable(),
+    medianDays: z.number().nullable(),
+  }),
+  keyDrivers: z.array(z.object({ label: z.string(), detail: z.string() })),
+  uncertaintyNote: z.string(),
+  sources: z.array(SourceRefSchema),
+  disclaimer: z.string(),
+});
+
+type Output = z.infer<typeof OutputSchema>;
+
+function dedupeSources(sources: z.infer<typeof SourceRefSchema>[]) {
+  const seen = new Set<string>();
+  return sources.filter((s) => (seen.has(s.url) ? false : (seen.add(s.url), true)));
+}
+
+export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> = {
+  name: "estimate_timeline",
+  title: "Estimate clearance timeline",
+  description:
+    "Estimates how long reaching a target clearance level might realistically take, given current status and whether the employer has a Facility Clearance (FCL) yet. Returns a range with key drivers and an explicit uncertainty note — never a false-precision single number.",
+  inputSchema: InputSchema,
+  outputSchema: OutputSchema,
+  handler: async ({ target_level, current_status, employer_has_fcl }) => {
+    const investigationKey = target_level === "ts_sci" ? "ts" : target_level;
+    const base = TIMELINES.investigations[investigationKey];
+    const drivers: Output["keyDrivers"] = [];
+    const sources: z.infer<typeof SourceRefSchema>[] = [];
+
+    // DCSA publishes quarterly AVERAGES, not medians (confirmed in research/R4 —
+    // medianDays is null for both levels as of this data's lastVerified date).
+    // Rather than leaving minDays null while maxDays holds a value (which reads
+    // as a bug, not a deliberate "we only have one number"), collapse to a
+    // single honest point estimate when that's genuinely all the source gives.
+    const basePoint = base.medianDays ?? base.meanDays;
+    let estimate: Output["estimate"] = {
+      minDays: basePoint,
+      maxDays: basePoint,
+      medianDays: base.medianDays,
+    };
+    drivers.push({ label: "Baseline initial investigation", detail: base.notes });
+    sources.push(base.source);
+
+    if (target_level === "ts_sci") {
+      drivers.push({
+        label: "SCI access determination",
+        detail:
+          "TS/SCI adds an SCI access determination on top of the TS investigation. We don't have a verified separate figure for that step — the range above reflects the TS investigation only.",
+      });
+    }
+
+    if (current_status === "active") {
+      estimate = { minDays: null, maxDays: null, medianDays: null };
+      const reciprocityRule = findRule("sead7") ?? findRule("reciprocity");
+      drivers.length = 0;
+      drivers.push({
+        label: "Already active at or above this level",
+        detail:
+          "Under SEAD 7 reciprocity, agencies are generally expected to accept an existing active clearance rather than re-investigate from scratch — typically an administrative transfer, not a new investigation. We don't have a verified day-count for this case; it's usually much faster than an initial investigation.",
+      });
+      if (reciprocityRule) sources.push(...reciprocityRule.sources);
+    } else if (current_status === "interim" || current_status === "lapsed_lt_2y" || current_status === "lapsed_gt_2y") {
+      const modifier = findModifier(current_status);
+      if (!modifier) {
+        // Data genuinely lacks this modifier (shouldn't happen once research/R4
+        // has landed, but stay honest rather than silently matching on nothing).
+        drivers.push({
+          label: `Status: ${current_status.replace(/_/g, " ")}`,
+          detail:
+            "We don't have a verified figure specific to this status yet, so the baseline initial-investigation estimate above is shown. Ask your FSO for a case-specific read.",
+        });
+      } else if (modifier.typicalDaysMin !== null || modifier.typicalDaysMax !== null) {
+        // A real, numeric modifier (e.g. a lapsed-clearance reinstatement
+        // window) — this REPLACES the baseline, since it's the more specific
+        // and more accurate figure for this exact scenario.
+        estimate = { minDays: modifier.typicalDaysMin, maxDays: modifier.typicalDaysMax, medianDays: null };
+        drivers.length = 0;
+        drivers.push({ label: modifier.id.replace(/_/g, " "), detail: modifier.effectDescription });
+        sources.push(modifier.source);
+      } else {
+        // A real modifier exists but has no day-count by nature (e.g. "interim"
+        // is a parallel enablement, not a change to the underlying investigation
+        // timeline) — keep the baseline estimate, but explain with the REAL
+        // researched narrative rather than a generic placeholder.
+        drivers.push({ label: modifier.id.replace(/_/g, " "), detail: modifier.effectDescription });
+        sources.push(modifier.source);
+      }
+    }
+
+    if (employer_has_fcl === "no") {
+      const fclModifier = findModifier("no_fcl");
+      const fclRule = findRule("fcl-sponsorship") ?? findRule("fcl");
+      drivers.push({
+        label: "Employer has no Facility Clearance (FCL) yet",
+        detail:
+          fclModifier?.effectDescription ??
+          "Your prospective employer would need to sponsor and obtain an FCL before you could start on classified work. This step is highly variable (often months) and isn't included in the estimate above — ask the employer directly about their FCL sponsorship timeline.",
+      });
+      if (fclModifier) sources.push(fclModifier.source);
+      if (fclRule) sources.push(...fclRule.sources);
+    } else if (employer_has_fcl === "unknown") {
+      drivers.push({
+        label: "Employer FCL status unknown",
+        detail:
+          "If your prospective employer doesn't yet have a Facility Clearance, that adds unpredictable time not reflected above. Ask them directly.",
+      });
+    }
+
+    return {
+      estimate,
+      keyDrivers: drivers,
+      uncertaintyNote:
+        "These figures come from historical DCSA timeliness reporting and are medians/typical ranges, not guarantees. Individual cases vary with foreign contacts, financial history, prior investigations, and current investigative backlog. Treat this as a planning range, and ask your FSO for a case-specific estimate once you're in process.",
+      sources: dedupeSources(sources),
+      disclaimer: DISCLAIMERS.notLegalAdvice,
+    };
+  },
+};

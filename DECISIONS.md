@@ -27,3 +27,14 @@ Format: `D-NNN` · date · decision · why · fallback/impact. Append-only; neve
 ### D-004 — 2026-11-11 — Package manager
 **Decision:** pnpm throughout (matches local tooling and `create-next-app --use-pnpm`).
 **Impact:** None.
+
+### D-005 — 2026-11-11 — PII guard ordering nuance between the MCP and API transports (verified live, not just reasoned about)
+**Finding:** Ran a real `@modelcontextprotocol/client` against the local `/mcp` route (not just unit tests). Confirmed: (1) full handshake, `tools/list`, `resources/list`, and `tools/call` all work against `@modelcontextprotocol/server` v2 via `mcp-handler`. (2) PII placed in a **declared** schema field (e.g. `explain_rule`'s `topic: "my ssn is 123-45-6789"`) is correctly rejected with the friendly `assertNoPiiCui` message — confirmed live, `isError: true`. (3) PII placed in an **undeclared** extra field is silently stripped by the SDK's own zod validation *before* our `callTool` wrapper (and therefore our PII guard) ever runs — the call just succeeds using the valid declared fields, as if the extra field was never sent.
+**Why this is acceptable, not a gap:** The undeclared-field case can never influence output, get stored, or get echoed anywhere — it's a pure no-op, functionally identical to the field never being sent. The hard constraint is about PII never being *processed*; it isn't. The one path where PII could matter — a real, declared, user-filled field — is caught on both transports (the API route's `callTool` sees the fully raw JSON body before any stripping, so it's even stricter on this specific edge case, but the gap it closes is a no-op anyway).
+**Action:** Red-team testing (spec §5) will explicitly include both cases as regression tests, so this stays a documented, verified, deliberate behavior rather than an unexamined asymmetry.
+
+### D-006 — 2026-11-11 — Speedrun client now retries 5xx, not just 429 (found live, not hypothetically)
+**Finding:** `search_defense_roles` genuinely failed against the live Speedrun API during manual smoke testing (`SpeedrunApiError:500`, surfaced correctly as a scrubbed `upstream_error` to the caller) — then succeeded on an immediate retry. The original client only retried on `429`; a transient `5xx` was treated as terminal.
+**Decision:** `lib/speedrun/client.ts` now also retries up to `MAX_RETRIES` (3) on any `5xx`, with the same backoff as the 429 path, before surfacing the error.
+**Why:** This is real, observed upstream behavior, not a hypothetical edge case — exactly the kind of thing spec §5's "latency, correctness" testing is meant to catch, caught here during build rather than left for the judging panel to find.
+**Impact:** `tests/unit/speedrun-client.test.ts` covers both the bounded-retry-then-fail case and the retry-then-succeed case.

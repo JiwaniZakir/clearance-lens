@@ -58,6 +58,14 @@ async function fetchJson<T>(url: string): Promise<T> {
       continue;
     }
 
+    // 5xx is the upstream's own failure, not ours — retry a bounded number of
+    // times before surfacing it. Verified live: a transient 500 here is real,
+    // not hypothetical (see DECISIONS.md D-006).
+    if (res.status >= 500 && attempt < MAX_RETRIES - 1) {
+      await backoff(attempt);
+      continue;
+    }
+
     if (!res.ok) {
       let code: string | undefined;
       let message = `Speedrun API returned ${res.status}`;
