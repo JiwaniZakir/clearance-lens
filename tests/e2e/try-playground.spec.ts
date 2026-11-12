@@ -5,7 +5,7 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
  * 40 near-duplicate tests that mostly differ by persona backstory — which
  * doesn't change UI behavior, since the UI doesn't know or care which
  * persona is typing — this covers the DISTINCT interaction paths the R3
- * personas actually exercise across all 14 tabs (all 14 tools, one each),
+ * personas actually exercise across all 15 tabs (all 15 tools, one each),
  * plus one chained integration journey.
  * Persona-specific judgment (should an agent broaden a search, how should
  * it phrase a debrief) was already exercised directly against the MCP
@@ -529,6 +529,24 @@ test.describe("/try — Aggregated signal", () => {
   });
 });
 
+test.describe("/try — Interview guide", () => {
+  test("picking a role renders posting-traced questions, panel guardrails, and an explicit never-a-score note", async ({
+    page,
+  }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Interview guide");
+    const picker = page.locator("div").filter({ hasText: "Pick a role to build an interview guide for" }).first();
+    await pickFirstRole(picker);
+
+    await expect(page.getByText(/structured interview$/).first()).toBeVisible({ timeout: LONG_TIMEOUT });
+    await expect(page.getByText(/Strong answer:/).first()).toBeVisible();
+    // Scoped to the guardrail list item: "national origin" also appears,
+    // correctly, in the shared no-demographic-inference disclaimer below.
+    await expect(page.getByRole("listitem").filter({ hasText: /national origin/i })).toBeVisible();
+    await expect(page.getByText(/No field anywhere in this output is a score/i)).toBeVisible();
+  });
+});
+
 test.describe("/try — per-tool deep links (?tool=)", () => {
   test("?tool=estimate_timeline pre-selects the Timeline tab", async ({ page }) => {
     await page.goto("/try?tool=estimate_timeline");
@@ -570,6 +588,8 @@ test.describe("/try — per-tool deep links (?tool=)", () => {
     await expect(page.getByRole("tab", { name: "Contribute signal" })).toHaveAttribute("data-state", "active");
     await page.goto("/try?tool=get_aggregated_signal");
     await expect(page.getByRole("tab", { name: "Aggregated signal" })).toHaveAttribute("data-state", "active");
+    await page.goto("/try?tool=generate_interview_guide");
+    await expect(page.getByRole("tab", { name: "Interview guide" })).toHaveAttribute("data-state", "active");
   });
 });
 

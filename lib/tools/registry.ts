@@ -13,6 +13,7 @@ import { prepareConsentedCardTool } from "@/lib/tools/prepare-consented-card";
 import { prepareSignedAttestationTool } from "@/lib/tools/prepare-signed-attestation";
 import { contributeAnonymousSignalTool } from "@/lib/tools/contribute-anonymous-signal";
 import { getAggregatedSignalTool } from "@/lib/tools/get-aggregated-signal";
+import { generateInterviewGuideTool } from "@/lib/tools/generate-interview-guide";
 
 /**
  * The single list of every tool this server exposes. Both app/mcp/route.ts
@@ -42,6 +43,7 @@ export const TOOL_REGISTRY: ToolDef<any, any>[] = [
   prepareSignedAttestationTool,
   contributeAnonymousSignalTool,
   getAggregatedSignalTool,
+  generateInterviewGuideTool,
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

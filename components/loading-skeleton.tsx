@@ -279,3 +279,20 @@ export function AggregatedSignalSkeleton() {
     </SkeletonCard>
   );
 }
+
+/** Mirrors the interview-guide output: a guardrail list, then N question blocks. */
+export function InterviewGuideSkeleton() {
+  return (
+    <SkeletonCard className="flex flex-col gap-4">
+      <div role="status" aria-label="Generating interview guide" className="flex flex-col gap-4">
+        <Bone className="h-4 w-1/2" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex flex-col gap-2">
+            <Bone className="h-3 w-full" />
+            <Bone className="h-3 w-5/6" />
+          </div>
+        ))}
+      </div>
+    </SkeletonCard>
+  );
+}

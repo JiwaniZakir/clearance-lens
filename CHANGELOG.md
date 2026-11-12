@@ -219,3 +219,17 @@ Round 7 (clean re-run after D-036's voided contaminated attempt): trimmed mean *
 - Investigated, no action needed: `/try`'s raw pre-hydration HTML having no interactive elements — expected for a `'use client'` page; this project's own 86-test real-browser E2E suite confirms it's fully interactive once JS runs.
 - New dedicated test coverage: 12 PII regression cases, 10 cooldown-mechanism tests, 3 keyword regression cases, 1 company-profile-caveat test, full E2E coverage for all 3 new /try tabs including a real end-to-end Ed25519 sign/verify round trip in a real browser.
 - Unit suite: 299 → 365. Full E2E suite (85 passed, 1 pre-existing skip), protocol 14/14, zero CSP violations on every page, `linkcheck` clean, Lighthouse clean on `/` and `/try`.
+
+## [Unreleased] — new tool: generate_interview_guide (2026-11-12)
+
+The compliant alternative to "AI recruiter panels that score candidates," recommended by an earlier research sub-task and never built until now. Full reasoning: DECISIONS.md D-040.
+
+### feat
+- **New tool `generate_interview_guide`** — a structured interview guide for a startup's own human panel: posting-traced questions, strong/weak answer anchors, follow-up probes, and panel guardrails (no protected-characteristic questions, no soliciting export-controlled information). Structurally incapable of evaluating anyone — no candidate input field, no score-shaped output field. Grounded in Schmidt & Hunter (1998): structured interviews .51 vs. unstructured .38.
+- Ships with its homepage card and `/try` tab in the same change, not as follow-ups.
+
+### fix
+- README's "stateless for N of M tools" count was off by one since round 7 (the stateful exception is two tools, not one) — now 13 of 15.
+
+### test
+- 9 new unit tests; unit suite 365 → 374. E2E 87 passed (1 pre-existing skip), protocol 14/14.

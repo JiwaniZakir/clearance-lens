@@ -58,6 +58,7 @@ import {
   SignedAttestationSkeleton,
   AnonymousSignalSkeleton,
   AggregatedSignalSkeleton,
+  InterviewGuideSkeleton,
 } from "@/components/loading-skeleton";
 
 import { useToolCall } from "@/lib/use-tool-call";
@@ -104,6 +105,9 @@ import type {
   ContributeAnonymousSignalOutput,
   GetAggregatedSignalInput,
   GetAggregatedSignalOutput,
+  InterviewMinutes,
+  GenerateInterviewGuideInput,
+  GenerateInterviewGuideOutput,
 } from "@/lib/try-tool-types";
 
 // Found live via the spec §6 judging panel (DECISIONS.md): 4 of 5 fresh
@@ -138,6 +142,7 @@ const TAB_DEFS = [
   { id: "attestation", label: "Signed attestation" },
   { id: "contribute", label: "Contribute signal" },
   { id: "aggregate", label: "Aggregated signal" },
+  { id: "interview", label: "Interview guide" },
 ] as const;
 
 type TabId = (typeof TAB_DEFS)[number]["id"];
@@ -164,6 +169,7 @@ const TOOL_NAME_TO_TAB: Record<string, TabId> = {
   prepare_signed_attestation: "attestation",
   contribute_anonymous_signal: "contribute",
   get_aggregated_signal: "aggregate",
+  generate_interview_guide: "interview",
 };
 
 function tabFromToolParam(toolParam: string | null): TabId {
@@ -1896,6 +1902,116 @@ function AggregateSignalTab() {
 }
 
 /* ------------------------------------------------------------------------ */
+/* Interview guide                                                          */
+/* ------------------------------------------------------------------------ */
+
+// A role-side prep artifact for a startup's own human panel — never takes
+// or shows anything about a candidate (DECISIONS.md). Mirrors the Trial
+// assessment tab's shape: pick a live role, pick a length, get a
+// posting-traced structure.
+function InterviewGuideTab() {
+  const { data, error, loading, call } = useToolCall<GenerateInterviewGuideInput, GenerateInterviewGuideOutput>(
+    "generate_interview_guide",
+  );
+  const [selectedRole, setSelectedRole] = React.useState<PickedRole | null>(null);
+  const [minutes, setMinutes] = React.useState<InterviewMinutes>(45);
+
+  function generate(role: PickedRole | null = selectedRole, m: InterviewMinutes = minutes) {
+    if (!role) return;
+    void call({ role_id: role.id, minutes: m });
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <RolePicker
+        label="Pick a role to build an interview guide for"
+        selectedRole={selectedRole}
+        onSelect={(role) => {
+          setSelectedRole(role);
+          generate(role, minutes);
+        }}
+      />
+
+      {selectedRole && (
+        <SegmentedControl
+          value={String(minutes)}
+          onChange={(v) => {
+            const m = Number(v) as InterviewMinutes;
+            setMinutes(m);
+            generate(selectedRole, m);
+          }}
+          options={[
+            { value: "30", label: "30 min" },
+            { value: "45", label: "45 min" },
+            { value: "60", label: "60 min" },
+          ]}
+        />
+      )}
+
+      {!selectedRole && (
+        <EmptyState
+          icon={SearchX}
+          title="Pick a role above"
+          description="The guide is built only from a real, live job posting's own stated requirements — never from anything about a candidate."
+        />
+      )}
+      {loading && <InterviewGuideSkeleton />}
+      {!loading && error && <ErrorState error={error} onRetry={() => generate()} />}
+      {!loading && !error && data && (
+        <div className="flex flex-col gap-5 rounded-lg border border-neutral-6 bg-neutral-1 p-4 sm:p-5">
+          <div>
+            <h3 className="text-[1.0625rem] font-semibold text-neutral-12">
+              {data.roleTitle} at {data.company}
+            </h3>
+            <p className="mt-1 text-xs text-neutral-10">{data.minutes}-minute structured interview</p>
+          </div>
+
+          <ul className="flex list-disc flex-col gap-1.5 pl-5 text-[0.8125rem] leading-[1.5] text-neutral-11">
+            {data.guardrailsForThePanel.map((g, i) => (
+              <li key={i}>{g}</li>
+            ))}
+          </ul>
+
+          <ol className="flex flex-col gap-4">
+            {data.questions.map((q, i) => (
+              <li key={i} className="flex flex-col gap-2 border-t border-neutral-6 pt-4">
+                <p className="text-sm font-medium text-neutral-12">
+                  {i + 1}. {q.question}
+                </p>
+                <dl className="grid gap-1.5 text-[0.8125rem] leading-[1.5] text-neutral-11">
+                  <div>
+                    <dt className="inline font-medium text-neutral-12">Strong answer: </dt>
+                    <dd className="inline">{q.evaluationGuidance.strongAnswerLooksLike}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline font-medium text-neutral-12">Weak answer: </dt>
+                    <dd className="inline">{q.evaluationGuidance.weakAnswerLooksLike}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline font-medium text-neutral-12">Follow-up: </dt>
+                    <dd className="inline">{q.evaluationGuidance.followUpProbe}</dd>
+                  </div>
+                </dl>
+              </li>
+            ))}
+          </ol>
+
+          <p className="text-[0.8125rem] leading-[1.4] text-neutral-10">{data.limitsNote}</p>
+          <p className="text-[0.8125rem] leading-[1.4] text-neutral-10">{data.neverAScoreNote}</p>
+          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-6 pt-3">
+            <span className="text-xs text-neutral-10">Sources:</span>
+            {data.sources.map((s, i) => (
+              <SourceCitationChip key={i} source={s} />
+            ))}
+          </div>
+          <p className="text-[0.8125rem] leading-[1.4] text-neutral-10">{data.disclaimer}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
 /* Page                                                                      */
 /* ------------------------------------------------------------------------ */
 
@@ -2042,6 +2158,10 @@ function TryPageInner() {
           <TabsPrimitive.Content value="aggregate">
             <h2 className="sr-only">Aggregated signal</h2>
             <AggregateSignalTab />
+          </TabsPrimitive.Content>
+          <TabsPrimitive.Content value="interview">
+            <h2 className="sr-only">Interview guide</h2>
+            <InterviewGuideTab />
           </TabsPrimitive.Content>
         </TabsPrimitive.Root>
       </main>

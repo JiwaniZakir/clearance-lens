@@ -468,3 +468,37 @@ export interface GetAggregatedSignalOutput {
   sources: SourceRef[];
   disclaimer: string;
 }
+
+/* ---------------------------------------------------------------------- */
+/* generate_interview_guide (lib/tools/generate-interview-guide.ts)       */
+/* ---------------------------------------------------------------------- */
+
+export type InterviewMinutes = 30 | 45 | 60;
+
+export interface GenerateInterviewGuideInput {
+  role_id: string;
+  minutes: InterviewMinutes;
+}
+
+export interface InterviewQuestion {
+  question: string;
+  tracedToQuote: string;
+  evaluationGuidance: {
+    strongAnswerLooksLike: string;
+    weakAnswerLooksLike: string;
+    followUpProbe: string;
+  };
+}
+
+export interface GenerateInterviewGuideOutput {
+  roleTitle: string;
+  company: string;
+  minutes: number;
+  questions: InterviewQuestion[];
+  guardrailsForThePanel: string[];
+  itarSafetyNote: string;
+  limitsNote: string;
+  neverAScoreNote: string;
+  sources: SourceRef[];
+  disclaimer: string;
+}

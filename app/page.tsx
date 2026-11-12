@@ -79,6 +79,11 @@ const TOOL_CARD_META: Record<string, { blurb: string; fields: string[] }> = {
       "Reads that pool back as rounded percentages for a role or company — never an individual record, and never before at least 5 people have contributed (a k-anonymity floor).",
     fields: ["role_id", "company_slug", "percentages"],
   },
+  generate_interview_guide: {
+    blurb:
+      "A structured interview guide for a startup's own human panel, built only from the posting — traced questions and evaluation anchors, never a candidate score.",
+    fields: ["role_id", "minutes", "questions"],
+  },
 };
 
 export default function Home() {
