@@ -5,14 +5,17 @@
  * calling the app's own /api/tools/{name} directly (research/R2-design-
  * system.md §3.4-3.10, §3.13-3.15, §5's /try wireframe, §6 Do/Don't rules).
  *
- * 9 tabs covering all 11 tools (get_company_profile and fit_debrief are
- * reachable via embedded flows — a dialog, and the Job Preview debrief step
- * — rather than their own tabs). The wireframe named five (Search roles /
- * Timeline / Trial assessment / Job preview / Explain a rule); "Role
+ * 11 tabs covering all 11 tools, one each. The wireframe named five (Search
+ * roles / Timeline / Trial assessment / Job preview / Explain a rule); "Role
  * rubric" was added because get_role_rubric is one of the tool files this
  * page was explicitly scoped to call; "Readiness brief" / "Verify GitHub" /
- * "Consented card" were added after the spec §6 judging panel found those 3
- * tools had no UI path anywhere in /try (DECISIONS.md D-026).
+ * "Consented card" were added after the spec §6 judging panel (round 1)
+ * found those 3 tools had no UI path anywhere in /try (DECISIONS.md D-026);
+ * "Company profile" / "Fit debrief" were added as dedicated tabs after
+ * rounds 1 and 3, independently, kept flagging those 2 tools' embedded-only
+ * entry points (a dialog, and the Job Preview debrief step — both of which
+ * still exist too) as "no UI entry point" against the README's "try every
+ * tool directly" claim (DECISIONS.md D-029).
  */
 
 import * as React from "react";
@@ -93,13 +96,15 @@ import type {
 // Found live via the spec §6 judging panel (DECISIONS.md): 4 of 5 fresh
 // judges independently flagged that /try — explicitly positioned by the
 // README as "try every tool directly, no agent handy" — only had reachable
-// UI for 6 of 11 tools (get_company_profile and fit_debrief were already
-// reachable via embedded flows — a dialog, and the job-preview debrief
-// step — just not as their own tabs, which a plain HTML grep for each
-// tool's name would miss). readiness_brief, verify_evidence, and
-// prepare_consented_card had NO UI path at all. Added as 3 more tabs below
-// rather than just softening the README's claim, completing the original
-// 11-tool vision instead of lowering the bar to match a gap.
+// UI for 6 of 11 tools. readiness_brief, verify_evidence, and
+// prepare_consented_card had NO UI path at all and were added as 3 tabs in
+// round 1. get_company_profile and fit_debrief were already reachable via
+// embedded flows (a dialog, and the job-preview debrief step) and were left
+// as-is at the time — but rounds 1 AND 3, independently, with fresh judges
+// each time, kept flagging those same 2 tools as having "no UI entry
+// point," reading the README's "try every tool DIRECTLY" literally. Rather
+// than keep re-litigating that reading, both now also get their own
+// dedicated tab — the embedded entry points still exist too, unchanged.
 const TAB_DEFS = [
   { id: "search", label: "Search roles" },
   { id: "timeline", label: "Timeline" },
@@ -110,6 +115,8 @@ const TAB_DEFS = [
   { id: "readiness", label: "Readiness brief" },
   { id: "verify", label: "Verify GitHub" },
   { id: "card", label: "Consented card" },
+  { id: "company", label: "Company profile" },
+  { id: "fit", label: "Fit debrief" },
 ] as const;
 
 type TabId = (typeof TAB_DEFS)[number]["id"];
@@ -120,8 +127,7 @@ type TabId = (typeof TAB_DEFS)[number]["id"];
 // not a judge's misreading — but this page never read that query param at
 // all, so every one of those links silently landed on the default Search
 // roles tab regardless of which tool was clicked. Maps each registry tool
-// name to its tab; the 2 tools without their own tab (get_company_profile,
-// fit_debrief) fall back to the tab they're actually reachable from.
+// name to its own tab.
 const TOOL_NAME_TO_TAB: Record<string, TabId> = {
   search_defense_roles: "search",
   estimate_timeline: "timeline",
@@ -132,8 +138,8 @@ const TOOL_NAME_TO_TAB: Record<string, TabId> = {
   readiness_brief: "readiness",
   verify_evidence: "verify",
   prepare_consented_card: "card",
-  get_company_profile: "search", // reachable via a dialog from search results
-  fit_debrief: "preview", // reachable via the Job Preview flow's debrief step
+  get_company_profile: "company",
+  fit_debrief: "fit",
 };
 
 function tabFromToolParam(toolParam: string | null): TabId {
@@ -771,6 +777,111 @@ function JobPreviewTab() {
 }
 
 /* ------------------------------------------------------------------------ */
+/* Fit debrief                                                              */
+/* ------------------------------------------------------------------------ */
+
+// fit_debrief's own tool description says it works "from run_job_preview OR
+// YOUR OWN REFLECTION" — it was never meant to require a completed preview
+// first. This tab lets it run standalone, as its own dedicated entry point.
+// Previously only reachable via the Job Preview tab's debrief step — found
+// live via the spec §6 judging panel (rounds 1 and 3, independently, as
+// "no UI entry point for this tool"). That embedded entry point still
+// exists in JobPreviewTab too; this doesn't replace it.
+function FitDebriefTab() {
+  const fit = useToolCall<FitDebriefInput, FitDebriefOutput>("fit_debrief");
+  const [selectedRole, setSelectedRole] = React.useState<PickedRole | null>(null);
+  const [loved, setLoved] = React.useState<string[]>([]);
+  const [disliked, setDisliked] = React.useState<string[]>([]);
+
+  function handleSelectRole(role: PickedRole) {
+    setSelectedRole(role);
+    setLoved([]);
+    setDisliked([]);
+    fit.reset();
+  }
+
+  function toggleTag(tag: string, list: string[], setList: (v: string[]) => void) {
+    setList(list.includes(tag) ? list.filter((t) => t !== tag) : [...list, tag]);
+  }
+
+  function generateDebrief() {
+    if (!selectedRole) return;
+    void fit.call({ role_id: selectedRole.id, loved, disliked });
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <RolePicker
+        label="Pick a role to debrief — loved/disliked work-style tags only, never a score"
+        selectedRole={selectedRole}
+        onSelect={handleSelectRole}
+      />
+
+      {!selectedRole && (
+        <EmptyState
+          icon={SearchX}
+          title="Pick a role above"
+          description="Mark what you loved or what gave you pause from this role's real, live posting, then generate a debrief — summary template, questions to ask, and a share-draft. Never a score."
+        />
+      )}
+
+      {selectedRole && (
+        <div className="flex flex-col gap-2">
+          <p className="text-[0.75rem] font-semibold uppercase tracking-wide text-neutral-10">
+            What stands out about this role?
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {FIT_TAGS.map((tag) => {
+              const isLoved = loved.includes(tag);
+              const isDisliked = disliked.includes(tag);
+              return (
+                <div key={tag} className="flex items-center justify-between gap-3 rounded-md border border-neutral-6 px-3 py-2">
+                  <span className="text-sm text-neutral-12">{FIT_TAG_LABELS[tag]}</span>
+                  <div className="flex shrink-0 gap-1.5">
+                    <button
+                      type="button"
+                      aria-pressed={isLoved}
+                      aria-label={`Mark "${FIT_TAG_LABELS[tag]}" as loved`}
+                      onClick={() => toggleTag(tag, loved, setLoved)}
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-full border transition-colors duration-150 ease-out",
+                        isLoved ? "border-accent-8 bg-accent-2 text-accent-11" : "border-neutral-6 text-neutral-9 hover:text-neutral-11",
+                      )}
+                    >
+                      <Heart className="h-4 w-4" aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={isDisliked}
+                      aria-label={`Mark "${FIT_TAG_LABELS[tag]}" as gave pause`}
+                      onClick={() => toggleTag(tag, disliked, setDisliked)}
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-full border transition-colors duration-150 ease-out",
+                        isDisliked ? "border-neutral-8 bg-neutral-3 text-neutral-12" : "border-neutral-6 text-neutral-9 hover:text-neutral-11",
+                      )}
+                    >
+                      <ThumbsDown className="h-4 w-4" aria-hidden />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <Button onClick={generateDebrief} className="self-start" disabled={loved.length === 0 && disliked.length === 0}>
+            Generate debrief
+          </Button>
+
+          {fit.loading && <FitDebriefSkeleton />}
+          {!fit.loading && fit.error && <ErrorState error={fit.error} onRetry={generateDebrief} />}
+          {!fit.loading && !fit.error && fit.data && <FitDebriefSummary data={fit.data} loved={loved} disliked={disliked} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
 /* Explain a rule                                                           */
 /* ------------------------------------------------------------------------ */
 
@@ -1247,6 +1358,55 @@ function ConsentedCardTab() {
 }
 
 /* ------------------------------------------------------------------------ */
+/* Company profile                                                         */
+/* ------------------------------------------------------------------------ */
+
+// Previously only reachable via a dialog opened from a Search roles result
+// — found live via the spec §6 judging panel (rounds 1 and 3, independently,
+// as "no UI entry point for this tool"). That dialog entry point (below)
+// still exists too; this adds a standalone way in for anyone who already
+// has a company slug (e.g. from a prior search, or from /sources).
+function CompanyProfileTab() {
+  const { data, error, loading, call, reset } = useToolCall<CompanyProfileInput, CompanyProfileOutput>(
+    "get_company_profile",
+  );
+  const [input, setInput] = React.useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    void call({ company_slug: trimmed });
+  }
+
+  return (
+    <div className="flex max-w-xl flex-col gap-6">
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="e.g. anduril-industries"
+          aria-label="Company slug"
+          className="flex-1"
+        />
+        <Button type="submit">Look up</Button>
+      </form>
+
+      {!data && !loading && !error && (
+        <EmptyState
+          icon={SearchX}
+          title="Enter a company slug"
+          description="A company's slug appears in its profile URL and in the companySlug field on any role from Search roles — try anduril-industries, or pick a role there first."
+        />
+      )}
+      {loading && <CompanyProfileSkeleton />}
+      {!loading && error && <ErrorState error={error} onRetry={() => reset()} retryLabel="Edit and try again" />}
+      {!loading && !error && data && <CompanyProfileCard data={data} />}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
 /* Company profile dialog                                                   */
 /* ------------------------------------------------------------------------ */
 
@@ -1329,7 +1489,16 @@ function TryPageInner() {
         </DisclaimerBanner>
 
         <TabsPrimitive.Root defaultValue={initialTab} className="flex flex-col gap-6">
-          <TabsPrimitive.List className="flex gap-1 overflow-x-auto border-b border-neutral-6 [scrollbar-width:none]">
+          {/* The tab strip holds 11 tools and overflows well before mobile/
+           * tablet widths. The native scrollbar is hidden ([scrollbar-width:
+           * none]) for a cleaner look, but that removed the ONLY visual cue
+           * that more tabs exist off-screen, leaving no affordance at all —
+           * found live via the spec §6 judging panel round 3 (measured: only
+           * 3 of 9 tabs visible at 390px, ~6-7 at 820px, with no arrow or
+           * partial-tab peek). A fixed edge mask-image signals "there's more
+           * here, scroll" at both ends regardless of scroll position — the
+           * standard, JS-free fix for this pattern. */}
+          <TabsPrimitive.List className="flex gap-1 overflow-x-auto border-b border-neutral-6 [-webkit-mask-image:linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)] [mask-image:linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)] [scrollbar-width:none]">
             {TAB_DEFS.map((t) => (
               <TabsPrimitive.Trigger key={t.id} value={t.id} className={tabTriggerClass}>
                 {t.label}
@@ -1381,6 +1550,14 @@ function TryPageInner() {
           <TabsPrimitive.Content value="card">
             <h2 className="sr-only">Consented card</h2>
             <ConsentedCardTab />
+          </TabsPrimitive.Content>
+          <TabsPrimitive.Content value="company">
+            <h2 className="sr-only">Company profile</h2>
+            <CompanyProfileTab />
+          </TabsPrimitive.Content>
+          <TabsPrimitive.Content value="fit">
+            <h2 className="sr-only">Fit debrief</h2>
+            <FitDebriefTab />
           </TabsPrimitive.Content>
         </TabsPrimitive.Root>
       </main>

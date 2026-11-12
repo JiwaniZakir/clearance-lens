@@ -52,17 +52,35 @@ const OutputSchema = z.object({
 
 const MAX_PAGES_SCANNED = 4; // 4 * 50 = up to 200 postings — handles upstream pagination robustly
 const MAX_DETAIL_FETCHES = 25; // bounds latency: at most this many parallel per-job detail calls
+// Each page fetch has its own retry/backoff budget (lib/speedrun/client.ts,
+// up to 3 attempts with up to ~3s of backoff on a transient 429/5xx), and
+// this loop can fetch up to MAX_PAGES_SCANNED of them SEQUENTIALLY — found
+// live via the spec §6 judging panel round 3 (independently reproduced: two
+// calls took 22.4s and 11.0s against an otherwise sub-400ms baseline,
+// traced to a transient upstream slowdown, not a query-specific issue —
+// identical re-queries moments later were fast). A deadline on the page-scan
+// phase bounds the worst case to roughly one slow page's own retry budget
+// rather than up to four of them compounding, which matters because that
+// total is close enough to common MCP-client tool-call timeout budgets that
+// an un-bounded worst case would read as a hang.
+const PAGE_SCAN_DEADLINE_MS = 8000;
 
 async function fetchCandidateSummaries(query: string | undefined, location: string | undefined) {
   const all: SpeedrunJobSummary[] = [];
   let page = 0;
+  const deadline = Date.now() + PAGE_SCAN_DEADLINE_MS;
+  let truncatedByDeadline = false;
   for (let i = 0; i < MAX_PAGES_SCANNED; i++) {
+    if (Date.now() > deadline) {
+      truncatedByDeadline = true;
+      break;
+    }
     const res = await searchJobs({ q: query, industry: "defense_space", loc: location, page, scope: "portfolio" });
     all.push(...res.jobs);
     if (!res.has_more || res.next_page == null) break;
     page = res.next_page;
   }
-  return all;
+  return { all, truncatedByDeadline };
 }
 
 export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typeof OutputSchema>> = {
@@ -73,7 +91,8 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
   handler: async ({ query, clearance, itar_only, location, remote, limit }) => {
-    let candidates = await fetchCandidateSummaries(query, location);
+    const { all: fetchedCandidates, truncatedByDeadline } = await fetchCandidateSummaries(query, location);
+    let candidates = fetchedCandidates;
 
     if (remote === true) candidates = candidates.filter((c) => c.remote);
     else if (remote === false) candidates = candidates.filter((c) => !c.remote);
@@ -102,6 +121,11 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
     const page = results.slice(0, limit);
 
     const notes: string[] = [`Scanned ${rolesScanned} posting${rolesScanned === 1 ? "" : "s"} matching your search terms.`];
+    if (truncatedByDeadline) {
+      notes.push(
+        "The upstream job network responded slowly, so this scan stopped early rather than keep waiting — results above may be incomplete. Try again, or narrow the search.",
+      );
+    }
     if (clearance || itar_only) {
       notes.push(
         `Checked requirement signals on the first ${toDetail.length} of those; narrower or broader search terms may surface more matches than this single call checked.`,

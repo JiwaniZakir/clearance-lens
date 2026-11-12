@@ -5,9 +5,8 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
  * 40 near-duplicate tests that mostly differ by persona backstory — which
  * doesn't change UI behavior, since the UI doesn't know or care which
  * persona is typing — this covers the DISTINCT interaction paths the R3
- * personas actually exercise across all 9 tabs (all 11 tools — 2 more,
- * get_company_profile and fit_debrief, are reachable via embedded flows
- * rather than their own tab), plus one chained integration journey.
+ * personas actually exercise across all 11 tabs (all 11 tools, one each),
+ * plus one chained integration journey.
  * Persona-specific judgment (should an agent broaden a search, how should
  * it phrase a debrief) was already exercised directly against the MCP
  * tools by the agent-in-the-loop eval (DECISIONS.md D-016); this suite
@@ -389,6 +388,54 @@ test.describe("/try — Consented card", () => {
   });
 });
 
+// Regression for DECISIONS.md D-029 (judging panel rounds 1 and 3): these
+// 2 tools previously had no dedicated tab at all (only reachable via an
+// embedded flow) — fresh judges in both rounds, independently, flagged this
+// as "no UI entry point" against the README's "try every tool directly"
+// claim, so each now gets its own standalone tab too.
+test.describe("/try — Company profile", () => {
+  test("looking up a real company slug renders its live profile", async ({ page }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Company profile");
+    await page.getByLabel("Company slug").fill("anduril-industries");
+    await page.getByRole("button", { name: "Look up" }).click();
+    await expect(page.getByText(/Anduril/i).first()).toBeVisible({ timeout: LONG_TIMEOUT });
+  });
+});
+
+test.describe("/try — Fit debrief", () => {
+  test("runs standalone from a picked role, with no job preview required first", async ({ page }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Fit debrief");
+    const picker = page.locator("div").filter({ hasText: "Pick a role to debrief" }).first();
+    await pickFirstRole(picker);
+
+    await page.getByRole("button", { name: /Mark .* as loved/ }).first().click();
+    await page.getByRole("button", { name: "Generate debrief" }).click();
+
+    await expect(page.getByText(/questions to ask|share-draft|summary/i).first()).toBeVisible({ timeout: LONG_TIMEOUT });
+    // The tool's own hard constraint: explicitly never a score.
+    await expect(page.getByText(/never a score|not a score/i).first()).toBeVisible({ timeout: LONG_TIMEOUT });
+  });
+});
+
+test.describe("/try — tab strip overflow affordance", () => {
+  // Regression for DECISIONS.md D-029 (judging panel round 3): the tab
+  // strip's native scrollbar is hidden for a cleaner look, which previously
+  // removed the only visual cue that more tabs exist off-screen at mobile/
+  // tablet widths, with zero replacement affordance.
+  test("the tablist has a non-trivial mask-image fade at mobile width", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/try");
+    const list = page.getByRole("tablist");
+    const maskImage = await list.evaluate(
+      (el) => getComputedStyle(el).maskImage || getComputedStyle(el).webkitMaskImage,
+    );
+    expect(maskImage).not.toBe("none");
+    expect(maskImage.length).toBeGreaterThan(0);
+  });
+});
+
 // Found via the spec §6 judging panel round 2 (DECISIONS.md D-028):
 // components/tool-card.tsx's homepage "Try it" buttons link to
 // /try?tool=<registry-tool-name> for all 11 tools, but /try never read
@@ -406,13 +453,14 @@ test.describe("/try — per-tool deep links (?tool=)", () => {
     await expect(page.getByRole("tab", { name: "Consented card" })).toHaveAttribute("data-state", "active");
   });
 
-  test("?tool=fit_debrief and ?tool=get_company_profile fall back to their actual entry points (no dedicated tab)", async ({
-    page,
-  }) => {
+  // Regression for DECISIONS.md (judging panel round 3, D-029): these two
+  // tools previously had no dedicated tab (fell back to Job preview /
+  // Search roles, where they were embedded) -- now each gets its own.
+  test("?tool=fit_debrief and ?tool=get_company_profile pre-select their own dedicated tabs", async ({ page }) => {
     await page.goto("/try?tool=fit_debrief");
-    await expect(page.getByRole("tab", { name: "Job preview" })).toHaveAttribute("data-state", "active");
+    await expect(page.getByRole("tab", { name: "Fit debrief" })).toHaveAttribute("data-state", "active");
     await page.goto("/try?tool=get_company_profile");
-    await expect(page.getByRole("tab", { name: "Search roles" })).toHaveAttribute("data-state", "active");
+    await expect(page.getByRole("tab", { name: "Company profile" })).toHaveAttribute("data-state", "active");
   });
 
   test("an unrecognized or absent ?tool= value falls back to the default Search roles tab", async ({ page }) => {

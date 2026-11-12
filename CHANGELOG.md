@@ -89,3 +89,28 @@ Round 2: trimmed mean **6.96**, but a **hard-constraint violation** (2/5 judges)
 - Investigated and found NOT reproducible: a claim that 200-level-deep nesting bypassed the PII depth guard (tested directly, both in isolation and through the full HTTP pipeline — correctly rejects every time).
 - Investigated and found NOT a real gap: the search keyword field allegedly relying on placeholder-as-label (both actual search inputs already have a proper `<label>` or `aria-label`).
 - Unit suite: 219 → 237. Full E2E suite re-extended and re-verified against production (62 passed, 2 graceful skips, both viewports). Lighthouse still 100/100/100/100 on all 4 pages.
+
+## [Unreleased] — judging panel round 3 response (2026-11-12)
+
+Round 3: trimmed mean **6.82**, another **hard-constraint violation** (2/5 judges, 2 bypass patterns distinct from round 2's) capped the effective score at 6.0. Full results `panel/round-3/`, full response DECISIONS.md D-029.
+
+### fix
+- **Hard constraint:** a case-ID shape in agency-prefix order ("DCSA-2026-0417") and real clearance-adjudication jargon naming no DISS/JPAS/NBIS system ("my SOR was adjudicated favorably... with T5 scope and CI poly", bare "adjudicated under e-QIP") both bypassed every existing PII/CUI detector. Widened the case-ID pattern to accept either order; added a new keyword-co-occurrence check (each token alone too short/generic to flag — "CI" collides with "Continuous Integration" in this domain).
+- **Credit-card false positive on UUID-shaped identifiers** (4/5 judges independently reproduced) — D-027's own new credit-card shape check matched by coincidence inside an all-numeral `role_id` UUID. Added a UUID pre-strip scoped only to that one check.
+- `search_defense_roles` multi-second tail latency (22.4s/11.0s outliers reproduced live) — root-caused to a transient upstream slowdown compounding across up to 4 sequential page-fetch retries. Added an 8-second deadline on the page-scan loop with an honest note when it triggers.
+- "Secret security clearance" was classified to only the generic clearance fallback, not the specific `secret` level — that pattern required "secret clearance" immediately adjacent; made "security" optional between them.
+- No MCP tool annotations were declared on any of the 11 tools, despite the original plan's own stated intent — added `readOnlyHint: true` (every tool here only reads/computes).
+- `/try`'s 9-tool tab strip had zero visual affordance that it scrolls at mobile/tablet widths (measured: only 3-7 of 9 tabs visible, no arrow, no partial-tab peek) — added a fixed edge mask-image fade.
+- `/try`'s `<title>` stayed the generic "Clearance Lens" — added a sibling Server Component layout so it gets the same "`<Page>` · Clearance Lens" template every other page has.
+- A 2px horizontal overflow on mobile (header wordmark + toggle/button cluster) — reduced the row's gap below the `sm:` breakpoint.
+- `get_company_profile`'s "currently open roles" figure can strain credulity against a company's own employee-count label (e.g. Anduril: 2,586 roles vs. 1,001-5,000 employees) — confirmed this is a general upstream-dataset characteristic (every company in the network shows a similarly high ratio), not a bug in this tool's own aggregation; added a plain caveat rather than "fixing" a number being faithfully passed through.
+
+### feat
+- `/try`: added dedicated tabs for `get_company_profile` ("Company profile") and `fit_debrief` ("Fit debrief") — previously reachable only via embedded flows (a dialog; the Job Preview debrief step), a reasoned choice after round 1 that fresh judges in both round 1 AND round 3 independently flagged again as "no UI entry point." Both embedded entry points are unchanged, not replaced.
+
+### test
+- Investigated and found NOT reproducible: the footer's "Status" link 404s (recruiter_user, trust_skeptic) — its actual `href` is `/api/health` (200 OK, live), not literally `/status` (404) — both judges appear to have guessed the URL from the link's visible text.
+- Investigated and found NOT a real gap: `estimate_timeline` "never produces a true range" (candidate_user) — tested all 12 input combinations directly; `lapsed_gt_2y` genuinely returns a true 180/270 range. The judge's specific sample just didn't include that branch.
+- Reconfirmed, not a new finding: the recurring "/try tabs don't switch" claim, via the same click-simulation-limited tool D-026 already root-caused — this round is the clearest confirmation yet, since the one judge using real Playwright screenshots did not reproduce it and instead found the real, different mobile-overflow bug above on the identical control.
+- Fixed a pre-existing, intermittent flake in the homepage's own axe scan (caught live during this round's verification, not from the panel) — traced to `components/hero.tsx`'s one-time staged-reveal animation; scanning mid-CSS-transition could transiently change a chat bubble's computed contrast. Added a settle wait before scanning the homepage specifically; stable across 3 repeated runs.
+- Unit suite: 237 → 251. Full E2E suite (70 passed, both viewports) against a fresh production build.

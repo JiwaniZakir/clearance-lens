@@ -55,6 +55,17 @@ describe("extractStatedSignals", () => {
     const values = extractStatedSignals("Must hold an active security clearance.").map((s) => s.value);
     expect(values).toContain("clearance_required_unspecified");
   });
+
+  // Regression for DECISIONS.md (judging panel round 3): "Secret security
+  // clearance" (as opposed to "Top Secret security clearance", round 2's
+  // case) fell through to ONLY the generic fallback, because the "secret"
+  // pattern required "secret clearance" immediately adjacent, and real
+  // postings commonly insert "security" between the level and "clearance."
+  it("classifies 'Secret security clearance' as the specific secret level, not just the generic fallback", () => {
+    const values = extractStatedSignals("Candidates must hold a Secret security clearance.").map((s) => s.value);
+    expect(values).toContain("secret");
+    expect(values).not.toContain("clearance_required_unspecified");
+  });
 });
 
 describe("extractInferredSignals via extractRequirementSignals", () => {

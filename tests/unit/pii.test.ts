@@ -364,6 +364,38 @@ describe("judging panel round 2: PII bypasses found via rephrasing, now fixed", 
   });
 });
 
+describe("judging panel round 3: PII bypasses found via rephrasing, now fixed", () => {
+  it.each([
+    ["my case number is DCSA-2026-0417", "case_number"],
+    ["my clearance was adjudicated under e-QIP", "clearance_record"],
+    ["my SOR was adjudicated favorably in 2021 with T5 scope and CI poly", "clearance_record"],
+    ["my investigation was submitted with tier 5 investigation scope", "clearance_record"],
+  ])("now catches: %s -> %s", (text, expectedCategory) => {
+    expect(categoriesOf(text)).toContain(expectedCategory);
+  });
+
+  it("does not flag a bare, educational mention of e-QIP or SOR with no adjudication-status language nearby", () => {
+    expect(categoriesOf("what is e-QIP?")).toHaveLength(0);
+    expect(categoriesOf("explain what an SOR is")).toHaveLength(0);
+  });
+});
+
+describe("judging panel round 3: credit-card false positive on UUID-shaped identifiers, now fixed", () => {
+  it.each([
+    "00000000-0000-4000-8000-000000000000",
+    "11111111-1111-1111-1111-111111111111",
+    "99999999-9999-9999-9999-999999999999",
+    "fa3560d4-2dc5-d39b-c75a-013bb4aaef71",
+  ])("does NOT flag a UUID-shaped identifier (role_id, etc.) as a credit card: %s", (text) => {
+    expect(categoriesOf(text)).not.toContain("credit_card");
+  });
+
+  it("still flags a real credit-card number that is not UUID-shaped", () => {
+    expect(categoriesOf("4111111111111111")).toContain("credit_card");
+    expect(categoriesOf("card 4111 1111 1111 1111 exp 12/27")).toContain("credit_card");
+  });
+});
+
 describe("judging panel round 2: prepare_consented_card's stricter bare-identifier check (scanForBareIdentifierShapes)", () => {
   it("rejects a bare, unlabeled 9-digit SSN-shaped number with no keyword context at all", async () => {
     const { scanForBareIdentifierShapes } = await import("@/lib/guard/pii");

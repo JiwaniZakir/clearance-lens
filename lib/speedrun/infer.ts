@@ -70,7 +70,12 @@ interface StatedPattern {
 const STATED_PATTERNS: StatedPattern[] = [
   { kind: "clearance_level", value: "ts_sci", pattern: /\btop secret\s*\/?\s*sci\b|\bts\s*\/\s*sci\b/i },
   { kind: "clearance_level", value: "ts", pattern: /\btop secret\b(?!\s*\/?\s*sci)/i },
-  { kind: "clearance_level", value: "secret", pattern: /\b(?:active\s+)?secret clearance\b/i },
+  // "security" made optional between "secret" and "clearance": found live
+  // via the spec §6 judging panel round 3 — "Secret security clearance" (a
+  // common real phrasing) failed this pattern's old strict adjacency
+  // requirement, falling through to only the generic
+  // clearance_required_unspecified fallback below instead of "secret".
+  { kind: "clearance_level", value: "secret", pattern: /\b(?:active\s+)?secret (?:security\s+)?clearance\b/i },
   {
     kind: "clearance_level",
     value: "clearance_required_unspecified",

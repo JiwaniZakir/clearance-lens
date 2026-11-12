@@ -100,7 +100,12 @@ const DIGIT_RUN_5PLUS = /\b[A-Za-z]?\d{5,}\b/;
 // is in review" and "reference number 2024-ABC-56789" both used generic
 // framing words (file/reference) the keyword list was never going to cover
 // exhaustively, but the ID's own shape is a reliable independent signal.
-const CASE_ID_SHAPE = /\b(19|20)\d{2}-[A-Za-z]{2,4}-\d{4,}\b/;
+// Second alternative (letters-year-number, e.g. "DCSA-2026-0417") added:
+// found live via the spec §6 judging panel round 3 — the original pattern
+// only covered year-first case IDs ("2024-ABC-56789"); a real DCSA case
+// number in agency-prefix order bypassed it entirely.
+const CASE_ID_SHAPE =
+  /\b(?:(19|20)\d{2}-[A-Za-z]{2,4}-\d{4,}|[A-Za-z]{2,6}-(19|20)\d{2}-\d{4,})\b/;
 
 /** Specific adjudication/records-system jargon. Deliberately narrow — generic
  *  words like "clearance", "secret", or "active" must NOT appear here, since
@@ -131,6 +136,22 @@ const CASE_ID_SHAPE = /\b(19|20)\d{2}-[A-Za-z]{2,4}-\d{4,}\b/;
 const CLEARANCE_RECORD_CONTEXT =
   /\b(?:diss|jpas|nbis)\s+(?:record|printout|screenshot|summary|history|shows|says|entry)|e-?adjudication|subject summary|investigation (?:opened|closed)|adjudication (?:result|history)|eqip (?:record|history)|owning\s+smo|\bpsq\b/i;
 
+/** Clearance-adjudication jargon, each too short/generic to flag bare (e.g.
+ *  "CI" collides with "Continuous Integration" in a tech-hiring context,
+ *  "T5"/"SOR" are too short to be safe alone) but, co-occurring with an
+ *  adjudication-status verb anywhere in the same text, reliably indicates
+ *  real clearance-record content rather than an innocent acronym mention.
+ *  Found live via the spec §6 judging panel round 3: "my SOR was adjudicated
+ *  favorably in 2021 with T5 scope and CI poly" and "my clearance was
+ *  adjudicated under e-QIP" both bypassed every existing detector — neither
+ *  names DISS/JPAS/NBIS, the only system names this file previously
+ *  recognized, and the e-QIP case only required a trailing
+ *  case/id/submission/request noun (CASE_NUMBER_CONTEXT), not an adjacent
+ *  adjudication verb. */
+const ADJUDICATION_JARGON_TOKEN =
+  /\b(?:sor|t-?5\s+(?:scope|investigation|clearance)|tier\s*5\s+(?:scope|investigation)|ci\s*poly(?:graph)?|counterintelligence\s+poly(?:graph)?|e-?qip)\b/i;
+const ADJUDICATION_VERB = /\b(?:adjudicat\w*|submitted|processed|completed|pending|favorably|unfavorably)\b/i;
+
 const IMAGE_DATA_URI = /data:image\/[a-z0-9+.-]+;base64,/i;
 const BINARY_DATA_URI = /data:[a-z0-9/+.-]+;base64,/i;
 /** A long, unbroken run of base64-alphabet characters with no PII keyword nearby —
@@ -143,6 +164,18 @@ const LONG_BASE64_RUN = /[A-Za-z0-9+/]{200,}={0,2}/;
  *  shape essentially never appears in legitimate defense-job-search
  *  content, so it's safe to flag on structure alone. */
 const CREDIT_CARD_SHAPE = /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/;
+/** Standard UUID shape (8-4-4-4-12 hex, dash-separated). Every internal
+ *  identifier in this product (role_id, etc.) is a UUID, and an all-numeral
+ *  one (e.g. "00000000-0000-4000-8000-000000000000" — a plausible probe
+ *  value, or any UUID whose hex digits happen to all land on 0-9) can
+ *  satisfy CREDIT_CARD_SHAPE's 4-4-4-4 digit-group pattern by coincidence.
+ *  Found live via the spec §6 judging panel round 3 (4 of 5 judges
+ *  independently reproduced this): a legitimate role_id lookup was rejected
+ *  as "a credit card number." Stripped out before the credit-card check
+ *  runs, and ONLY before that check — a UUID has no legitimate way to also
+ *  look like an SSN/DOB/passport shape, so narrowing this to credit-card
+ *  detection alone doesn't reopen any other category. */
+const UUID_SHAPE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 
 /** The actual, un-obfuscated detectors. Operates on already-normalized,
  *  already-decoded plain text — see `scanTextForPiiCui` below, which is the
@@ -176,11 +209,12 @@ function scanPlainText(text: string): PiiFinding[] {
   }
 
   if (CLEARANCE_RECORD_CONTEXT.test(text)) add("clearance_record");
+  if (ADJUDICATION_JARGON_TOKEN.test(text) && ADJUDICATION_VERB.test(text)) add("clearance_record");
 
   if (IMAGE_DATA_URI.test(text)) add("image_upload");
   else if (BINARY_DATA_URI.test(text) || LONG_BASE64_RUN.test(text)) add("binary_data");
 
-  if (CREDIT_CARD_SHAPE.test(text)) add("credit_card");
+  if (CREDIT_CARD_SHAPE.test(text.replace(UUID_SHAPE, ""))) add("credit_card");
 
   return findings;
 }

@@ -141,6 +141,23 @@ export const getCompanyProfileTool: ToolDef<z.infer<typeof InputSchema>, z.infer
         ? `Work realities below reflect all ${sample.length} currently open role(s) at this company.`
         : `Work realities below are computed from a sample of ${sample.length} of this company's ${company.open_roles} listed open role(s), not a census of all of them.`,
     );
+    // "Open role(s)" is the upstream network's own listing count, not a
+    // deduplicated distinct-requisition count — found live via the spec §6
+    // judging panel round 3 (function_engineer independently cross-checked
+    // Anduril's 2,586 listed roles against its own 1,001-5,000 employee
+    // label and flagged the ratio as implausible). Checked directly against
+    // the upstream API across dozens of companies: every one of them shows a
+    // similarly high roles-to-headcount ratio, consistent with the listing
+    // count including multiple postings for the same or a similar position
+    // across locations/teams rather than one row per distinct req — a
+    // characteristic of the upstream dataset, not a bug in this tool's own
+    // aggregation, but worth saying plainly rather than letting the number
+    // read as a literal open-headcount figure.
+    if (company.open_roles > 200) {
+      gaps.push(
+        `"${company.open_roles} open role(s)" is this network's own listing count, which can include multiple postings for the same or a similar position across different locations or teams — treat it as a hiring-volume signal, not a literal count of distinct open requisitions.`,
+      );
+    }
 
     return {
       company: {

@@ -89,6 +89,41 @@ describe("search_defense_roles", () => {
     expect(vi.mocked(searchJobs)).toHaveBeenCalledTimes(4);
   });
 
+  // Regression for DECISIONS.md (judging panel round 3): up to 4 sequential
+  // page fetches, each with its own retry/backoff budget, could compound to
+  // a 20+ second worst case on a transient upstream slowdown (reproduced
+  // live: 22.4s and 11.0s outliers against a sub-400ms baseline). A deadline
+  // on the page-scan loop bounds this.
+  it("stops scanning early and notes it when the upstream responds too slowly (deadline guard)", async () => {
+    let callCount = 0;
+    const dateNowSpy = vi.spyOn(Date, "now").mockImplementation(() => {
+      callCount++;
+      // Call 1 computes the deadline (returns 0 -> deadline = 8000ms). Every
+      // call after that simulates 5 seconds having passed since the
+      // previous page fetch, so the loop's 2nd deadline check (10000ms) is
+      // already past it.
+      return callCount === 1 ? 0 : (callCount - 1) * 5000;
+    });
+    try {
+      vi.mocked(searchJobs).mockImplementation(async ({ page }) => ({
+        total: 1000,
+        page: page ?? 0,
+        page_size: 50,
+        total_pages: 20,
+        has_more: true,
+        next_page: (page ?? 0) + 1,
+        jobs: [summary({ id: `job-${page}` })],
+      }));
+      vi.mocked(getJob).mockImplementation(async (id: string) => detail("No requirements stated.", { id }));
+
+      const result = await searchDefenseRolesTool.handler({ limit: 25 });
+      expect(vi.mocked(searchJobs)).toHaveBeenCalledTimes(1);
+      expect(result.note).toContain("responded slowly");
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
   it("filters by clearance level using detected signals, not upstream facets (upstream has no clearance param)", async () => {
     vi.mocked(searchJobs).mockResolvedValueOnce({
       total: 2,
