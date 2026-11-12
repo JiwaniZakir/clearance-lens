@@ -397,6 +397,22 @@ describe("judging panel round 4: PII bypasses found via rephrasing, now fixed", 
   });
 });
 
+describe("judging panel round 5: hard-constraint findings, now fixed", () => {
+  it.each([
+    "SECRET//NOFORN -- the propulsion subsystem spec sheet shows a 12 percent thrust margin",
+    "(S//NF) the test results were favorable",
+    "TOP SECRET//SI/TK briefing notes from the meeting",
+  ])("flags a classification/control marking: %s", (text) => {
+    expect(categoriesOf(text)).toContain("classification_marking");
+  });
+
+  it("does not flag ordinary self-attested clearance status (no // marking present)", () => {
+    expect(categoriesOf("I have an active Secret clearance and a Top Secret clearance background")).not.toContain(
+      "classification_marking",
+    );
+  });
+});
+
 describe("judging panel round 3: credit-card false positive on UUID-shaped identifiers, now fixed", () => {
   it.each([
     "00000000-0000-4000-8000-000000000000",

@@ -64,7 +64,13 @@ export const getRoleRubricTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typ
 
     const seen = new Set<string>();
     const eligibilityChecklist: z.infer<typeof ChecklistItemSchema>[] = [];
-    const sources = [SPEEDRUN_SOURCE];
+    // Deduplicated by URL below, not just pushed — found live via the spec
+    // §6 judging panel round 5 (product_designer): two distinct signals
+    // whose mapped rules happen to cite the same source (e.g. two
+    // citizenship-adjacent signals both citing the same ITAR/CFR section)
+    // listed that one citation twice, since `seen` only dedupes by signal
+    // value, not by the sources those signals' rules go on to cite.
+    const sourcesByUrl = new Map<string, (typeof SPEEDRUN_SOURCE)>([[SPEEDRUN_SOURCE.url, SPEEDRUN_SOURCE]]);
     for (const signal of role.signals) {
       const mapped = SIGNAL_TO_QUESTION[signal.value];
       if (!mapped || seen.has(signal.value)) continue;
@@ -72,9 +78,10 @@ export const getRoleRubricTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typ
       eligibilityChecklist.push({ question: mapped.question, whyItMatters: signal.evidence, basis: signal.basis });
       if (mapped.ruleId) {
         const rule = findRule(mapped.ruleId);
-        if (rule) sources.push(...rule.sources);
+        if (rule) for (const source of rule.sources) sourcesByUrl.set(source.url, source);
       }
     }
+    const sources = [...sourcesByUrl.values()];
     if (eligibilityChecklist.length === 0) {
       eligibilityChecklist.push({
         question: "No specific eligibility signal was detected in this posting — are there any citizenship or clearance requirements you already know about for this role?",

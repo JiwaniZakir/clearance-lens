@@ -161,10 +161,26 @@ export function extractStatedSignals(descriptionText: string): RequirementSignal
 // the description text (which is how the Australian NV2 mention itself
 // was found — a foreign clearance-system name is a stronger, more direct
 // signal than the location string alone).
+// "\bgb\b" added: found live via the spec §6 judging panel round 5
+// (candidate_user) — a real UK posting's location field used the ISO
+// country code form ("Newcastle, GB"), not a spelled-out country/city name,
+// so the existing checks (which required "united kingdom" or bare "uk")
+// missed it. Scoped to the location field specifically (this regex is never
+// run against free-form description text, only `context.location`), where
+// a bare 2-letter token colliding with something unrelated (e.g. "16GB" in
+// a spec sheet) isn't a realistic risk.
 const NON_US_LOCATION_SIGNAL =
-  /\b(?:australia|sydney|melbourne|canberra|united kingdom|\buk\b|london|canada|toronto|ottawa|germany|berlin|munich|japan|tokyo|singapore|new zealand)\b/i;
+  /\b(?:australia|sydney|melbourne|canberra|united kingdom|\buk\b|\bgb\b|london|canada|toronto|ottawa|germany|berlin|munich|japan|tokyo|singapore|new zealand)\b/i;
 const FOREIGN_CLEARANCE_SYSTEM =
   /\b(?:nv1|nv2|baseline clearance|negative vetting|positive vetting|\bsc clearance\b|\bdv clearance\b|developed vetting)\b/i;
+
+/** Exported so other modules (e.g. role-shared.ts's clearance-level filter
+ *  matching) can share this one geography check rather than re-implement
+ *  their own — see the regexes' own comments above for why this is
+ *  deliberately a short, curated allowlist, not general geography parsing. */
+export function looksNonUsLocation(location: string | null | undefined): boolean {
+  return NON_US_LOCATION_SIGNAL.test(location ?? "");
+}
 
 /** Adds cautious, clearly-labeled inferred signals ONLY to fill gaps the stated
  * extraction left open — never contradicts or duplicates a stated signal. */
@@ -180,8 +196,7 @@ export function extractInferredSignals(
     context.industry === "defense_space" ||
     /\bdefense\b|\bmilitary\b|\bmunitions\b|\bnational security\b/i.test(context.companyBlurb ?? "");
 
-  const looksNonUs =
-    NON_US_LOCATION_SIGNAL.test(context.location ?? "") || FOREIGN_CLEARANCE_SYSTEM.test(descriptionText);
+  const looksNonUs = looksNonUsLocation(context.location) || FOREIGN_CLEARANCE_SYSTEM.test(descriptionText);
 
   if (looksDefenseRelated && !hasStated("citizenship") && !looksNonUs) {
     inferred.push({

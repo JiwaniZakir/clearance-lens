@@ -22,7 +22,8 @@ export type PiiCategory =
   | "image_upload"
   | "binary_data"
   | "unscannable_structure"
-  | "credit_card";
+  | "credit_card"
+  | "classification_marking";
 
 export interface PiiFinding {
   category: PiiCategory;
@@ -40,6 +41,7 @@ const FRIENDLY_BY_CATEGORY: Record<PiiCategory, string> = {
   binary_data: "This looks like it includes an embedded file or binary data. Clearance Lens only accepts plain text fields — please remove any attached file data.",
   unscannable_structure: "This request is structured too deeply (nested objects/arrays many levels deep) for Clearance Lens to safely check for sensitive information. Please simplify the request and try again.",
   credit_card: "This looks like it includes a credit card number. Clearance Lens never accepts payment card numbers — please remove it; nothing here needs billing information.",
+  classification_marking: "This looks like it includes a classification marking (e.g. SECRET//NOFORN). Clearance Lens never accepts classified or export-controlled content, real or described — please remove it and describe your situation without quoting or paraphrasing any marked material.",
 };
 
 /** SSN-context keywords that gate the riskier bare-9-digit check. No trailing
@@ -199,6 +201,21 @@ const CREDIT_CARD_SHAPE = /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/;
  *  detection alone doesn't reopen any other category. */
 const UUID_SHAPE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 
+/** A real classification/control marking, in either its spelled-out banner
+ *  form ("SECRET//NOFORN") or its abbreviated portion-marking form
+ *  ("(S//NF)", "(TS//SI/TK)") — found live via the spec §6 judging panel
+ *  round 5 (product_designer): a synthetic "SECRET//NOFORN ... propulsion
+ *  subsystem spec sheet ..." string was accepted and echoed verbatim into
+ *  `prepare_consented_card`'s shareable output. Anchored specifically on
+ *  the "//" + a recognized control-marking abbreviation (NOFORN/ORCON/
+ *  FOUO/REL TO/NATO/SI/TK/HCS/SAP/FISA) — deliberately not on a bare
+ *  classification-level word alone (that's exactly the self-attestation
+ *  language, "I have a Secret clearance," this file's own design
+ *  elsewhere protects as legitimate). Distinctive enough that ordinary
+ *  text has no plausible reason to contain this exact shape. */
+const CLASSIFICATION_MARKING =
+  /\b(?:top secret|secret|confidential|unclassified)\s*\/\/\s*(?:noforn|orcon|fouo|rel\s+to|nato|si|tk|hcs|sap|fisa)\b|\(\s*(?:u|c|s|ts)\s*\/\/\s*(?:nf|noforn|orcon|fouo|rel\s+to|nato|si|tk|hcs|sap|fisa)/i;
+
 /** The actual, un-obfuscated detectors. Operates on already-normalized,
  *  already-decoded plain text — see `scanTextForPiiCui` below, which is the
  *  only caller and the thing that actually runs against raw user input. */
@@ -238,6 +255,8 @@ function scanPlainText(text: string): PiiFinding[] {
   else if (BINARY_DATA_URI.test(text) || LONG_BASE64_RUN.test(text)) add("binary_data");
 
   if (CREDIT_CARD_SHAPE.test(text.replace(UUID_SHAPE, ""))) add("credit_card");
+
+  if (CLASSIFICATION_MARKING.test(text)) add("classification_marking");
 
   return findings;
 }

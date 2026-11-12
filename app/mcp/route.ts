@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createMcpHandler } from "mcp-handler";
 import { TOOL_REGISTRY } from "@/lib/tools/registry";
 import { callTool } from "@/lib/tools/wrap";
+import { assertNoPiiCui, PiiCuiError } from "@/lib/guard/pii";
 import { RULES, RULES_LAST_VERIFIED } from "@/lib/rules-data";
 import { TIMELINES, TIMELINES_LAST_VERIFIED } from "@/lib/timelines-data";
 import { DISCLAIMERS } from "@/lib/disclaimers";
@@ -192,10 +193,63 @@ function withCors(response: Response): Response {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers: merged });
 }
 
+/**
+ * Found live via the spec §6 judging panel round 5 (trust_skeptic, directly
+ * reproduced): the MCP SDK's own `registerTool()` machinery validates
+ * `tools/call`'s `arguments` against each tool's zod `inputSchema` BEFORE
+ * invoking this file's own per-tool handler callback — and a plain
+ * (non-`.strict()`) zod object schema's own default behavior is to silently
+ * DROP unrecognized keys while parsing, not reject them. That means an
+ * extra, undocumented argument (e.g. `{query:"autonomy", ssn:"123-..."}`)
+ * never reaches `callTool()`'s own `assertNoPiiCui` call at all — it's
+ * already gone by the time our code sees the input. Confirmed this is
+ * specific to the MCP transport: the identical payload sent to the
+ * /api/tools/* REST route (which calls `assertNoPiiCui` on the fully raw,
+ * unparsed body) was already correctly rejected before this fix, and
+ * remains so. Scans the TRUE raw `tools/call` arguments here, before
+ * mcp-handler/the SDK ever parses them — the only place in this codebase
+ * that sees them unfiltered. `request.clone()` reads an independent copy of
+ * the body stream so the original request, consumed by `handler()` below,
+ * is unaffected.
+ */
+async function rejectPiiInRawToolCall(request: Request): Promise<Response | null> {
+  let body: unknown;
+  try {
+    body = await request.clone().json();
+  } catch {
+    return null; // Not JSON (or no body) — nothing to pre-scan; the SDK's own parser reports this.
+  }
+  if (!body || typeof body !== "object" || (body as { method?: unknown }).method !== "tools/call") return null;
+  const params = (body as { params?: { arguments?: unknown } }).params;
+  try {
+    assertNoPiiCui(params?.arguments);
+  } catch (err) {
+    if (!(err instanceof PiiCuiError)) throw err;
+    const id = (body as { id?: unknown }).id ?? null;
+    // A JSON-RPC SUCCESS wrapping an isError:true CallToolResult — the same
+    // shape the per-tool handler below produces for an in-schema PII
+    // rejection — not a top-level JSON-RPC `error`. The two read very
+    // differently to a calling agent: `result.isError` is a normal,
+    // expected tool outcome its own error-handling code already deals with,
+    // while a protocol-level `error` is a transport failure most MCP
+    // client SDKs throw as an exception instead of returning (confirmed:
+    // this exact mismatch broke this project's own existing protocol-suite
+    // test on the first version of this fix).
+    return Response.json({
+      jsonrpc: "2.0",
+      id,
+      result: { content: [{ type: "text", text: err.message }], isError: true },
+    });
+  }
+  return null;
+}
+
 async function corsGET(request: Request) {
   return withCors(await handler(request));
 }
 async function corsPOST(request: Request) {
+  const rejected = await rejectPiiInRawToolCall(request);
+  if (rejected) return withCors(rejected);
   return withCors(await handler(request));
 }
 function OPTIONS() {

@@ -27,6 +27,7 @@ const REFUSAL_CATEGORIES: Record<PiiCategory, string> = {
   binary_data: "Embedded files or other binary data",
   unscannable_structure: "Requests structured too deeply (nested many levels deep) for us to safely check",
   credit_card: "Credit or debit card numbers",
+  classification_marking: "Classification or control markings (e.g. SECRET//NOFORN), real or described",
 };
 
 // A real-shaped request to explain_rule's actual input field ("topic"),

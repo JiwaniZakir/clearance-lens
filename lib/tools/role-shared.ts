@@ -1,5 +1,5 @@
 import { getJob } from "@/lib/speedrun/client";
-import { extractRequirementSignals, type RequirementSignal } from "@/lib/speedrun/infer";
+import { extractRequirementSignals, looksNonUsLocation, type RequirementSignal } from "@/lib/speedrun/infer";
 import type { SpeedrunJobLabels } from "@/lib/speedrun/types";
 import type { SourceRef } from "@/lib/tools/wrap";
 
@@ -68,11 +68,29 @@ export type ClearanceFilter = "none" | "secret" | "ts" | "ts_sci";
  * or inferred) is that exact level, or — for "secret" — an unspecified "a
  * clearance is required" signal (reads as "at least Secret" in practice).
  * "none" matches roles where no clearance_level signal was detected at all. */
-export function matchesClearanceFilter(signals: RequirementSignal[], clearance: ClearanceFilter): boolean {
+/** `location` is optional only for callers (tests, other tools) that don't
+ *  have it handy and are checking a specific level directly (`levels.includes`
+ *  below needs no geography) — the "secret ~ unspecified" fallback is the
+ *  ONLY path this gates, since it's the one that assumes US DoD Secret by
+ *  default rather than matching an explicitly-stated level. */
+export function matchesClearanceFilter(
+  signals: RequirementSignal[],
+  clearance: ClearanceFilter,
+  location?: string | null,
+): boolean {
   const levels = signals.filter((s) => s.kind === "clearance_level").map((s) => s.value);
   if (clearance === "none") return levels.length === 0;
   if (levels.includes(clearance)) return true;
-  if (clearance === "secret" && levels.includes("clearance_required_unspecified")) return true;
+  // Found live via the spec §6 judging panel round 5 (candidate_user,
+  // reproduced twice): a UK Leonardo posting's generic "Security Clearance"
+  // mention (clearance_required_unspecified — the UK has its own, different
+  // vetting system) matched a "secret" filter query as if it meant the US
+  // DoD Secret clearance this product is entirely about. The fallback below
+  // assumes "an unspecified clearance" defaults to US Secret, a reasonable
+  // default for a US-based posting but not a foreign one.
+  if (clearance === "secret" && levels.includes("clearance_required_unspecified") && !looksNonUsLocation(location)) {
+    return true;
+  }
   return false;
 }
 

@@ -115,7 +115,7 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
       .filter((r): r is PromiseFulfilledResult<{ summary: SpeedrunJobSummary; signals: ReturnType<typeof extractRequirementSignals> }> => r.status === "fulfilled")
       .map((r) => r.value);
 
-    if (clearance) results = results.filter((r) => matchesClearanceFilter(r.signals, clearance));
+    if (clearance) results = results.filter((r) => matchesClearanceFilter(r.signals, clearance, r.summary.location));
     if (itar_only) results = results.filter((r) => looksItarRestricted(r.signals));
 
     const page = results.slice(0, limit);

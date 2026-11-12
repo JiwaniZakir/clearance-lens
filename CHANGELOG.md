@@ -132,3 +132,21 @@ Round 4: trimmed mean **7.49** (up from 6.82), median **7.90**, still capped at 
 - Investigated and found NOT reproducible: a claim that a too-long PII-containing string triggers the length-validation error instead of the PII-specific one — `wrap.ts`'s own pipeline order runs the PII guard strictly before zod validation, confirmed by direct re-reading and reproduction against production.
 - Confirmed as deliberate, pre-existing design choices, not new bugs: a bare 9-digit number not being flagged on tools other than `prepare_consented_card` (D-027's own documented, reasoned scoping); an unrecognized top-level key being silently dropped while one nested inside `prepare_consented_card` is strictly rejected (that tool's own deliberate `.strict()`, not an accidental inconsistency).
 - Unit suite: 251 → 260. Full E2E suite (78 passed, both viewports), protocol suite 14/14, Lighthouse 100/100/100/100/100 on all 4 pages.
+
+## [Unreleased] — judging panel round 5 response (2026-11-12)
+
+Round 5: trimmed mean **7.55** (up from 7.49), median 7.55, still capped at 6.0 by 2/5 judges, each a different hard-constraint category. Full results `panel/round-5/`, full response DECISIONS.md D-031.
+
+### fix
+- **Hard constraint: a PII/CUI bypass specific to the MCP transport.** An SSN in an undocumented extra `tools/call` argument field was silently dropped by the MCP SDK's own schema-based argument parsing before this project's `assertNoPiiCui` ever saw it (the REST `/api/tools/*` path was already unaffected, since it scans the fully raw body). Fixed by scanning the true raw `tools/call` body in a route-level wrapper, ahead of the SDK's own parsing, and returning the rejection in the same `result.isError:true` shape an in-schema PII rejection already uses (not a top-level JSON-RPC `error`, which most client SDKs throw as an exception instead of returning).
+- **Hard constraint: a new PII/CUI category.** Classification/control markings ("SECRET//NOFORN", "(S//NF)") were accepted and echoed verbatim into `prepare_consented_card`'s shareable output. Added a `classification_marking` category, anchored on the "//" + a recognized control-marking abbreviation specifically, not a bare classification-level word (which remains legitimate self-attestation language elsewhere in this product).
+- A leaked internal "product brief" authoring note in live `estimate_timeline`/`timelines.json` data (same class of bug as D-026's leaked Gate R→B annotation).
+- `get_role_rubric`'s `sources[]` listed the same citation twice when two distinct signals mapped to the same underlying rule — deduplicated by URL.
+- `search_defense_roles`' clearance filter matched a non-US posting (a real UK Leonardo listing) on a `clearance:"secret"` query, since its generic "unspecified clearance → presumed Secret" fallback wasn't geography-aware. Reused D-028's existing geography check (now exported and shared) and widened it to recognize ISO country codes ("Newcastle, GB"), not just spelled-out names.
+- `estimate_timeline`'s min==max cases now explain, in the output itself, that the specific input returns a single figure because its source publishes only one average — not because no range was computed — after judges across 2 separate rounds happened to sample only no-range inputs and read this as the tool failing its own "range where the data supports one" promise.
+
+### test
+- Investigated and found NOT a bug: requirement-signal badges appearing "inert" on a bare click — confirmed this is `@radix-ui/react-tooltip`'s own standard behavior (opens on hover or keyboard focus, not a mouse click, per the WAI-ARIA tooltip pattern); both real interaction paths (hover, keyboard focus) already work correctly.
+- Not changed, with reasoning: `run_job_preview`'s templated scene reuse across role types and duplicate upstream listings inflating `get_company_profile`'s role counts are both already-disclosed, acknowledged product characteristics, not newly-hidden defects.
+- Added 2 new dedicated unit test files for previously-untested modules: `get-role-rubric.test.ts`, `role-shared.test.ts`.
+- Unit suite: 260 → 276. Full E2E suite (76 passed, 2 graceful skips, both viewports), protocol suite 14/14 (including the existing declared-field PII test the MCP-transport fix's first draft broke and the second draft fixed), Lighthouse 100/100/100/100/100 on all 4 pages.
