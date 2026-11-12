@@ -16,3 +16,26 @@ One entry per build loop (spec §4). Goal → what shipped → test result → p
 - Two real live bugs found and fixed during build, not left for the panel: a transient Speedrun 5xx not being retried (D-006), a nullable-field type lie in `lib/speedrun/types.ts` (D-008).
 **Test result:** 149 unit tests passing, typecheck clean, lint clean. Full MCP-transport smoke test (handshake, tools/list, resources/list, prompts/list, every tool called) passing against local dev.
 **Not yet done:** the entire web app (`/`, `/try`, `/privacy`, `/sources` are still the default scaffold — by far the largest remaining item per PLAN.md), protocol/e2e/a11y/perf/red-team/agent-eval/link-check tests, deployment, judging panel.
+
+## Iteration 2 — Web app, protocol/red-team/agent-eval tests, deployment (2026-11-11 – 2026-11-12)
+**Goal:** Ship `/`, `/try`, `/privacy`, `/sources`; run the full spec §5 test battery; deploy to production.
+**Shipped:**
+- All 4 pages built in parallel by scoped subagents (landing / `/try` / privacy+sources), each with a strict file-ownership boundary to avoid conflicts; design tokens/components from R2.
+- `app/mcp/route.ts`'s CORS gap fixed (D-012) — found via direct `curl` with an `Origin` header, invisible to every prior Node-client smoke test.
+- Red-team pass (D-013): 5 confirmed PII-guard bypasses (Unicode lookalikes, short base64, ROT13, percent-encoding, a fail-open depth limit), all fixed with regression tests. BLOCKERS.md B-001 (cross-field PII evasion) resolved with a scoped `extraGuard` hook, not a global fix (D-014).
+- Agent-in-the-loop persona eval (spec §5): 4 fresh agents role-playing R3's personas against the live MCP server, 40 scenarios, 34/40 passing on first read — found and fixed the `nbis-diss` guard bug (D-016) and the `estimate_timeline` interim-eligibility gap (D-017), both reproducible, both central to real user journeys.
+- Deployed to production via Vercel's Git integration; verified live (D-023).
+**Test result:** unit suite grew to 206 (PII guard, estimate_timeline/explain_rule's first-ever dedicated tests, get_company_profile's comp-normalization regression, search_defense_roles's zero-result guidance). Protocol suite 14/14 against both local and production MCP endpoints.
+**Not yet done at the end of this iteration:** Playwright E2E beyond a skeleton accessibility spec, Lighthouse CI never run, judging panel never executed.
+
+## Iteration 3 — Accessibility/Lighthouse hardening, E2E suite, judging panel (2026-11-12)
+**Goal:** Close the remaining spec §5 gaps (full a11y/Lighthouse/E2E verification) and run the judging panel (spec §6).
+**Shipped:**
+- Diagnosed and fixed a shared dev server stuck in an HMR reload loop that was silently breaking client-side hydration for every agent using it (D-019); fixed a pnpm/Playwright config bug that meant no test had ever actually run against a production build before (D-019).
+- 2 real accessibility bugs found via Playwright + axe against a production build (a card nesting focusable children inside `role="button"`; several scrollable regions with no `tabIndex`) and 2 heading-order bugs found via Lighthouse — all fixed (D-019, D-020). Lighthouse CI wired up and run: **100/100/100/100 on every page**, both locally and on production.
+- `tests/e2e/try-playground.spec.ts`: the full Playwright persona-scenario suite across all 6 `/try` tabs plus a chained integration journey (D-022).
+- `scripts/linkcheck.ts`'s own retry-logic bug fixed (D-021) — it could silently downgrade a legitimate bot-block signal to a false FAIL.
+- 3 real gaps closed in the judging-panel aggregator before round 1 ever ran: missing-evidence discarding, score-range bounds, and a minimum-valid-judges safety floor (D-024).
+- Full production smoke test: all 11 tools, CORS, protocol suite, and E2E suite re-verified against the live deployed URL (D-023).
+**Test result:** unit suite 206/206, protocol 14/14 (local + production), E2E 49/50 (1 gracefully self-skipping on an inherently live-data-dependent case), Lighthouse 100/100/100/100 all 4 pages, linkcheck 128 passed/44 warned/0 failed, `tsc --noEmit` and `eslint .` clean.
+**Panel result:** round 1 launched — see `panel/round-1/` and this file's own next entry once it completes.
