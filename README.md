@@ -139,7 +139,7 @@ tests/
 
 ## Privacy, sources, and limitations
 
-- **[/privacy](https://clearance-lens.vercel.app/privacy)** — exactly what's sent, stored (nothing), logged (no bodies), and refused.
+- **[/privacy](https://clearance-lens.vercel.app/privacy)** — exactly what's sent, stored (almost nothing — see the one opt-in exception above), logged (no bodies), and refused.
 - **[/sources](https://clearance-lens.vercel.app/sources)** — every rule and statistic this product uses, with a primary-source link and a last-verified date. See also [`SOURCES.md`](./SOURCES.md).
 - This is **not legal advice**. Verify anything that matters with your Facility Security Officer or counsel.
 - Clearance Lens never queries DISS/NBIS/DCSA and never asks for clearance screenshots — the only legitimate verification path is your employer's FSO at the offer stage.
