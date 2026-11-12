@@ -84,7 +84,7 @@ export const buildTrialAssessmentTool: ToolDef<z.infer<typeof InputSchema>, z.in
   name: "build_trial_assessment",
   title: "Build a trial work-sample assessment",
   description:
-    "Generates an ITAR-safe, time-boxed work-sample exercise (brief, deliverable requirement, behaviorally-anchored rubric, 'what great looks like' bands) built only from a role's public posting text — never invented technical specifications. Grounded in Sackett et al. (2022) and work-sample design literature (research/R5-assessment-science.md).",
+    "Generates an ITAR-safe, time-boxed work-sample exercise (brief, deliverable requirement, behaviorally-anchored rubric, 'what great looks like' bands) built only from a role's public posting text — never invented technical specifications. Grounded in Sackett et al. (2022) and the work-sample design literature; see sources[].",
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
   handler: async ({ role_id, minutes }) => {
@@ -149,7 +149,7 @@ export const buildTrialAssessmentTool: ToolDef<z.infer<typeof InputSchema>, z.in
         "These bands are a deterministic starting shape (so this works with no LLM key in the /try playground). Your own agent may sharpen the band language with more job-specific detail if useful — keep the Exceptional/Developing boundary anchored to the quoted requirement, not a generic trait.",
       itarSafetyNote: DISCLAIMERS.itarSafeTrial,
       limitsNote:
-        "Work-sample tests are a strong predictor of job performance in the research literature when professionally built, standardized, and behaviorally scored at scale (research/R5-assessment-science.md, §A1) — that evidence licenses the design choices above (job-specific, traceable, behaviorally anchored), not a claim that this specific generated exercise reproduces any particular validity number.",
+        "Work-sample tests are a strong predictor of job performance in the research literature when professionally built, standardized, and behaviorally scored at scale (Sackett, Zhang, Berry & Lievens, 2022 — see sources[]) — that evidence licenses the design choices above (job-specific, traceable, behaviorally anchored), not a claim that this specific generated exercise reproduces any particular validity number.",
       sources: [
         SPEEDRUN_SOURCE,
         {

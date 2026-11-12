@@ -38,7 +38,7 @@ export const runJobPreviewTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typ
   name: "run_job_preview",
   title: "Run a first-week job preview",
   description:
-    "Returns a complete 4-or-6-scene 'first week' realistic job preview script for the agent to run interactively with the user, one scene at a time — standup priorities, an ambiguous spec, (30-min only) an ethics tradeoff, an ITAR moment, a clearance-wait week, and (30-min only) SCIF/travel-reporting life. Scenes are played straight, not softened (research/R5-assessment-science.md §C2) — honest downsides don't meaningfully reduce acceptance in the evidence.",
+    "Returns a complete 4-or-6-scene 'first week' realistic job preview script for the agent to run interactively with the user, one scene at a time — standup priorities, an ambiguous spec, (30-min only) an ethics tradeoff, an ITAR moment, a clearance-wait week, and (30-min only) SCIF/travel-reporting life. Scenes are played straight, not softened — realistic-job-preview research shows honest downsides don't meaningfully reduce acceptance; see sources[].",
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
   handler: async ({ role_id, minutes }) => {
@@ -64,7 +64,7 @@ export const runJobPreviewTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typ
         "Run this as a conversation, one scene at a time, not as a quiz dump. For each scene: show the setup and the choice labels only (withhold whatRealTeamsReportByChoice), let the user actually pick one, THEN reveal that choice's whatRealTeamsReportByChoice, then ask the scene's debriefPrompts conversationally. If requiresStatedRationale is true, ask the user to state their one-sentence rationale before revealing the outcome. Never score or rank a choice as right/wrong — every choice has a real, differentiated consequence; the point is realistic texture, not a test. After the last scene, ask aggregateDebriefPrompt once.",
       scenes,
       aggregateDebriefPrompt:
-        "Across everything you just saw — including the parts that weren't flattering — did this feel like an honest picture of the job? That question matters more than whether you're still interested (research/R5-assessment-science.md §A2: perceived honesty was the only significant mediator of real-world realistic-job-preview effects on outcomes).",
+        "Across everything you just saw — including the parts that weren't flattering — did this feel like an honest picture of the job? That question matters more than whether you're still interested.",
       polygraphNote:
         "A polygraph may be part of some agencies'/programs' processes. This preview describes that fact; it never simulates or role-plays an actual polygraph exam.",
       itarSafetyNote: DISCLAIMERS.itarSafeTrial,
