@@ -35,9 +35,12 @@ const nextConfig: NextConfig = {
           // every other security header was present (HSTS/X-Frame-Options/
           // Permissions-Policy/nosniff) but CSP was missing entirely. Checked
           // what the app actually needs before writing this, not guessed:
-          // next-themes injects an inline <script> (no nonce infra exists yet,
-          // hence 'unsafe-inline' on script-src — a real, accepted tradeoff,
-          // not an oversight), fonts are self-hosted via the `geist` package
+          // next-themes and Next.js itself inject inline <script>s, hence
+          // 'unsafe-inline' on script-src — a tested, accepted tradeoff (D-044):
+          // experimental SRI was tried and blocked all 4 inline scripts (no
+          // hydration); nonces would force every page into dynamic rendering;
+          // and there is no HTML-injection sink for an inline script to arrive
+          // through (tests/unit/security-invariants.test.ts). Fonts are self-hosted via the `geist` package
           // (no external font host needed), there are no <img>/next/image
           // elements or client-side cross-origin fetches anywhere in app/ or
           // components/ (every third-party API call happens server-side in a

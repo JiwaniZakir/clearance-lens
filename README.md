@@ -143,6 +143,7 @@ tests/
 
 - **[/privacy](https://clearance-lens.vercel.app/privacy)** — exactly what's sent, stored (almost nothing — see the one opt-in exception above), logged (no bodies), and refused.
 - **[/sources](https://clearance-lens.vercel.app/sources)** — every rule and statistic this product uses, with a primary-source link and a last-verified date. See also [`SOURCES.md`](./SOURCES.md).
+- **Security headers:** HSTS, CSP, `nosniff`, `frame-ancestors 'none'`, and a locked-down Permissions-Policy. The CSP does allow inline scripts (`'unsafe-inline'`): Next.js emits inline hydration scripts, and the only alternative, per-request nonces, would force every page into dynamic rendering. That directive guards against injected scripts, and this app renders no user-supplied HTML anywhere (no `dangerouslySetInnerHTML`/`innerHTML` — enforced by a test). See [`DECISIONS.md`](./DECISIONS.md) D-044.
 - This is **not legal advice**. Verify anything that matters with your Facility Security Officer or counsel.
 - Clearance Lens never queries DISS/NBIS/DCSA and never asks for clearance screenshots — the only legitimate verification path is your employer's FSO at the offer stage.
 
