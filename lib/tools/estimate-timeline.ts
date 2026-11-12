@@ -64,6 +64,24 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
       });
     }
 
+    // Found live via the spec §5 agent-in-the-loop persona eval (DECISIONS.md
+    // D-016): a true zero-history caller (current_status: "none") — the
+    // single most common new-grad call shape — never saw that an interim
+    // determination can let them start work well before the full baseline
+    // above finishes, because that content used to be gated behind
+    // current_status already being "interim", which a zero-history caller
+    // can never honestly claim. Surface it as an informational driver for
+    // "none" too — it doesn't change the numeric estimate (interim has no
+    // day-count of its own, same reasoning as the current_status==="interim"
+    // branch below), it just stops omitting genuinely relevant real content.
+    if (current_status === "none") {
+      const interimModifier = findModifier("interim");
+      if (interimModifier) {
+        drivers.push({ label: "Interim eligibility can start sooner", detail: interimModifier.effectDescription });
+        sources.push(interimModifier.source);
+      }
+    }
+
     if (current_status === "active") {
       estimate = { minDays: null, maxDays: null, medianDays: null };
       const reciprocityRule = findRule("sead7") ?? findRule("reciprocity");

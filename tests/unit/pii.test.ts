@@ -126,7 +126,19 @@ describe("Clearance record text detection", () => {
     "I hold a TS/SCI clearance",
     "can a startup sponsor my clearance?",
     "I'm interested in roles that require a clearance",
-  ])("does NOT flag self-attested clearance status: %s", (text) => {
+    // Found live via the spec §5 agent-in-the-loop persona eval: bare
+    // mentions of DISS/JPAS/NBIS (asking ABOUT the system, not pasting a
+    // record from it) were wrongly rejected — including explain_rule's own
+    // "nbis-diss" topic id and its real rule title, making that rule
+    // permanently unreachable. System names now require actual
+    // record-indicating context immediately adjacent (see the regex's own
+    // comment in lib/guard/pii.ts).
+    "nbis-diss",
+    "explain DISS to me",
+    "NBIS vs. DISS: Current System of Record",
+    "what is nbis",
+    "tell me about JPAS",
+  ])("does NOT flag self-attested clearance status or a bare system-name mention: %s", (text) => {
     expect(categoriesOf(text)).not.toContain("clearance_record");
   });
 });

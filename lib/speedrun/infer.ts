@@ -24,13 +24,37 @@ export interface RequirementSignal {
 
 const MAX_EXCERPT_LENGTH = 220;
 
+/**
+ * Expand to the containing sentence/bullet-line where reasonable, else a
+ * fixed window — always truncated and always a direct substring, never
+ * paraphrased. Bounded by the NEARER of a period or a newline on each side,
+ * not period alone: found live via the spec §5 agent-in-the-loop persona
+ * eval (DECISIONS.md D-016/D-018) that real postings commonly format
+ * requirements as newline-separated bullets with no trailing period on each
+ * item — period-only boundary search then walks past the current bullet
+ * entirely, either bleeding forward into unrelated later bullets (no period
+ * to stop at) or backward into an unrelated earlier paragraph (the nearest
+ * period could be several bullets/sections away). A bullet marker
+ * ("- "/"• "/"* ") immediately after the start boundary is stripped so the
+ * quoted excerpt reads as the requirement text itself, not the list syntax.
+ */
 function excerptAround(text: string, matchIndex: number, matchLength: number): string {
-  // Expand to the containing sentence where reasonable, else a fixed window —
-  // always truncated and always a direct substring, never paraphrased.
-  const start = Math.max(0, text.lastIndexOf(".", matchIndex) + 1);
-  const end = text.indexOf(".", matchIndex + matchLength);
-  const sliceEnd = end === -1 ? Math.min(text.length, matchIndex + matchLength + 120) : end + 1;
-  const raw = text.slice(start, sliceEnd).replace(/\s+/g, " ").trim();
+  const lastPeriod = text.lastIndexOf(".", matchIndex);
+  const lastNewline = text.lastIndexOf("\n", matchIndex);
+  const start = Math.max(0, lastPeriod, lastNewline) + 1;
+
+  const searchFrom = matchIndex + matchLength;
+  const nextPeriod = text.indexOf(".", searchFrom);
+  const nextNewline = text.indexOf("\n", searchFrom);
+  const candidates = [nextPeriod, nextNewline].filter((i) => i !== -1);
+  const end = candidates.length > 0 ? Math.min(...candidates) : -1;
+  const sliceEnd = end === -1 ? Math.min(text.length, searchFrom + 120) : end + 1;
+
+  const raw = text
+    .slice(start, sliceEnd)
+    .replace(/^[\s\-•*]+/, "") // strip a leading bullet marker, not part of the requirement text itself
+    .replace(/\s+/g, " ")
+    .trim();
   return raw.length > MAX_EXCERPT_LENGTH ? `${raw.slice(0, MAX_EXCERPT_LENGTH - 1)}…` : raw;
 }
 
@@ -52,8 +76,25 @@ const STATED_PATTERNS: StatedPattern[] = [
     value: "clearance_required_unspecified",
     pattern: /\b(?:security clearance|active clearance|current clearance)\b/i,
   },
-  { kind: "citizenship", value: "us_citizen_required", pattern: /\bmust be a\s+(?:u\.?s\.?|united states)\s+citizen\b|\bu\.?s\.?\s+citizenship required\b/i },
-  { kind: "citizenship", value: "us_person_required", pattern: /\bu\.?s\.?\s+person\b|\bitar[- ]?(?:regulated|controlled|restricted)\b/i },
+  // "us_citizen_required" excludes the case where "citizen" is itself one
+  // branch of a broader citizen/national/permanent-resident disjunction —
+  // found live via the spec §5 agent-in-the-loop eval (DECISIONS.md D-016/
+  // D-018): "must be a citizen, national, or lawful permanent resident" is
+  // the ITAR "US person" test (22 CFR 120.62) stated in its own words, not a
+  // citizen-only requirement, and was being misclassified as the narrower
+  // category. "us_person_required" below now also matches that disjunction
+  // directly, in either order.
+  {
+    kind: "citizenship",
+    value: "us_citizen_required",
+    pattern: /\bmust be a\s+(?:u\.?s\.?|united states)\s+citizen\b(?!.{0,60}?\b(?:national|permanent resident)\b)|\bu\.?s\.?\s+citizenship required\b/i,
+  },
+  {
+    kind: "citizenship",
+    value: "us_person_required",
+    pattern:
+      /\bu\.?s\.?\s+person\b|\bitar[- ]?(?:regulated|controlled|restricted)\b|\bcitizen\b.{0,40}?\b(?:national|permanent resident)\b|\b(?:national|permanent resident)\b.{0,40}?\bcitizen\b/i,
+  },
   { kind: "citizenship", value: "no_sponsorship", pattern: /\bno (?:visa )?sponsorship\b|\bunable to sponsor\b/i },
   { kind: "polygraph", value: "polygraph_required", pattern: /\bpolygraph\b/i },
   { kind: "facility_access", value: "scif_onsite", pattern: /\bscif\b/i },

@@ -87,9 +87,20 @@ const DIGIT_RUN_5PLUS = /\b[A-Za-z]?\d{5,}\b/;
 /** Specific adjudication/records-system jargon. Deliberately narrow — generic
  *  words like "clearance", "secret", or "active" must NOT appear here, since
  *  stating one's own clearance status/level is self-attestation, not a record
- *  leak, and is exactly what this product needs users to be able to say. */
+ *  leak, and is exactly what this product needs users to be able to say.
+ *  System NAMES (diss/jpas/nbis) require actual record-indicating context
+ *  immediately adjacent — bare mentions do NOT match. Without this, asking
+ *  explain_rule to explain what DISS/NBIS even ARE (the rule that explains
+ *  *why* self-attestation isn't verification — exactly the content this
+ *  product most wants to surface) was itself rejected as if it were pasted
+ *  record text, including the rule's own id ("nbis-diss") and title ("NBIS
+ *  vs. DISS: Current System of Record") — found live via the spec §5
+ *  agent-in-the-loop persona eval, not a hypothetical. The other phrases
+ *  below (subject summary, investigation opened/closed, etc.) still catch an
+ *  actual record dump independently, so this narrowing doesn't meaningfully
+ *  reduce real protection. */
 const CLEARANCE_RECORD_CONTEXT =
-  /\b(diss|jpas|nbis(?:\s+record)?|e-?adjudication|subject summary|investigation (?:opened|closed)|adjudication (?:result|history)|eqip (?:record|history))\b/i;
+  /\b(?:diss|jpas|nbis)\s+(?:record|printout|screenshot|summary|history|shows|says|entry)|e-?adjudication|subject summary|investigation (?:opened|closed)|adjudication (?:result|history)|eqip (?:record|history)/i;
 
 const IMAGE_DATA_URI = /data:image\/[a-z0-9+.-]+;base64,/i;
 const BINARY_DATA_URI = /data:[a-z0-9/+.-]+;base64,/i;
