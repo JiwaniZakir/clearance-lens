@@ -15,7 +15,7 @@ The agent calls `search_defense_roles`, then `get_role_rubric`, and answers usin
 
 **0:20 — Timeline.**
 Ask: *"If I had zero clearance history, how long before I could start?"*
-The agent calls `estimate_timeline` and shows a sourced range (DCSA timeliness data) with an explicit uncertainty note — never a single invented number.
+The agent calls `estimate_timeline` and shows a sourced estimate (DCSA timeliness data — a single published quarterly average for a from-scratch case like this one, not an invented range) with an explicit uncertainty note and the interim-eligibility driver that can start sooner.
 
 **0:30 — Job preview.**
 Ask: *"Give me a 20-minute first-week preview for that role."*

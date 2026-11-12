@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
 import { callTool, SourceRefSchema, type ToolDef, type SourceRef } from "@/lib/tools/wrap";
+import { SpeedrunApiError } from "@/lib/speedrun/client";
+import { GitHubApiError } from "@/lib/github/client";
 
 const EchoInput = z.object({ message: z.string().max(100) });
 const EchoOutput = z.object({ echoed: z.string(), sources: z.array(SourceRefSchema) });
@@ -68,6 +70,66 @@ describe("callTool pipeline", () => {
     const result = await callTool(badOutputTool, { message: "hi" });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("internal_error");
+  });
+
+  // Regression for DECISIONS.md (judging panel round 1): a 404 from any
+  // SpeedrunApiError/GitHubApiError used ONE generic, job-posting-flavored
+  // message ("may have been filled or removed since you last searched")
+  // regardless of entity type -- nonsensical for a company slug or a
+  // GitHub username. Each error class's own userMessage (set at the
+  // specific throw site that knows what was being looked up) must now be
+  // preferred over that generic fallback.
+  it("prefers a SpeedrunApiError's own userMessage over the generic 404 fallback", async () => {
+    const tool: ToolDef<{ message: string }, { echoed: string; sources: SourceRef[] }> = {
+      ...echoTool,
+      name: "speedrun-404",
+      handler: async () => {
+        throw new SpeedrunApiError("no company with that slug", 404, "not_found", "Entity-specific not-found text.");
+      },
+    };
+    const result = await callTool(tool, { message: "hi" });
+    expect(result).toEqual({ ok: false, error: { code: "not_found", message: "Entity-specific not-found text." } });
+  });
+
+  it("prefers a GitHubApiError's own userMessage over the generic 404 fallback", async () => {
+    const tool: ToolDef<{ message: string }, { echoed: string; sources: SourceRef[] }> = {
+      ...echoTool,
+      name: "github-404",
+      handler: async () => {
+        throw new GitHubApiError("GitHub user not found", 404, "Entity-specific GitHub not-found text.");
+      },
+    };
+    const result = await callTool(tool, { message: "hi" });
+    expect(result).toEqual({ ok: false, error: { code: "not_found", message: "Entity-specific GitHub not-found text." } });
+  });
+
+  it("falls back to the generic 404 message when an error class doesn't set its own userMessage", async () => {
+    const tool: ToolDef<{ message: string }, { echoed: string; sources: SourceRef[] }> = {
+      ...echoTool,
+      name: "speedrun-404-no-override",
+      handler: async () => {
+        throw new SpeedrunApiError("not found", 404, "not_found");
+      },
+    };
+    const result = await callTool(tool, { message: "hi" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toContain("may have been filled or removed");
+  });
+
+  it("a non-404 upstream error still gets the generic upstream_error message, never a userMessage meant for 404s", async () => {
+    const tool: ToolDef<{ message: string }, { echoed: string; sources: SourceRef[] }> = {
+      ...echoTool,
+      name: "speedrun-500",
+      handler: async () => {
+        throw new SpeedrunApiError("server error", 500, "upstream_error");
+      },
+    };
+    const result = await callTool(tool, { message: "hi" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("upstream_error");
+      expect(result.error.message).toContain("temporarily unavailable");
+    }
   });
 
   it("scans nested object fields for PII, not just top-level strings", async () => {

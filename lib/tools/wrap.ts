@@ -133,7 +133,7 @@ export async function callTool<TInput, TOutput>(
           code: err.status === 404 ? "not_found" : "upstream_error",
           message:
             err.status === 404
-              ? "We couldn't find that — it may have been filled or removed since you last searched."
+              ? err.userMessage ?? "We couldn't find that — it may have been filled or removed since you last searched."
               : "A data source this tool depends on is temporarily unavailable. Please try again shortly.",
         },
       };

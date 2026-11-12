@@ -38,7 +38,7 @@
     {
       "id": "lapsed_lt_2y",
       "appliesTo": ["secret", "ts"],
-      "effectDescription": "If the break in federal service or classified access is under 24 months AND the person's prior investigation is still within its 7-year validity window with no new derogatory information, SEAD 7 reciprocity generally applies: the new employer/agency should accept the existing eligibility rather than opening a brand-new investigation, and a reciprocity determination is supposed to be made in about 5 business days. Real-world administrative processing (routing the request, pulling records, re-verifying the position's access needs) commonly takes somewhat longer than that formal target, but no primary source gives a specific day count for that real-world ceiling [corrected during Gate R→B review — an unsourced \"20 days\" upper bound was removed; see DECISIONS.md] — ask the sponsoring FSO for a case-specific estimate.",
+      "effectDescription": "If the break in federal service or classified access is under 24 months AND the person's prior investigation is still within its 7-year validity window with no new derogatory information, SEAD 7 reciprocity generally applies: the new employer/agency should accept the existing eligibility rather than opening a brand-new investigation, and a reciprocity determination is supposed to be made in about 5 business days. Real-world administrative processing (routing the request, pulling records, re-verifying the position's access needs) commonly takes somewhat longer than that formal target, but no primary source gives a specific day count for that real-world ceiling — ask the sponsoring FSO for a case-specific estimate.",
       "typicalDaysMin": 5,
       "typicalDaysMax": null,
       "source": {

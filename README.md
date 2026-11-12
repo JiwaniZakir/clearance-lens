@@ -47,7 +47,7 @@ No agent handy? Try every tool directly at **[/try](https://clearance-lens.verce
 |---|---|
 | `search_defense_roles` | Live defense/hard-tech roles, with requirement signals labeled **stated** (quoted from the posting) vs **inferred** (a judgment call to confirm) |
 | `get_role_rubric` | An eligibility checklist + skills rubric for your agent to evaluate **privately** |
-| `estimate_timeline` | How long a clearance might realistically take — as a range, never a false-precision number |
+| `estimate_timeline` | How long a clearance might realistically take — a real range where the data supports one, a single sourced figure where it doesn't, never an invented number |
 | `readiness_brief` | A template your agent fills in locally: eligibility, gaps, a 2-week prep plan, recruiter questions |
 | `build_trial_assessment` | A 60/90/180-minute ITAR-safe work-sample exercise built only from the public posting |
 | `explain_rule` | Plain-English ITAR/clearance rule explanations with primary-source links |

@@ -306,3 +306,79 @@ export interface PickedRole {
   title: string;
   company: string;
 }
+
+/* ---------------------------------------------------------------------- */
+/* readiness_brief (lib/tools/readiness-brief.ts)                         */
+/* ---------------------------------------------------------------------- */
+
+export interface ReadinessBriefInput {
+  role_id: string;
+}
+
+export interface ReadinessBriefOutput {
+  roleTitle: string;
+  company: string;
+  template: {
+    eligibility: { prompt: string; agentFillsThisIn: true };
+    gaps: { prompt: string; agentFillsThisIn: true };
+    twoWeekPrepPlan: { prompt: string; suggestedFocusAreas: string[]; agentFillsThisIn: true };
+  };
+  recruiterQuestions: string[];
+  evaluate_locally: true;
+  instructionsForAgent: string;
+  sources: SourceRef[];
+  disclaimer: string;
+}
+
+/* ---------------------------------------------------------------------- */
+/* verify_evidence (lib/tools/verify-evidence.ts)                        */
+/* ---------------------------------------------------------------------- */
+
+export interface VerifyEvidenceInput {
+  github_username_or_url: string;
+}
+
+export interface VerifyEvidenceOutput {
+  profile: {
+    login: string;
+    name: string | null;
+    profileUrl: string;
+    bio: string | null;
+    publicRepoCount: number;
+    followers: number;
+    accountCreatedAt: string;
+  };
+  topLanguages: { language: string; repoCount: number }[];
+  recentActivity: { repo: string; url: string; pushedAt: string; description: string | null }[];
+  sources: SourceRef[];
+  disclaimer: string;
+}
+
+/* ---------------------------------------------------------------------- */
+/* prepare_consented_card (lib/tools/prepare-consented-card.ts)          */
+/* ---------------------------------------------------------------------- */
+
+export interface ConsentedFields {
+  headline?: string;
+  clearance_status_self_reported?: string;
+  citizenship_status_self_reported?: string;
+  highlights?: string[];
+  github_username?: string;
+  availability?: string;
+  notes?: string;
+}
+
+export interface PrepareConsentedCardInput {
+  role_id: string;
+  fields_user_approved: ConsentedFields;
+}
+
+export interface PrepareConsentedCardOutput {
+  roleTitle: string;
+  company: string;
+  card: { markdown: string; json: Record<string, unknown> };
+  notVerifiedNote: string;
+  applyLink: { url: string; label: string } | null;
+  sources: SourceRef[];
+  disclaimer: string;
+}

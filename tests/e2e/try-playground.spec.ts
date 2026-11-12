@@ -5,11 +5,13 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
  * 40 near-duplicate tests that mostly differ by persona backstory — which
  * doesn't change UI behavior, since the UI doesn't know or care which
  * persona is typing — this covers the DISTINCT interaction paths the R3
- * personas actually exercise across all 6 tabs, plus one chained
- * integration journey. Persona-specific judgment (should an agent broaden a
- * search, how should it phrase a debrief) was already exercised directly
- * against the MCP tools by the agent-in-the-loop eval (DECISIONS.md D-016);
- * this suite verifies the UI itself renders and gates each tool correctly.
+ * personas actually exercise across all 9 tabs (all 11 tools — 2 more,
+ * get_company_profile and fit_debrief, are reachable via embedded flows
+ * rather than their own tab), plus one chained integration journey.
+ * Persona-specific judgment (should an agent broaden a search, how should
+ * it phrase a debrief) was already exercised directly against the MCP
+ * tools by the agent-in-the-loop eval (DECISIONS.md D-016); this suite
+ * verifies the UI itself renders and gates each tool correctly.
  *
  * Runs against the REAL live speedrun API — data rotates — so assertions
  * are structural ("at least one result card," "a heading exists") rather
@@ -165,7 +167,10 @@ test.describe("/try — Trial assessment", () => {
     // technical data," never the literal substring "ITAR" — match the
     // actual rendered wording, not an assumed abbreviation.
     await expect(page.getByText(/export-controlled/i).first()).toBeVisible({ timeout: LONG_TIMEOUT });
-    await expect(page.getByRole("tab", { name: "Brief" })).toBeVisible();
+    // exact: true -- "Brief" is also a substring of the top-level
+    // "Readiness brief" tab, which getByRole's default substring matching
+    // would otherwise collide with.
+    await expect(page.getByRole("tab", { name: "Brief", exact: true })).toBeVisible();
 
     // Switching the 60/90/180-minute control re-fetches rather than just
     // relabeling stale content.
@@ -324,6 +329,63 @@ test.describe("/try — Explain a rule", () => {
     await expect(firstChip).toBeVisible();
     await firstChip.click();
     await expect(page.getByText(/not legal advice/i).first()).toBeVisible({ timeout: LONG_TIMEOUT });
+  });
+});
+
+// The next 3 tabs were added after the spec §6 judging panel (DECISIONS.md)
+// found that readiness_brief, verify_evidence, and prepare_consented_card
+// had no UI path anywhere in /try, despite the README's "try every tool
+// directly" claim.
+test.describe("/try — Readiness brief", () => {
+  test("picking a role renders the agent-fills-this-in template, focus areas, and recruiter questions", async ({
+    page,
+  }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Readiness brief");
+    const picker = page.locator("div").filter({ hasText: "Pick a role to build a readiness brief for" }).first();
+    await pickFirstRole(picker);
+
+    await expect(page.getByText(/fill in locally/i).first()).toBeVisible({ timeout: LONG_TIMEOUT });
+    await expect(page.getByText(/2-week prep plan/i).first()).toBeVisible();
+    await expect(page.getByText(/Ready-to-ask recruiter/i)).toBeVisible();
+    // This is explicitly a template, never a finished personalized brief.
+    await expect(page.getByText(/\b\d{1,3}%\s*(match|fit)\b/i)).toHaveCount(0);
+  });
+});
+
+test.describe("/try — Verify GitHub", () => {
+  test("checking a real public username renders its already-public signal, with no demographic inference", async ({
+    page,
+  }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Verify GitHub");
+    await page.getByLabel("GitHub username or profile URL").fill("octocat");
+    await page.getByRole("button", { name: "Check" }).click();
+
+    await expect(page.getByText("@octocat")).toBeVisible({ timeout: LONG_TIMEOUT });
+    await expect(page.getByText(/repos/i).first()).toBeVisible();
+    await expect(page.getByText(/not a verification of employment/i)).toBeVisible();
+  });
+});
+
+test.describe("/try — Consented card", () => {
+  test("only the fields actually filled in appear in the resulting card, with an explicit not-verified note", async ({
+    page,
+  }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Consented card");
+    const picker = page.locator("div").filter({ hasText: "Pick a role to build an intro card for" }).first();
+    await pickFirstRole(picker);
+
+    await page.getByLabel("Headline").fill("Backend engineer, 6 yrs, active TS");
+    await page.getByLabel("Availability").fill("Available now");
+    await page.getByRole("button", { name: "Build card" }).click();
+
+    await expect(page.getByText(/Backend engineer, 6 yrs, active TS/).first()).toBeVisible({ timeout: LONG_TIMEOUT });
+    await expect(page.getByText(/never submits an application|not verified/i).first()).toBeVisible();
+    // Fields never filled in (clearance/citizenship status) must not appear
+    // as if they were — nothing invented beyond what was actually typed.
+    await expect(page.getByText(/clearance_status_self_reported/)).toHaveCount(0);
   });
 });
 

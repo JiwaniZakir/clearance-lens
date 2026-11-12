@@ -10,10 +10,17 @@ const API_BASE = "https://api.github.com";
 
 export class GitHubApiError extends Error {
   readonly status: number;
-  constructor(message: string, status: number) {
+  /** See SpeedrunApiError's identical field (lib/speedrun/client.ts) for why
+   * this exists: lib/tools/wrap.ts's shared callTool() catch previously
+   * used one generic, job-posting-flavored 404 message for every entity
+   * type, including a GitHub profile, which doesn't get "filled" the way a
+   * job posting does. */
+  readonly userMessage?: string;
+  constructor(message: string, status: number, userMessage?: string) {
     super(message);
     this.name = "GitHubApiError";
     this.status = status;
+    this.userMessage = userMessage;
   }
 }
 
@@ -67,7 +74,11 @@ async function githubFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders(), next: { revalidate: 600 } });
   const remaining = res.headers.get("x-ratelimit-remaining");
   if (res.status === 404) {
-    throw new GitHubApiError("GitHub user not found", 404);
+    throw new GitHubApiError(
+      "GitHub user not found",
+      404,
+      "We couldn't find a GitHub user with that username — double-check the spelling, or that the profile is public.",
+    );
   }
   if (res.status === 403 && remaining === "0") {
     const resetAt = res.headers.get("x-ratelimit-reset");

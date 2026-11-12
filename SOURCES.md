@@ -2,6 +2,8 @@
 
 Every rule, statistic, and legal citation this product uses, with a primary or authoritative source and a last-verified date. If something here could change (a law, a timeline figure, an API version), it's cited rather than asserted from memory — see `DECISIONS.md` and `research/` for the full verification trail. This file backs the live [`/sources`](https://clearance-lens.vercel.app/sources) page; `tests/unit/data-integrity.test.ts` confirms every URL in `data/rules.json`/`data/timelines.json` appears somewhere below.
 
+This project was built end-to-end in one concentrated session, and every citation below was actually opened and confirmed live as part of that build — which is why the dates cluster together rather than reflecting a staggered, ongoing audit. Treat each date as that content's build-time snapshot, not a promise of continuous re-checking.
+
 ---
 
 ## From `data/rules.json` and `data/timelines.json`

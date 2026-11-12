@@ -183,3 +183,59 @@ export function RuleExplainSkeleton() {
     </SkeletonCard>
   );
 }
+
+/** Mirrors readiness-brief's output: three prompt+focus-areas blocks, a question list. */
+export function ReadinessBriefSkeleton() {
+  return (
+    <SkeletonCard className="flex flex-col gap-4">
+      <div role="status" aria-label="Building readiness brief" className="flex flex-col gap-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex flex-col gap-2">
+            <Bone className="h-3 w-32" />
+            <Bone className="h-3 w-full" />
+            <Bone className="h-3 w-4/5" />
+          </div>
+        ))}
+        <Bone className="h-3 w-24" />
+        <Bone className="h-10 w-full" />
+        <Bone className="h-10 w-full" />
+      </div>
+    </SkeletonCard>
+  );
+}
+
+/** Mirrors a GitHub profile card: avatar-row, repo-count/followers stats, a language-chip row, a recent-activity list. */
+export function VerifyEvidenceSkeleton() {
+  return (
+    <SkeletonCard className="flex flex-col gap-4">
+      <div role="status" aria-label="Checking GitHub profile" className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <Bone className="h-5 w-40" />
+          <Bone className="h-4 w-24" />
+        </div>
+        <div className="flex gap-2">
+          <Bone className="h-6 w-20 rounded-full" />
+          <Bone className="h-6 w-20 rounded-full" />
+        </div>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Bone key={i} className="h-10 w-full" />
+        ))}
+      </div>
+    </SkeletonCard>
+  );
+}
+
+/** Mirrors the consented-card preview: a markdown-block, a not-verified note. */
+export function ConsentedCardSkeleton() {
+  return (
+    <SkeletonCard className="flex flex-col gap-4">
+      <div role="status" aria-label="Building your card" className="flex flex-col gap-4">
+        <Bone className="h-4 w-1/2" />
+        <Bone className="h-3 w-full" />
+        <Bone className="h-3 w-full" />
+        <Bone className="h-3 w-2/3" />
+        <Bone className="h-16 w-full" />
+      </div>
+    </SkeletonCard>
+  );
+}

@@ -60,7 +60,7 @@
       "category": "clearance-process",
       "summary": "DISS (Defense Information System for Security) replaced the older JPAS as the system of record in 2021. The National Background Investigation Services (NBIS) program was meant to eventually replace DISS entirely, but as of November 2026 that full cutover has not happened — DCSA has actually pulled key case-management functions back toward an upgraded DISS. Industry case-initiation and review (\"IRA\") functionality moved into \"DISS-JVS\" on July 31, 2026; September 30, 2026 was the last day to start new cases in \"NBIS-Agency\"; and NBIS-Agency becomes fully read-only after November 30, 2026, with any unfinished case needing to be re-started in DISS-JVS. In short: DISS-JVS, not NBIS, is the live day-to-day system right now. Either way, access to these systems is restricted to vetted Facility Security Officers — individual candidates and recruiters cannot query them directly, which is exactly why self-attestation plus FSO verification at offer stage remain the only legitimate path.",
       "keyPoints": [
-        "JPAS → DISS transition completed in 2021 [corrected during Gate R→B review — an unsourced specific date, \"March 31, 2021,\" was removed; R4's own research and this entry's cited sources only support \"in 2021,\" not a specific day; see DECISIONS.md]",
+        "JPAS → DISS transition completed in 2021",
         "NBIS was meant to replace DISS, but as of Nov 2026 that full replacement has not happened",
         "DCSA is moving case-initiation/review functions back into an upgraded \"DISS-JVS,\" not forward into NBIS",
         "Key 2026 dates: DISS-JVS industry go-live July 31; last NBIS-Agency case-initiation Sept 30; NBIS-Agency read-only after Nov 30",

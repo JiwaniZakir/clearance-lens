@@ -112,10 +112,28 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
     // body. With no guidance, a zero-result reads as "that company/role
     // doesn't exist" rather than "this specific query didn't match." Say so
     // explicitly rather than let an empty list speak for itself.
-    if (rolesScanned === 0 && query) {
-      notes.push(
-        `No postings matched "${query}" at all. A company name alone often won't match — try a role type instead (e.g. "autonomy engineer" or "manufacturing engineer"), drop the query to browse everything in this industry, or check get_company_profile for that company directly. A real company can still have zero live postings right now even when it's actively hiring elsewhere.`,
-      );
+    //
+    // Found live via the spec §6 judging panel (DECISIONS.md): when BOTH
+    // query and location are set, a zero result's real cause could be
+    // either one (confirmed live: a state name like "Texas" zeroes
+    // location matching while the exact same query alone returns plenty)
+    // — confidently blaming query alone, as the original fix did, is
+    // actively misleading when location was the actual cause. Name
+    // whichever filter(s) are actually active rather than guessing which
+    // one is at fault.
+    if (rolesScanned === 0 && (query || location)) {
+      const activeFilters = [
+        query ? `the keyword "${query}"` : null,
+        location ? `the location filter "${location}"` : null,
+      ].filter((f): f is string => f !== null);
+      const filterList = activeFilters.join(" and ");
+      const suggestion =
+        query && location
+          ? `Try removing one filter at a time to isolate which is causing the mismatch — a company name alone often won't match on keyword, and a state/region name (vs. an exact city) often won't match on location.`
+          : location
+            ? `Location matching looks for an exact city string (e.g. "Austin, TX"), not a state or region name — try the specific city, or drop the location filter to browse all locations.`
+            : `A company name alone often won't match — try a role type instead (e.g. "autonomy engineer" or "manufacturing engineer"), drop the query to browse everything in this industry, or check get_company_profile for that company directly. A real company can still have zero live postings right now even when it's actively hiring elsewhere.`;
+      notes.push(`No postings matched ${filterList} at all. ${suggestion}`);
     } else if (page.length === 0 && rolesScanned > 0) {
       notes.push(`${rolesScanned} postings matched the search terms, but none passed the clearance/itar_only filter — try loosening or removing it.`);
     }

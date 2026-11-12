@@ -141,9 +141,48 @@ describe("search_defense_roles", () => {
 
     const result = await searchDefenseRolesTool.handler({ query: "Shield AI", limit: 10 });
     expect(result.roles).toEqual([]);
-    expect(result.note).toContain('No postings matched "Shield AI"');
+    expect(result.note).toContain('the keyword "Shield AI"');
     expect(result.note.toLowerCase()).toContain("role type");
     expect(result.note).toContain("get_company_profile");
+  });
+
+  // Regression for DECISIONS.md (judging panel round 1): a location-only
+  // zero-result used to be blamed on the keyword (e.g. "No postings
+  // matched \"engineer\"") even when the keyword was never the actual
+  // cause — reproduced live: filtering on a state name like "Texas"
+  // zeroes results while the identical keyword alone returns plenty.
+  it("a zero-result caused by location alone blames the location, not an absent or unrelated keyword", async () => {
+    vi.mocked(searchJobs).mockResolvedValueOnce({
+      total: 0,
+      page: 0,
+      page_size: 50,
+      total_pages: 0,
+      has_more: false,
+      next_page: null,
+      jobs: [],
+    });
+
+    const result = await searchDefenseRolesTool.handler({ location: "Texas", limit: 10 });
+    expect(result.note).toContain('the location filter "Texas"');
+    expect(result.note).not.toContain("the keyword");
+    expect(result.note.toLowerCase()).toContain("exact city string");
+  });
+
+  it("a zero-result with BOTH a keyword and a location names both as possible causes, rather than confidently blaming just one", async () => {
+    vi.mocked(searchJobs).mockResolvedValueOnce({
+      total: 0,
+      page: 0,
+      page_size: 50,
+      total_pages: 0,
+      has_more: false,
+      next_page: null,
+      jobs: [],
+    });
+
+    const result = await searchDefenseRolesTool.handler({ query: "engineer", location: "Texas", limit: 10 });
+    expect(result.note).toContain('the keyword "engineer"');
+    expect(result.note).toContain('the location filter "Texas"');
+    expect(result.note.toLowerCase()).toContain("one filter at a time");
   });
 
   it("results that exist but are all filtered out by clearance/itar_only get their own distinct guidance (not the zero-match message)", async () => {

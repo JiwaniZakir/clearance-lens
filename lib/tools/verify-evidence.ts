@@ -1,13 +1,33 @@
 import { z } from "zod";
-import { getPublicSignalSummary } from "@/lib/github/client";
+import { getPublicSignalSummary, parseGitHubUsername } from "@/lib/github/client";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 
+function looksLikeValidGitHubUsernameOrUrl(input: string): boolean {
+  try {
+    parseGitHubUsername(input);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const InputSchema = z.object({
+  // Format-checked here, not just inside the handler — found live via the
+  // spec §5 judging panel (DECISIONS.md): a syntactically invalid value
+  // (parseGitHubUsername throwing a plain Error) previously fell through
+  // to callTool()'s generic catch-all, producing a misleading "Something
+  // went wrong, please try again" that wrongly invites retrying input that
+  // will deterministically fail again. Validating the format at the zod
+  // layer gives it the same clear, specific "invalid_input" treatment
+  // every other bad-input case already gets, before the handler even runs.
   github_username_or_url: z
     .string()
     .min(1)
     .max(200)
+    .refine(looksLikeValidGitHubUsernameOrUrl, {
+      message: "Expected a GitHub username (letters/digits/hyphens, 1-39 characters) or a https://github.com/<username> URL.",
+    })
     .describe("A GitHub username, or a https://github.com/<username> profile URL."),
 });
 

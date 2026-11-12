@@ -24,7 +24,7 @@ const TOOL_CARD_META: Record<string, { blurb: string; fields: string[] }> = {
   },
   estimate_timeline: {
     blurb:
-      "Estimates how long reaching a target clearance level might realistically take, given current status — as a range, never a false-precision single number.",
+      "Estimates how long reaching a target clearance level might realistically take, given current status — a real range where the data supports one, a single sourced figure where it doesn't, never an invented number.",
     fields: ["target_level", "current_status", "estimate"],
   },
   search_defense_roles: {

@@ -18,11 +18,21 @@ const MAX_RETRIES = 3;
 export class SpeedrunApiError extends Error {
   readonly status: number;
   readonly code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /** Found live via the spec §5 judging panel (DECISIONS.md): lib/tools/
+   * wrap.ts's shared callTool() catch block used ONE generic "may have been
+   * filled or removed since you last searched" message for every 404,
+   * regardless of whether the lookup was a job posting (where that phrasing
+   * is accurate) or a company slug (where it reads oddly — a company isn't
+   * "filled"). Each exported client function below (getJob/getCompany) now
+   * sets an entity-appropriate message here; wrap.ts prefers it when
+   * present, falling back to the old generic text only if not set. */
+  readonly userMessage?: string;
+  constructor(message: string, status: number, code?: string, userMessage?: string) {
     super(message);
     this.name = "SpeedrunApiError";
     this.status = status;
     this.code = code;
+    this.userMessage = userMessage;
   }
 }
 
@@ -37,7 +47,7 @@ function buildUrl(path: string, params: Record<string, string | number | boolean
   return url.toString();
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchJson<T>(url: string, notFoundMessage?: string): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let res: Response;
@@ -78,7 +88,7 @@ async function fetchJson<T>(url: string): Promise<T> {
       } catch {
         // body wasn't JSON — keep the generic message
       }
-      throw new SpeedrunApiError(message, res.status, code);
+      throw new SpeedrunApiError(message, res.status, code, res.status === 404 ? notFoundMessage : undefined);
     }
 
     return (await res.json()) as T;
@@ -107,10 +117,16 @@ export async function searchJobs(params: SpeedrunJobSearchParams): Promise<Speed
 
 export async function getJob(id: string): Promise<SpeedrunJobDetailResponse> {
   const url = buildUrl(`/jobs/${encodeURIComponent(id)}`, {});
-  return fetchJson<SpeedrunJobDetailResponse>(url);
+  return fetchJson<SpeedrunJobDetailResponse>(
+    url,
+    "We couldn't find a role with that id — it may have been filled or removed since you last searched. Try search_defense_roles again for a current id.",
+  );
 }
 
 export async function getCompany(slug: string): Promise<SpeedrunCompanyResponse> {
   const url = buildUrl(`/companies/${encodeURIComponent(slug)}`, {});
-  return fetchJson<SpeedrunCompanyResponse>(url);
+  return fetchJson<SpeedrunCompanyResponse>(
+    url,
+    "We couldn't find a company with that slug. Company slugs come from search_defense_roles's own companySlug field on a role — a guessed slug (e.g. a company's common name) often won't match.",
+  );
 }
