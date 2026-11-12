@@ -1,0 +1,38 @@
+{
+  "roundNumber": 6,
+  "personaIndexUsed": 1,
+  "note": "This file's scores are honestly reconstructed, not freshly computed by scripts/panel-aggregate.ts against a complete raw record: this round's full result was read and acted on live, in-session (see DECISIONS.md D-033), but before it was persisted to this directory, a context-window compaction lost the verbatim raw output for 2 of 5 judges (trust_skeptic, function_engineer) from the recoverable transcript. The 3 fully-recovered judges' `overall` scores below are freshly recomputed from their real, verbatim dimensions (see judges.json) using this project's real weightedOverall() formula, not estimated. `trimmedMean`/`effectiveScore` (7.65) and `anyHardConstraintViolation`/`passed` are carried forward from what was genuinely read and acted on live before compaction, not re-derived from the 3 recovered judges alone — see judges.json for exactly what is and isn't verbatim-recoverable.",
+  "nonRespondingJudges": [],
+  "discardedForNoEvidence": [],
+  "overalls": [
+    {
+      "judge": "product_designer",
+      "overall": 7.75
+    },
+    {
+      "judge": "candidate_user",
+      "overall": 7.75
+    },
+    {
+      "judge": "recruiter_user",
+      "overall": 7.45
+    },
+    {
+      "judge": "trust_skeptic",
+      "overall": null
+    },
+    {
+      "judge": "function_engineer",
+      "overall": null
+    }
+  ],
+  "droppedJudge": null,
+  "trimmedMean": 7.65,
+  "median": null,
+  "anyHardConstraintViolation": false,
+  "anyJudgeBelow9": true,
+  "effectiveScore": 7.65,
+  "allFiveValid": true,
+  "inconclusive": false,
+  "passed": false
+}

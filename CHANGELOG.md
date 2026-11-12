@@ -150,3 +150,32 @@ Round 5: trimmed mean **7.55** (up from 7.49), median 7.55, still capped at 6.0 
 - Not changed, with reasoning: `run_job_preview`'s templated scene reuse across role types and duplicate upstream listings inflating `get_company_profile`'s role counts are both already-disclosed, acknowledged product characteristics, not newly-hidden defects.
 - Added 2 new dedicated unit test files for previously-untested modules: `get-role-rubric.test.ts`, `role-shared.test.ts`.
 - Unit suite: 260 → 276. Full E2E suite (76 passed, 2 graceful skips, both viewports), protocol suite 14/14 (including the existing declared-field PII test the MCP-transport fix's first draft broke and the second draft fixed), Lighthouse 100/100/100/100/100 on all 4 pages.
+
+## [Unreleased] — Clearance Lens v2: signed self-attestation + GitLab evidence (2026-11-12)
+
+User-directed feature work, run alongside the judging-panel loop, not a panel finding. Full reasoning and the two pending/paused pieces: DECISIONS.md D-032.
+
+### feat
+- **New tool `prepare_signed_attestation`.** Wraps a closed-vocabulary self-asserted claim (clearance level, citizenship status, available-from date — no free text) in an Ed25519-signed, W3C-Verifiable-Credential-shaped object. The candidate's own agent generates the keypair and signs entirely client-side (Node's native `crypto`, no new dependency); this server only verifies the signature and that the claims match what was actually signed — it never receives or sees a private key. Proves who signed a claim and when, never that the claim is true.
+- **`verify_evidence` now also supports GitLab** as a second "already-public evidence" source, activated only by an explicit `gitlab.com` URL — every existing bare-username/github.com call is unaffected. GitLab's anonymous public API exposes meaningfully less than GitHub's (no bio/followers/created_at); those fields are honestly returned as `null` rather than a fabricated placeholder. Output gained a `platform: "github" | "gitlab"` field.
+
+### test
+- New dedicated test file for `prepare_signed_attestation` (9 cases: valid/multi-claim, tampering, wrong key, mismatched `issued_at`, empty claims, unknown claim key, malformed payload, disclaimer content).
+- `verify_evidence`'s test file extended with a 4-test GitLab block (platform detection, honest-null fields, bare-username still defaults to GitHub, schema-level URL acceptance).
+
+## [Unreleased] — judging panel round 6 response (2026-11-12)
+
+Round 6: trimmed mean **7.65**, uncapped — the first round with **zero hard-constraint findings** from any judge. Full results `panel/round-6/`, full response DECISIONS.md D-033.
+
+### fix
+- **New rule entry `laa-non-citizen`**: no tool explained that DoD clearance *eligibility* for a non-citizen (a Limited Access Authorization, 32 CFR § 117.10) is a separate, much stricter regime than ITAR's "U.S. person" test — capped at SECRET, granted only in "rare circumstances," scoped to one contract. Cross-linked both directions with `itar-us-person`.
+- `explain_rule` still missed "green_card"/"lpr"/"permanent resident clearance" as synonyms for `itar-us-person` (same `keywords` mechanism as the new LAA entry closes this).
+- **CORS/actual-method inconsistency on `/mcp`**: the preflight advertised `GET` as an allowed method, but a real `GET /mcp` always 405s in this stateless deployment. Narrowed the advertised methods to `POST, OPTIONS` to match actual behavior.
+- Added `app/robots.ts`/`app/sitemap.ts` (standard Next.js 16 `MetadataRoute` generators) — previously missing entirely.
+- `search_defense_roles`' detail-check gap was disclosed only in prose: `rolesScanned` counts every posting matching the search terms (up to 200), but only the first 25 ever get a detail fetch and requirement-signal check. Added `requirementSignalsCheckedCount` as its own output field so a calling agent can detect the gap without depending on prose.
+- `build_trial_assessment` never disclosed that quoted rubric criteria carry the source posting's own typos verbatim (a real example: "Mange the Anduril Group 5 Mission Autonomy Systems Engineering homeroom"). The verbatim quoting itself is a deliberate anti-fabrication choice, not a bug — added a sentence to the existing `rubricRefinementNote` naming the tradeoff explicitly.
+- **Self-inflicted regression, found while verifying the above, not from any judge**: the new `prepare_signed_attestation` tool (added for v2) was never added to the homepage's hand-maintained `TOOL_CARD_META` blurb map, so its card fell back to its full agent-facing description — which contains long unbroken code-snippet tokens — and overflowed the page at 320/375px. Fixed the instance (added the missing blurb) and the class of bug (`break-words` on the card description, so a future forgotten entry degrades gracefully instead of breaking layout).
+
+### test
+- Investigated, not reproducible: a claimed 3.36:1 dark-mode button contrast failure — actual computed color is the `on-solid-dark` token (`rgb(13,16,20)`), not white; hand-computed contrast ≈5.66:1, passes AA. Judge measurement error.
+- Unit suite: 276 → 301 (includes both this round's regression tests and the v2 pieces' own new tests above). Full E2E suite (77 passed, 1 pre-existing skip), protocol suite 14/14, `linkcheck` 130 passed/0 failed, Lighthouse all 4 categories ≥95 on `/` and `/try` (desktop preset) after the tool-card fix.
