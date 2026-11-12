@@ -198,3 +198,24 @@ The three compliant alternatives offered in place of a declined OAuth-ranking/cr
 ### test
 - New dedicated test files for `lib/cosign/client.ts`, `lib/gitlab/client.ts` (previously untested), `lib/signal/store.ts`'s k-anonymity math, and both new tools.
 - Unit suite: 301 → 344. Full E2E suite, protocol suite 14/14 (including the new prompt), `linkcheck` 130/0, Lighthouse clean on `/` and `/try`. Live-verified end-to-end: a real Cosign profile fetched correctly; 5 real contributions through the signal tools confirmed the k-anonymity suppression behavior matches the unit tests.
+
+## [Unreleased] — judging panel round 7 response (2026-11-12)
+
+Round 7 (clean re-run after D-036's voided contaminated attempt): trimmed mean **7.49**, median 7.65, capped at 6.0 by a hard-constraint violation from 1 of 5 judges. Full results `panel/round-7/`, full response DECISIONS.md D-039.
+
+### fix
+- **Hard constraint: no PII detector at all for email addresses or phone numbers.** `search_defense_roles`/`explain_rule`/`prepare_consented_card` all accepted and echoed contact info back verbatim, while every other documented category (SSN/DOB/passport/credit-card/classification-marking) was already caught in the same fields. Added `email`/`phone` categories to the PII/CUI guard.
+- **`/try` had no UI for 3 of 14 tools** (`prepare_signed_attestation`, `contribute_anonymous_signal`, `get_aggregated_signal`) — added all 3 as full tabs. The attestation tab does real Ed25519 keypair generation and signing in-browser via the Web Crypto API, since that tool's design assumes the caller's own agent does this locally and `/try` has none.
+- **"Stateless by design" / "What we store: Nothing" were no longer accurate** now that the anonymous-signal tools genuinely persist anonymous aggregate state — README.md and `/privacy` now state the one exception precisely.
+- **No anti-fabrication protection on `contribute_anonymous_signal`** — a script could push 0→10 fake contributions in under 2 seconds with zero auth. Added a short per-role cooldown that defeats that exact burst pattern (explicitly not a complete fix for a more patient adversary, which both tools' disclaimers now say).
+- Missing CSP header — added, scoped to what the app actually needs (checked first, not guessed).
+- A borderline WCAG contrast ratio (4.58:1/4.63:1, essentially no safety margin above the 4.5 AA floor) — widened in both themes.
+- `explain_rule` still missed "permanent_resident"/"permanent resident" as a synonym for `itar-us-person`.
+- `get_company_profile`'s existing staleness caveat was scoped to hiring criteria only, not to profile fields like `stage` themselves, which can lag a company's real current status.
+- `verify_evidence`'s `/try` tab was stale since the GitLab/Cosign additions (still GitHub-only copy, and would render a literal `null` for GitLab/Cosign's nullable fields) — fixed, and the tab renamed from "Verify GitHub" to "Verify evidence."
+
+### test
+- Investigated, not reproducible: a claimed "binary data" mislabel for 61+ repeated characters — tried 7 different characters across 3 tools at the exact described length boundary; never reproduced.
+- Investigated, no action needed: `/try`'s raw pre-hydration HTML having no interactive elements — expected for a `'use client'` page; this project's own 86-test real-browser E2E suite confirms it's fully interactive once JS runs.
+- New dedicated test coverage: 12 PII regression cases, 10 cooldown-mechanism tests, 3 keyword regression cases, 1 company-profile-caveat test, full E2E coverage for all 3 new /try tabs including a real end-to-end Ed25519 sign/verify round trip in a real browser.
+- Unit suite: 299 → 365. Full E2E suite (85 passed, 1 pre-existing skip), protocol 14/14, zero CSP violations on every page, `linkcheck` clean, Lighthouse clean on `/` and `/try`.
