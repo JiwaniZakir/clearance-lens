@@ -1,0 +1,40 @@
+{
+  "roundNumber": 1,
+  "personaIndexUsed": 0,
+  "nonRespondingJudges": [],
+  "discardedForNoEvidence": [],
+  "overalls": [
+    {
+      "judge": "function_engineer",
+      "overall": 6.95
+    },
+    {
+      "judge": "product_designer",
+      "overall": 7.5
+    },
+    {
+      "judge": "candidate_user",
+      "overall": 6.75
+    },
+    {
+      "judge": "recruiter_user",
+      "overall": 6.35
+    },
+    {
+      "judge": "trust_skeptic",
+      "overall": 6.700000000000001
+    }
+  ],
+  "droppedJudge": {
+    "judge": "product_designer",
+    "overall": 7.5
+  },
+  "trimmedMean": 6.6875,
+  "median": 6.75,
+  "anyHardConstraintViolation": false,
+  "anyJudgeBelow9": true,
+  "effectiveScore": 6.6875,
+  "allFiveValid": true,
+  "inconclusive": false,
+  "passed": false
+}

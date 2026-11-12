@@ -47,3 +47,26 @@ All notable changes to Clearance Lens, in reverse chronological order. Conventio
 - Lighthouse CI wired up and run against production: 100/100/100/100 (performance/accessibility/best-practices/seo) on every page (D-020, D-023).
 - Full production smoke test: all 11 tools, CORS, the protocol conformance suite, and the full E2E suite all re-verified against the live deployed URL, not just local builds (D-023).
 - `estimate-timeline.test.ts` and `explain-rule.test.ts` added — the first two tools built had never had a dedicated unit test file, only live smoke tests (D-017). Unit suite: 149 → 206 tests across this phase.
+
+## [Unreleased] — judging panel round 1 response (2026-11-12)
+
+Round 1 of the frozen panel protocol: trimmed mean **6.69** (fail), no hard-constraint violation. Full results `panel/round-1/`, full response DECISIONS.md D-026.
+
+### feat
+- `/try`: added 3 tabs for the only tools it never exposed at all — `readiness_brief`, `verify_evidence` ("Verify GitHub"), `prepare_consented_card` ("Consented card") — closing a gap 4 of 5 judges flagged against the README's "try every tool directly" claim.
+
+### fix
+- A leaked internal Gate R→B review annotation in live `explain_rule`/`estimate_timeline` content (`data/rules.json`, `data/timelines.json`) — stripped.
+- `lib/speedrun/extract-sections.ts`'s header-detection gate missed plain Title Case headers entirely and didn't reset the current section on an unrecognized-but-real header, letting qualifications bleed into every later section — fixed `get_role_rubric`'s (and silently, `readiness_brief`'s) garbled "skills" output; added a defense-in-depth boilerplate filter.
+- `lib/tools/wrap.ts` used one generic, job-posting-flavored 404 message for every entity type — `SpeedrunApiError`/`GitHubApiError` now carry an entity-specific `userMessage`.
+- `verify_evidence`: a syntactically-invalid username produced a misleading "something went wrong, retry" — moved the format check into the zod schema for a proper `invalid_input` error.
+- `search_defense_roles`: a zero-result note blamed the keyword even when location was the actual cause — now names whichever filter(s) are active.
+- Two switch toggles ("ITAR only," "Remote") had the accessible name "on" — added explicit `aria-label`.
+- `estimate_timeline`'s "never a false-precision number" claim was false for most real inputs — softened everywhere it appears to match what's actually delivered.
+- `/sources`' uniform `lastVerified` dates across 40+ citations spanning decades were never disclosed as a single build-time snapshot rather than a staggered audit — said so explicitly.
+
+### test
+- `tests/e2e/try-playground.spec.ts` extended with tests for the 3 new tabs (56 cases total, both viewports).
+- Unit suite: 206 → 219.
+- Investigated (4/5 judges' single most-repeated finding) and disproved as a product bug: `/try`'s tabs appeared not to switch on click — a bare JS `.click()` doesn't fire the pointer-event sequence Radix Tabs needs; a real simulated click (this project's own E2E suite, and any real mouse/touch/keyboard user) works every time.
+- `get_company_profile`'s reported 10–14s latency on a near-miss slug — investigated, could not reproduce after 7+ varied live attempts; not fixed.
