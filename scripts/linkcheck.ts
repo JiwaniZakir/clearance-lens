@@ -1,7 +1,13 @@
 #!/usr/bin/env tsx
 /**
- * Link check (spec §5): every source URL across data/*.json and research/*.md
- * must return 2xx/3xx. Run: pnpm linkcheck
+ * Link check (spec §5): every source URL across data/*.json, research/*.md,
+ * SOURCES.md, the /sources page's own rows, and every URL a tool cites inline
+ * (lib/tools/*.ts) must return 2xx/3xx. Run: pnpm linkcheck
+ *
+ * The last three were added after judging panel round 8 (DECISIONS.md D-042):
+ * the checker originally scanned only data/ and research/, so URLs that live
+ * only on the /sources page or in a tool's own `sources[]` — including the
+ * a16z speedrun Talent Network itself — were never checked automatically.
  *
  * Design notes:
  * - Shells out to `curl` per URL rather than using Node's native `fetch`.
@@ -77,6 +83,20 @@ function collectUrls(): Map<string, Set<string>> {
     }
   };
   if (fs.existsSync(researchDir)) walk(researchDir);
+
+  for (const rel of ["SOURCES.md", "app/sources/page.tsx"]) {
+    const full = path.join(ROOT, rel);
+    if (fs.existsSync(full)) for (const url of extractUrlsFromText(fs.readFileSync(full, "utf8"))) add(url, rel);
+  }
+  const toolsDir = path.join(ROOT, "lib/tools");
+  for (const file of fs.readdirSync(toolsDir)) {
+    if (!file.endsWith(".ts")) continue;
+    // Only `url: "..."` literals — the tools' own sources[] entries — not every
+    // string that happens to contain a URL (e.g. example text in a prompt).
+    for (const m of fs.readFileSync(path.join(toolsDir, file), "utf8").matchAll(/url:\s*"(https?:\/\/[^"]+)"/g)) {
+      add(m[1], `lib/tools/${file}`);
+    }
+  }
 
   return sources;
 }
