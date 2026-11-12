@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema } from "@/lib/tools/role-shared";
-import { extractSections } from "@/lib/speedrun/extract-sections";
+import { extractSections, isJobContentBullet } from "@/lib/speedrun/extract-sections";
 import { findRule } from "@/lib/rules-data";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
@@ -139,9 +139,12 @@ export const getRoleRubricTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typ
       });
     }
 
-    const skillsRubric = sections.qualifications.length > 0
-      ? sections.qualifications.map((q) => ({ skill: q, evidenceFromPosting: q }))
-      : sections.rawBullets.map((q) => ({ skill: q, evidenceFromPosting: q }));
+    // Eligibility lines belong to the checklist above, not here (D-050).
+    const skillQuals = sections.qualifications.filter(isJobContentBullet);
+    const skillsRubric = (skillQuals.length > 0 ? skillQuals : sections.rawBullets.filter(isJobContentBullet)).map((q) => ({
+      skill: q,
+      evidenceFromPosting: q,
+    }));
 
     return {
       roleTitle: role.title,
@@ -155,8 +158,7 @@ export const getRoleRubricTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typ
       ],
       evaluate_locally: true,
       instructionsForAgent:
-        "This checklist is for you (the agent) to evaluate privately using what you already know about the user. " +
-        DISCLAIMERS.evaluateLocally,
+        "This checklist and skills rubric are for you, the agent. " + DISCLAIMERS.evaluateLocally,
       sources,
       disclaimer: DISCLAIMERS.notAScore,
     };

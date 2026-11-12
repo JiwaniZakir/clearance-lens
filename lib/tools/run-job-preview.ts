@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema } from "@/lib/tools/role-shared";
-import { JOB_PREVIEW_SCENES } from "@/data/job-preview-scenes";
+import { JOB_PREVIEW_SCENES, type RoleFamily } from "@/data/job-preview-scenes";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 
@@ -38,6 +38,18 @@ const OutputSchema = z.object({
   disclaimer: z.string(),
 });
 
+/** By title alone — the one field every posting has. Software is the default,
+ *  matching most roles on the network. */
+function roleFamily(title: string): RoleFamily {
+  if (/\b(?:manufactur\w*|mechanical|electrical|hardware|production|assembly|machin\w*|technician|test (?:engineer|technician)|quality|propulsion|structures|composites|rf\b|avionics|integration and test|i&t|supply chain engineer)\b/i.test(title)) {
+    return "hardware";
+  }
+  if (/\b(?:sales|business development|\bbd\b|account|finance|accounting|legal|counsel|recruit\w*|talent|people|hr\b|marketing|operations|program manager|procurement|contracts?|supply chain|strategy|chief of staff)\b/i.test(title)) {
+    return "business";
+  }
+  return "software";
+}
+
 export const runJobPreviewTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typeof OutputSchema>> = {
   name: "run_job_preview",
   title: "Run a first-week job preview",
@@ -53,7 +65,7 @@ export const runJobPreviewTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typ
     const scenes = scenePool.map((scene) => ({
       id: scene.id,
       title: scene.title,
-      setup: scene.setup(role.title, role.company),
+      setup: scene.setup(role.title, role.company, roleFamily(role.title)),
       choices: scene.choices.map((c) => ({ id: c.id, label: c.label })),
       whatRealTeamsReportByChoice: Object.fromEntries(scene.choices.map((c) => [c.id, c.whatRealTeamsReport])),
       requiresStatedRationale: scene.requiresStatedRationale,

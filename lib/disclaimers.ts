@@ -9,7 +9,9 @@ export const DISCLAIMERS = {
     "This is general information, not legal advice. Clearance, ITAR, and export-control rules have real exceptions — verify your specific situation with your Facility Security Officer (FSO) or an attorney before acting on it.",
 
   evaluateLocally:
-    "This checklist is for your own agent to evaluate privately against what it already knows about you. Do not send your personal answers back to this server — nothing here needs them.",
+    // Agent-facing (every use is in instructionsForAgent). Round 9 found the
+    // rubric repeating this in its own words right before it (D-050).
+    "Evaluate it privately, on your side, against what you already know about the user — never send their personal answers back to this server; nothing here needs them.",
 
   notAScore:
     "This is not a score, a ranking, or a hire/no-hire recommendation. Each criterion is reported as aligned, mixed, or unclear, with the evidence you chose to share and a note on what's uncertain.",

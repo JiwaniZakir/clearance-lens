@@ -41,7 +41,7 @@ describe("get_role_rubric", () => {
     mockJob("Must be a U.S. Citizen. Active Secret clearance required.");
     const result = await getRoleRubricTool.handler({ role_id: "job-1" });
     expect(result.evaluate_locally).toBe(true);
-    expect(result.instructionsForAgent).toMatch(/do not send|not send/i);
+    expect(result.instructionsForAgent).toMatch(/never send|do not send|not send/i);
   });
 
   it("maps detected signals to checklist questions with correct basis labeling", async () => {

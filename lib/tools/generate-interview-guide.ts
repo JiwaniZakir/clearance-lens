@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema } from "@/lib/tools/role-shared";
-import { extractSections } from "@/lib/speedrun/extract-sections";
+import { extractSections, isJobContentBullet } from "@/lib/speedrun/extract-sections";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 
@@ -71,6 +71,19 @@ function buildGuidance(quote: string): z.infer<typeof EvaluationGuidanceSchema> 
   };
 }
 
+/** Phrased by what the bullet is: something the job does (a task) or
+ *  something the candidate brings (a skill). Round 9 found one template
+ *  pasted around every bullet (D-050). */
+function questionFor(quote: string): string {
+  if (/^(?:design|build|develop|lead|own|write|implement|integrate|test|deploy|maintain|create|drive|manage|define|architect|support|collaborate|work|partner|analy[sz]e|evaluate|operate|run|ship|deliver|coordinate|conduct|perform|establish|improve|optimi[sz]e)\b/i.test(quote)) {
+    return `This role involves: "${quote}". Tell me about the closest thing you've done — what you did, what made it hard, and how it turned out.`;
+  }
+  if (/^(?:experience|proficien|knowledge|familiar|understanding|expertise|skill|background|strong|deep|solid|demonstrated|proven|ability|comfort)/i.test(quote)) {
+    return `The posting asks for: "${quote}". Walk me through a specific project where you used that — what you'd do differently now, and why.`;
+  }
+  return `Tell me about a time your work connected to: "${quote}". Walk me through a specific example.`;
+}
+
 export const generateInterviewGuideTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typeof OutputSchema>> = {
   name: "generate_interview_guide",
   title: "Generate a structured interview guide for a role",
@@ -89,18 +102,25 @@ export const generateInterviewGuideTool: ToolDef<z.infer<typeof InputSchema>, z.
     // build_trial_assessment already prioritizes for its own, different
     // purpose) -- the inverse preference order is deliberate, not a copy
     // of that file's own choice.
+    const quals = sections.qualifications.filter(isJobContentBullet);
     const pool =
-      sections.qualifications.length >= spec.count
-        ? sections.qualifications
-        : [...sections.qualifications, ...sections.responsibilities, ...sections.rawBullets];
+      quals.length >= spec.count
+        ? quals
+        : [...quals, ...sections.responsibilities, ...sections.rawBullets].filter(isJobContentBullet);
     const uniquePool = [...new Set(pool)];
     const chosen = uniquePool.slice(0, spec.count);
 
     const questions: z.infer<typeof QuestionSchema>[] = chosen.map((quote) => ({
-      question: `Tell me about a time your work connected to: "${quote}". Walk me through a specific example.`,
+      question: questionFor(quote),
       tracedToQuote: quote,
       evaluationGuidance: buildGuidance(quote),
     }));
+    const shortfall =
+      chosen.length < spec.count
+        ? [
+            `This posting states only ${chosen.length} role-specific requirement${chosen.length === 1 ? "" : "s"} (its eligibility, degree, and logistics lines aren't interview material), so this guide has ${chosen.length} question${chosen.length === 1 ? "" : "s"} instead of ${spec.count} — add your own, traced to the actual work.`,
+          ]
+        : [];
 
     return {
       roleTitle: role.title,
@@ -108,6 +128,8 @@ export const generateInterviewGuideTool: ToolDef<z.infer<typeof InputSchema>, z.
       minutes,
       questions,
       guardrailsForThePanel: [
+        ...shortfall,
+        "Eligibility (citizenship, clearance) isn't interview material: it's verified through your FSO and standard work-authorization processes, never probed as \"experience\" — and asking about citizenship beyond what the role legally requires can itself be discrimination.",
         `${spec.note} Every question below traces to this posting's own stated requirements — if the conversation drifts, these are the anchors to come back to.`,
         "Never ask about, or let the conversation drift into, a candidate's age, race, color, religion, sex, national origin, disability, genetic information, pregnancy, or veteran status — federal law (Title VII, the ADA, the ADEA, GINA, USERRA) protects every one of these, and an informal-sounding rapport question (\"when did you graduate,\" \"do you have kids\") can be exactly as legally risky as a direct one.",
         "Never ask a candidate to describe, confirm, or produce real classified, CUI, or export-controlled technical information — even if they volunteer a clearance-related story, redirect to what they can discuss at the unclassified level.",

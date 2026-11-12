@@ -98,3 +98,19 @@ export function extractSections(descriptionText: string): ExtractedSections {
 
   return { responsibilities, qualifications, rawBullets };
 }
+
+/** Eligibility, credential, and logistics lines — real requirements, but not
+ *  job CONTENT. Found via the spec §6 judging panel round 9: interview
+ *  questions and trial rubrics were built from them ("Tell me about a time
+ *  your work connected to: 'Must be a U.S. citizen…'", a rubric criterion
+ *  "Addresses: 'Eligible to obtain… Top Secret clearance'"), and the skills
+ *  rubric listed a clearance line as a skill. Eligibility is covered by
+ *  get_role_rubric's eligibility checklist, never by questions or tasks —
+ *  and an interviewer shouldn't probe citizenship as "experience" (D-050). */
+const NON_CONTENT_BULLET =
+  /\b(?:citizen(?:ship)?|u\.?s\.? person|green card|permanent resident|security clearance|clearance|top secret|ts\/sci|\bsecret\b|polygraph|itar|export[- ]control\w*|eligib\w*|background (?:check|investigation)|drug (?:test|screen)|authorized to work|work authorization|visa|sponsorship|bachelor'?s|master'?s|ph\.?d|doctorate|b\.s\.|m\.s\.|\bbs\b|\bms\b|degree|gpa|travel up to|willing(?:ness)? to (?:travel|relocate)|relocat\w*|on-?site \d|in-office|lift(?:ing)? up to|\d+\s*lbs?\b|shift work|weekends?)\b/i;
+
+export function isJobContentBullet(text: string): boolean {
+  return !NON_CONTENT_BULLET.test(text) && !BOILERPLATE_BULLET.test(text);
+}
+

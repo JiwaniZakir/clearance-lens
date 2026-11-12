@@ -24,11 +24,23 @@ export interface SceneChoice {
   whatRealTeamsReport: string;
 }
 
+/** Round 9 (function_engineer): a Senior Manufacturing Engineer got a
+ *  standup about a "telemetry ingest fix". The only role-specific detail in
+ *  any scene is scene 1's pair of competing priorities, so that pair now
+ *  comes from the role's family; every other scene fits any role (D-050). */
+export type RoleFamily = "software" | "hardware" | "business";
+
+const COMPETING_PRIORITIES: Record<RoleFamily, string> = {
+  software: "the telemetry ingest fix AND the demo",
+  hardware: "the fixture rework on the line AND the first-article inspection report",
+  business: "the supplier quote comparison AND the customer briefing deck",
+};
+
 export interface JobPreviewScene {
   id: string;
   title: string;
   includedInShortVersion: boolean; // the 4 scenes shown at minutes=20
-  setup: (roleTitle: string, company: string) => string;
+  setup: (roleTitle: string, company: string, family: RoleFamily) => string;
   choices: SceneChoice[];
   requiresStatedRationale: boolean;
   debriefPrompts: string[];
@@ -45,8 +57,8 @@ export const JOB_PREVIEW_SCENES: JobPreviewScene[] = [
     id: "standup_priority",
     title: "The vague standup priority",
     includedInShortVersion: true,
-    setup: (roleTitle, company) =>
-      `It's your third day as a ${roleTitle} at ${company}. In standup, your lead says: "We need the telemetry ingest fix AND the demo for Thursday — whichever you get to first." Nobody says which one actually matters more, and your lead is already halfway out the door to another meeting.`,
+    setup: (roleTitle, company, family) =>
+      `It's your third day as a ${roleTitle} at ${company}. In standup, your lead says: "We need ${COMPETING_PRIORITIES[family]} for Thursday — whichever you get to first." Nobody says which one actually matters more, and your lead is already halfway out the door to another meeting.`,
     choices: [
       {
         id: "ask_now",

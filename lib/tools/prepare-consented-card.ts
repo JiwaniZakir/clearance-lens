@@ -164,8 +164,7 @@ export const prepareConsentedCardTool: ToolDef<z.infer<typeof InputSchema>, z.in
       cardTemplate: { markdown: lines.join("\n"), fields, neverInclude: NEVER_INCLUDE },
       evaluate_locally: true,
       instructionsForAgent:
-        "Fill in each {{placeholder}} in cardTemplate.markdown yourself, locally, with what the user approved for THIS company, following each field's guidance and cardTemplate.neverInclude. Don't add anything they didn't approve. Show them the finished card and get a final yes before they send it themselves. Never send the filled-in values back to Clearance Lens — nothing here needs them. " +
-        DISCLAIMERS.evaluateLocally,
+        "Fill in each {{placeholder}} in cardTemplate.markdown yourself, locally, with what the user approved for THIS company, following each field's guidance and cardTemplate.neverInclude. Don't add anything they didn't approve. Show them the finished card and get a final yes before they send it themselves. Never send the filled-in values back to Clearance Lens — nothing here needs them.",
       notVerifiedNote,
       applyLink: { url: role.url, label: `Apply via ${role.company}'s listing` },
       sources: [SPEEDRUN_SOURCE],

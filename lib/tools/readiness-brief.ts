@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema } from "@/lib/tools/role-shared";
-import { extractSections } from "@/lib/speedrun/extract-sections";
+import { extractSections, isJobContentBullet } from "@/lib/speedrun/extract-sections";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 
@@ -38,7 +38,9 @@ export const readinessBriefTool: ToolDef<z.infer<typeof InputSchema>, z.infer<ty
   handler: async ({ role_id }) => {
     const role = await resolveRole(role_id);
     const sections = extractSections(role.descriptionText);
-    const focusAreas = (sections.qualifications.length > 0 ? sections.qualifications : sections.rawBullets).slice(0, 6);
+    // A prep plan for "Must be a U.S. citizen" isn't a plan — D-050.
+    const quals = sections.qualifications.filter(isJobContentBullet);
+    const focusAreas = (quals.length > 0 ? quals : sections.rawBullets.filter(isJobContentBullet)).slice(0, 6);
 
     const questionsToAskTheRecruiter = [
       `Does the ${role.title} role currently require an active clearance, or could I start on unclassified work while an investigation is pending?`,
@@ -76,8 +78,7 @@ export const readinessBriefTool: ToolDef<z.infer<typeof InputSchema>, z.infer<ty
       questionsToAskTheRecruiter,
       evaluate_locally: true,
       instructionsForAgent:
-        "Fill in the three template sections yourself, locally, using what you already know about the user. " +
-        DISCLAIMERS.evaluateLocally,
+        "Fill in the three template sections yourself. " + DISCLAIMERS.evaluateLocally,
       sources: [SPEEDRUN_SOURCE],
       disclaimer: DISCLAIMERS.notAScore,
     };

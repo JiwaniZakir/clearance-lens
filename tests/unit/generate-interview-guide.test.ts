@@ -122,3 +122,18 @@ describe("generate_interview_guide", () => {
     if (!parsed.success) expect(parsed.error.issues[0]?.message).toMatch(/30, 45, or 60/);
   });
 });
+
+// D-050 (judging panel round 9): eligibility, degree, and logistics bullets
+// became interview questions ("Tell me about a time your work connected to:
+// 'Must be a U.S. citizen…'") and trial rubric criteria.
+describe("eligibility and credential bullets are never interview questions (D-050)", () => {
+  it("skips citizenship, clearance, and degree bullets, and phrases task vs. skill bullets differently", async () => {
+    const { isJobContentBullet } = await import("@/lib/speedrun/extract-sections");
+    expect(isJobContentBullet("Must be a U.S. citizen and eligible to apply for a security clearance")).toBe(false);
+    expect(isJobContentBullet("Eligible to obtain and maintain an active U.S. Top Secret security clearance")).toBe(false);
+    expect(isJobContentBullet("Bachelor's degree in Computer Science or related field")).toBe(false);
+    expect(isJobContentBullet("Willingness to travel up to 25%")).toBe(false);
+    expect(isJobContentBullet("Design and build real-time flight software in C++")).toBe(true);
+    expect(isJobContentBullet("Experience with embedded Linux and RTOS")).toBe(true);
+  });
+});

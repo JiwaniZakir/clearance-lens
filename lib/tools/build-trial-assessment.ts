@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { resolveRole, SPEEDRUN_SOURCE, RoleIdSchema } from "@/lib/tools/role-shared";
-import { extractSections } from "@/lib/speedrun/extract-sections";
+import { extractSections, isJobContentBullet } from "@/lib/speedrun/extract-sections";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 
@@ -102,10 +102,13 @@ export const buildTrialAssessmentTool: ToolDef<z.infer<typeof InputSchema>, z.in
     // fall back to qualifications, then any bullet, so a thinly-structured
     // posting still produces a usable, job-specific rubric rather than an
     // empty one.
+    // Eligibility/credential lines aren't work to sample (round 9: a rubric
+    // criterion read "Addresses: 'Eligible to obtain… clearance'") — D-050.
+    const resp = sections.responsibilities.filter(isJobContentBullet);
     const pool =
-      sections.responsibilities.length >= scope.rubricCount
-        ? sections.responsibilities
-        : [...sections.responsibilities, ...sections.qualifications, ...sections.rawBullets];
+      resp.length >= scope.rubricCount
+        ? resp
+        : [...resp, ...sections.qualifications, ...sections.rawBullets].filter(isJobContentBullet);
     const uniquePool = [...new Set(pool)];
     const chosen = uniquePool.slice(0, scope.rubricCount);
 
@@ -136,6 +139,11 @@ export const buildTrialAssessmentTool: ToolDef<z.infer<typeof InputSchema>, z.in
       "",
       "Named responsibilities this exercise is scoped against (quoted from the posting):",
       ...chosen.map((q) => `  - "${q}"`),
+      "",
+      // Round 9: the brief listed responsibilities but never said what to do.
+      chosen.length > 0
+        ? `Your task: pick the responsibility above closest to your experience, and within the time box produce one concrete artifact for a realistic, unclassified version of it — ${scope.taskShape.charAt(0).toLowerCase()}${scope.taskShape.slice(1)}`
+        : "This posting lists no role-specific responsibilities to scope a task against — the hiring team should supply one before sending this.",
     ];
 
     return {
