@@ -55,6 +55,9 @@ import {
   ReadinessBriefSkeleton,
   VerifyEvidenceSkeleton,
   ConsentedCardSkeleton,
+  SignedAttestationSkeleton,
+  AnonymousSignalSkeleton,
+  AggregatedSignalSkeleton,
 } from "@/components/loading-skeleton";
 
 import { useToolCall } from "@/lib/use-tool-call";
@@ -91,6 +94,16 @@ import type {
   PrepareConsentedCardOutput,
   ConsentedFields,
   PickedRole,
+  AttestationClearanceLevel,
+  AttestationCitizenshipStatus,
+  AttestationClaims,
+  PrepareSignedAttestationInput,
+  PrepareSignedAttestationOutput,
+  SignalExperienceBucket,
+  ContributeAnonymousSignalInput,
+  ContributeAnonymousSignalOutput,
+  GetAggregatedSignalInput,
+  GetAggregatedSignalOutput,
 } from "@/lib/try-tool-types";
 
 // Found live via the spec §6 judging panel (DECISIONS.md): 4 of 5 fresh
@@ -105,6 +118,11 @@ import type {
 // point," reading the README's "try every tool DIRECTLY" literally. Rather
 // than keep re-litigating that reading, both now also get their own
 // dedicated tab — the embedded entry points still exist too, unchanged.
+// prepare_signed_attestation / contribute_anonymous_signal /
+// get_aggregated_signal added as 3 more tabs after the spec §6 judging
+// panel round 7 (3 of 5 fresh judges independently): these 3 newest tools
+// (Clearance Lens v2) had no UI path in /try at all, directly contradicting
+// the README's "Try every tool directly at /try" claim (DECISIONS.md).
 const TAB_DEFS = [
   { id: "search", label: "Search roles" },
   { id: "timeline", label: "Timeline" },
@@ -113,10 +131,13 @@ const TAB_DEFS = [
   { id: "preview", label: "Job preview" },
   { id: "explain", label: "Explain a rule" },
   { id: "readiness", label: "Readiness brief" },
-  { id: "verify", label: "Verify GitHub" },
+  { id: "verify", label: "Verify evidence" },
   { id: "card", label: "Consented card" },
   { id: "company", label: "Company profile" },
   { id: "fit", label: "Fit debrief" },
+  { id: "attestation", label: "Signed attestation" },
+  { id: "contribute", label: "Contribute signal" },
+  { id: "aggregate", label: "Aggregated signal" },
 ] as const;
 
 type TabId = (typeof TAB_DEFS)[number]["id"];
@@ -140,6 +161,9 @@ const TOOL_NAME_TO_TAB: Record<string, TabId> = {
   prepare_consented_card: "card",
   get_company_profile: "company",
   fit_debrief: "fit",
+  prepare_signed_attestation: "attestation",
+  contribute_anonymous_signal: "contribute",
+  get_aggregated_signal: "aggregate",
 };
 
 function tabFromToolParam(toolParam: string | null): TabId {
@@ -1094,7 +1118,7 @@ function ReadinessBriefTab() {
 }
 
 /* ------------------------------------------------------------------------ */
-/* Verify GitHub                                                            */
+/* Verify evidence                                                          */
 /* ------------------------------------------------------------------------ */
 
 function VerifyEvidenceTab() {
@@ -1116,8 +1140,8 @@ function VerifyEvidenceTab() {
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="e.g. octocat or https://github.com/octocat"
-          aria-label="GitHub username or profile URL"
+          placeholder="e.g. octocat, https://gitlab.com/<user>, or https://cosign.co/<path>"
+          aria-label="GitHub username, or a GitHub/GitLab/Cosign profile URL"
           className="flex-1"
         />
         <Button type="submit">Check</Button>
@@ -1126,8 +1150,8 @@ function VerifyEvidenceTab() {
       {!data && !loading && !error && (
         <EmptyState
           icon={SearchX}
-          title="Enter a GitHub username"
-          description="Shows only what's already public on GitHub right now — repo count, top languages, recent activity. No scraping, no private data, no authentication required of you or them."
+          title="Enter a GitHub username, or a GitLab/Cosign profile URL"
+          description="Shows only what's already public right now on that one platform — repo count and activity for GitHub/GitLab, or a thin directory entry for Cosign. No scraping, no private data, no authentication required of you or them."
         />
       )}
       {loading && <VerifyEvidenceSkeleton />}
@@ -1146,10 +1170,15 @@ function VerifyEvidenceTab() {
                 @{data.profile.login}
               </a>
             </div>
-            <div className="flex shrink-0 gap-2 font-mono text-[0.8125rem] text-neutral-11">
+            <div className="flex shrink-0 items-center gap-2 font-mono text-[0.8125rem] text-neutral-11">
+              <span className="rounded-full bg-neutral-3 px-2 py-0.5 text-xs capitalize">{data.platform}</span>
               <span>{data.profile.publicRepoCount} repos</span>
-              <span>·</span>
-              <span>{data.profile.followers} followers</span>
+              {data.profile.followers !== null && (
+                <>
+                  <span>·</span>
+                  <span>{data.profile.followers} followers</span>
+                </>
+              )}
             </div>
           </div>
           {data.profile.bio && <p className="text-sm leading-[1.5] text-neutral-12">{data.profile.bio}</p>}
@@ -1458,6 +1487,415 @@ function CompanyProfileDialog({ slug, onClose }: { slug: string | null; onClose:
 }
 
 /* ------------------------------------------------------------------------ */
+/* Signed attestation                                                       */
+/* ------------------------------------------------------------------------ */
+
+// Added after the spec §6 judging panel round 7 (candidate_user,
+// product_designer, trust_skeptic, independently): no UI entry point at
+// all for this tool. This tool's whole design assumes the CALLER's own
+// agent generates a keypair and signs locally (never this server) — /try
+// has no agent, so this does the identical thing directly in the browser
+// via the Web Crypto API's native Ed25519 support, to show the real
+// mechanism working end to end rather than just describing it. The
+// private key is a CryptoKey that never leaves this component's state and
+// is non-extractable in spirit (only the public key is ever exported).
+function arrayBufferToBase64(buf: ArrayBuffer): string {
+  let binary = "";
+  for (const byte of new Uint8Array(buf)) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function SignedAttestationTab() {
+  const { data, error, loading, call, reset } = useToolCall<
+    PrepareSignedAttestationInput,
+    PrepareSignedAttestationOutput
+  >("prepare_signed_attestation");
+  const [clearanceLevel, setClearanceLevel] = React.useState<AttestationClearanceLevel | "">("");
+  const [citizenshipStatus, setCitizenshipStatus] = React.useState<AttestationCitizenshipStatus | "">("");
+  const [availableFrom, setAvailableFrom] = React.useState("");
+  const [keyPair, setKeyPair] = React.useState<CryptoKeyPair | null>(null);
+  const [cryptoError, setCryptoError] = React.useState<string | null>(null);
+  const [signing, setSigning] = React.useState(false);
+
+  async function generateKeypair() {
+    setCryptoError(null);
+    try {
+      const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+      setKeyPair(pair as CryptoKeyPair);
+    } catch {
+      setCryptoError(
+        "This browser doesn't support Ed25519 signing (Web Crypto API) — try a recent Chrome, Firefox, Edge, or Safari. Outside /try, your own AI agent generates and signs this the same way, in Node.js, and that path doesn't depend on browser support at all.",
+      );
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!keyPair) return;
+    setSigning(true);
+    try {
+      const claims: AttestationClaims = {
+        clearance_level: clearanceLevel || undefined,
+        citizenship_status: citizenshipStatus || undefined,
+        available_from: availableFrom || undefined,
+      };
+      const issued_at = new Date().toISOString();
+      const signed_payload = JSON.stringify({ claims, issued_at });
+      const [signatureBuf, publicKeyBuf] = await Promise.all([
+        crypto.subtle.sign("Ed25519", keyPair.privateKey, new TextEncoder().encode(signed_payload)),
+        crypto.subtle.exportKey("spki", keyPair.publicKey),
+      ]);
+      await call({
+        claims,
+        issued_at,
+        signed_payload,
+        signature_base64: arrayBufferToBase64(signatureBuf),
+        public_key_base64: arrayBufferToBase64(publicKeyBuf),
+      });
+    } finally {
+      setSigning(false);
+    }
+  }
+
+  const hasAnyClaim = clearanceLevel || citizenshipStatus || availableFrom;
+
+  return (
+    <div className="flex max-w-xl flex-col gap-6">
+      <DisclaimerBanner>
+        This tool is built for YOUR agent to generate a keypair and sign locally — never sending a private key
+        anywhere. Since /try has no agent, this page does the identical thing directly in your browser instead, so
+        you can see the real mechanism work end to end. The private key generated below never leaves this browser
+        tab and is never sent to Clearance Lens.
+      </DisclaimerBanner>
+
+      {!keyPair && !cryptoError && (
+        <Button onClick={generateKeypair} className="self-start">
+          Generate a test keypair in this browser
+        </Button>
+      )}
+      {cryptoError && (
+        <ErrorState error={{ code: "internal_error", message: cryptoError }} onRetry={generateKeypair} />
+      )}
+
+      {keyPair && (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-neutral-6 bg-neutral-2 p-4">
+          <p className="text-xs text-neutral-10">Keypair generated in this browser tab. At least one claim is required.</p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="attest-clearance">Clearance level</FieldLabel>
+              <Select
+                id="attest-clearance"
+                value={clearanceLevel}
+                onChange={(e) => setClearanceLevel(e.target.value as AttestationClearanceLevel | "")}
+              >
+                <option value="">Not included</option>
+                <option value="none">None yet</option>
+                <option value="interim">Interim</option>
+                <option value="secret">Secret</option>
+                <option value="ts">Top Secret</option>
+                <option value="ts_sci">Top Secret/SCI</option>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="attest-citizenship">Citizenship status</FieldLabel>
+              <Select
+                id="attest-citizenship"
+                value={citizenshipStatus}
+                onChange={(e) => setCitizenshipStatus(e.target.value as AttestationCitizenshipStatus | "")}
+              >
+                <option value="">Not included</option>
+                <option value="us_citizen">U.S. citizen</option>
+                <option value="green_card">Green card holder</option>
+                <option value="other_protected_individual">Other protected individual</option>
+                <option value="not_us_person">Not a U.S. person</option>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="attest-available">Available from</FieldLabel>
+              <Input
+                id="attest-available"
+                type="date"
+                value={availableFrom}
+                onChange={(e) => setAvailableFrom(e.target.value)}
+              />
+            </div>
+          </div>
+          <Button type="submit" className="self-start" disabled={!hasAnyClaim || signing}>
+            {signing ? "Signing…" : "Sign and verify"}
+          </Button>
+        </form>
+      )}
+
+      {loading && <SignedAttestationSkeleton />}
+      {!loading && error && <ErrorState error={error} onRetry={() => reset()} />}
+      {!loading && !error && data && (
+        <div className="flex flex-col gap-4 rounded-lg border border-neutral-6 bg-neutral-1 p-4 sm:p-5">
+          <p className="text-sm font-medium text-neutral-12">{data.whatThisProves}</p>
+          <pre className="whitespace-pre-wrap rounded-md bg-neutral-2 p-3 font-mono text-[0.8125rem] leading-[1.5] text-neutral-12">
+            {data.shareableMarkdown}
+          </pre>
+          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-6 pt-3">
+            <span className="text-xs text-neutral-10">Sources:</span>
+            {data.sources.map((s, i) => (
+              <SourceCitationChip key={i} source={s} />
+            ))}
+          </div>
+          <p className="text-[0.8125rem] leading-[1.4] text-neutral-10">{data.disclaimer}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* Contribute anonymous signal                                              */
+/* ------------------------------------------------------------------------ */
+
+// Added after the spec §6 judging panel round 7 (candidate_user,
+// product_designer, trust_skeptic, independently): no UI entry point at
+// all for this tool, despite the README's "try every tool directly" claim.
+function ContributeSignalTab() {
+  const { data, error, loading, call, reset } = useToolCall<ContributeAnonymousSignalInput, ContributeAnonymousSignalOutput>(
+    "contribute_anonymous_signal",
+  );
+  const [selectedRole, setSelectedRole] = React.useState<PickedRole | null>(null);
+  const [clearanceLevel, setClearanceLevel] = React.useState<AttestationClearanceLevel | "">("");
+  const [citizenshipStatus, setCitizenshipStatus] = React.useState<AttestationCitizenshipStatus | "">("");
+  const [experience, setExperience] = React.useState<SignalExperienceBucket | "">("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedRole) return;
+    void call({
+      role_id: selectedRole.id,
+      contribution: {
+        clearance_level: clearanceLevel || undefined,
+        citizenship_status: citizenshipStatus || undefined,
+        years_experience_bucket: experience || undefined,
+      },
+    });
+  }
+
+  const hasAnyField = clearanceLevel || citizenshipStatus || experience;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <RolePicker label="Pick a role to contribute anonymous signal for" selectedRole={selectedRole} onSelect={setSelectedRole} />
+
+      {selectedRole && (
+        <DisclaimerBanner>
+          No name, contact info, or identifier of any kind is ever recorded — only the closed-choice buckets below,
+          and only once you submit. Nothing here is readable back as an individual record, only as a rounded
+          aggregate percentage once enough people contribute (see the Aggregated signal tab).
+        </DisclaimerBanner>
+      )}
+
+      {selectedRole && (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-neutral-6 bg-neutral-2 p-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="signal-clearance">Clearance level</FieldLabel>
+              <Select
+                id="signal-clearance"
+                value={clearanceLevel}
+                onChange={(e) => setClearanceLevel(e.target.value as AttestationClearanceLevel | "")}
+              >
+                <option value="">Prefer not to say</option>
+                <option value="none">None yet</option>
+                <option value="interim">Interim</option>
+                <option value="secret">Secret</option>
+                <option value="ts">Top Secret</option>
+                <option value="ts_sci">Top Secret/SCI</option>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="signal-citizenship">Citizenship status</FieldLabel>
+              <Select
+                id="signal-citizenship"
+                value={citizenshipStatus}
+                onChange={(e) => setCitizenshipStatus(e.target.value as AttestationCitizenshipStatus | "")}
+              >
+                <option value="">Prefer not to say</option>
+                <option value="us_citizen">U.S. citizen</option>
+                <option value="green_card">Green card holder</option>
+                <option value="other_protected_individual">Other protected individual</option>
+                <option value="not_us_person">Not a U.S. person</option>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="signal-experience">Years of experience</FieldLabel>
+              <Select
+                id="signal-experience"
+                value={experience}
+                onChange={(e) => setExperience(e.target.value as SignalExperienceBucket | "")}
+              >
+                <option value="">Prefer not to say</option>
+                <option value="0-2">0-2</option>
+                <option value="3-5">3-5</option>
+                <option value="6-10">6-10</option>
+                <option value="10+">10+</option>
+              </Select>
+            </div>
+          </div>
+          <Button type="submit" className="self-start" disabled={!hasAnyField}>
+            Contribute anonymously
+          </Button>
+        </form>
+      )}
+
+      {!selectedRole && (
+        <EmptyState
+          icon={SearchX}
+          title="Pick a role above"
+          description="Contributions are tied to one real, live job posting — select one to continue."
+        />
+      )}
+      {loading && <AnonymousSignalSkeleton />}
+      {!loading && error && <ErrorState error={error} onRetry={() => reset()} />}
+      {!loading && !error && data && (
+        <div className="flex flex-col gap-3 rounded-lg border border-neutral-6 bg-neutral-1 p-4 sm:p-5">
+          <p className="text-sm font-medium text-neutral-12">
+            Recorded for {data.roleTitle} at {data.company}.
+          </p>
+          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-6 pt-3">
+            <span className="text-xs text-neutral-10">Sources:</span>
+            {data.sources.map((s, i) => (
+              <SourceCitationChip key={i} source={s} />
+            ))}
+          </div>
+          <p className="text-[0.8125rem] leading-[1.4] text-neutral-10">{data.disclaimer}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* Aggregated signal                                                         */
+/* ------------------------------------------------------------------------ */
+
+// Added after the spec §6 judging panel round 7 (candidate_user,
+// product_designer, trust_skeptic, independently): no UI entry point at
+// all for this tool.
+function AggregateSignalTab() {
+  const { data, error, loading, call, reset } = useToolCall<GetAggregatedSignalInput, GetAggregatedSignalOutput>(
+    "get_aggregated_signal",
+  );
+  const [scopeType, setScopeType] = React.useState<"role" | "company">("role");
+  const [selectedRole, setSelectedRole] = React.useState<PickedRole | null>(null);
+  const [companySlug, setCompanySlug] = React.useState("");
+
+  function runLookup(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (scopeType === "role") {
+      if (!selectedRole) return;
+      void call({ role_id: selectedRole.id });
+    } else {
+      const trimmed = companySlug.trim();
+      if (!trimmed) return;
+      void call({ company_slug: trimmed });
+    }
+  }
+
+  const BUCKET_LABEL: Record<string, string> = {
+    none: "None yet",
+    interim: "Interim",
+    secret: "Secret",
+    ts: "Top Secret",
+    ts_sci: "Top Secret/SCI",
+    us_citizen: "U.S. citizen",
+    green_card: "Green card holder",
+    other_protected_individual: "Other protected individual",
+    not_us_person: "Not a U.S. person",
+    "0-2": "0-2 years",
+    "3-5": "3-5 years",
+    "6-10": "6-10 years",
+    "10+": "10+ years",
+    otherBelowFloor: "Other (too few to break out individually)",
+  };
+
+  return (
+    <div className="flex max-w-xl flex-col gap-6">
+      <SegmentedControl
+        value={scopeType}
+        onChange={setScopeType}
+        options={[
+          { value: "role", label: "By role" },
+          { value: "company", label: "By company" },
+        ]}
+      />
+
+      {scopeType === "role" ? (
+        <RolePicker label="Pick a role" selectedRole={selectedRole} onSelect={setSelectedRole} />
+      ) : (
+        <form onSubmit={runLookup} className="flex gap-2">
+          <Input
+            value={companySlug}
+            onChange={(e) => setCompanySlug(e.target.value)}
+            placeholder="e.g. anduril-industries"
+            aria-label="Company slug"
+            className="flex-1"
+          />
+        </form>
+      )}
+
+      <Button onClick={runLookup} className="self-start" disabled={scopeType === "role" ? !selectedRole : !companySlug.trim()}>
+        Read aggregated signal
+      </Button>
+
+      {loading && <AggregatedSignalSkeleton />}
+      {!loading && error && <ErrorState error={error} onRetry={() => reset()} />}
+      {!loading && !error && data && (
+        <div className="flex flex-col gap-4 rounded-lg border border-neutral-6 bg-neutral-1 p-4 sm:p-5">
+          <p className="text-sm font-medium text-neutral-12">{data.scope.label}</p>
+          {!data.meetsFloor && (
+            <EmptyState
+              icon={SearchX}
+              title="Not enough contributions yet"
+              description={`Only ${data.totalContributions} so far — at least 5 are needed before any breakdown is shown, so a reader could never single out an early contributor.`}
+            />
+          )}
+          {data.meetsFloor && data.percentages && (
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-neutral-10">{data.totalContributions} anonymous contributions</p>
+              {(
+                [
+                  ["Clearance level", data.percentages.clearanceLevel],
+                  ["Citizenship status", data.percentages.citizenshipStatus],
+                  ["Years of experience", data.percentages.yearsExperience],
+                ] as const
+              ).map(([label, breakdown]) =>
+                breakdown ? (
+                  <div key={label} className="flex flex-col gap-1.5">
+                    <p className="text-[0.75rem] font-semibold uppercase tracking-wide text-neutral-10">{label}</p>
+                    {Object.entries(breakdown).map(([key, pct]) => (
+                      <div key={key} className="flex items-center gap-2 text-sm text-neutral-12">
+                        <span className="w-44 shrink-0 truncate">{BUCKET_LABEL[key] ?? key}</span>
+                        <div className="h-2 flex-1 rounded-full bg-neutral-4">
+                          <div className="h-2 rounded-full bg-accent-9" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="w-10 shrink-0 text-right font-mono text-xs text-neutral-11">{pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null,
+              )}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-6 pt-3">
+            <span className="text-xs text-neutral-10">Sources:</span>
+            {data.sources.map((s, i) => (
+              <SourceCitationChip key={i} source={s} />
+            ))}
+          </div>
+          <p className="text-[0.8125rem] leading-[1.4] text-neutral-10">{data.disclaimer}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
 /* Page                                                                      */
 /* ------------------------------------------------------------------------ */
 
@@ -1578,7 +2016,7 @@ function TryPageInner() {
             <ReadinessBriefTab />
           </TabsPrimitive.Content>
           <TabsPrimitive.Content value="verify">
-            <h2 className="sr-only">Verify GitHub</h2>
+            <h2 className="sr-only">Verify evidence</h2>
             <VerifyEvidenceTab />
           </TabsPrimitive.Content>
           <TabsPrimitive.Content value="card">
@@ -1592,6 +2030,18 @@ function TryPageInner() {
           <TabsPrimitive.Content value="fit">
             <h2 className="sr-only">Fit debrief</h2>
             <FitDebriefTab />
+          </TabsPrimitive.Content>
+          <TabsPrimitive.Content value="attestation">
+            <h2 className="sr-only">Signed attestation</h2>
+            <SignedAttestationTab />
+          </TabsPrimitive.Content>
+          <TabsPrimitive.Content value="contribute">
+            <h2 className="sr-only">Contribute signal</h2>
+            <ContributeSignalTab />
+          </TabsPrimitive.Content>
+          <TabsPrimitive.Content value="aggregate">
+            <h2 className="sr-only">Aggregated signal</h2>
+            <AggregateSignalTab />
           </TabsPrimitive.Content>
         </TabsPrimitive.Root>
       </main>

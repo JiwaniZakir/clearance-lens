@@ -5,7 +5,7 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
  * 40 near-duplicate tests that mostly differ by persona backstory — which
  * doesn't change UI behavior, since the UI doesn't know or care which
  * persona is typing — this covers the DISTINCT interaction paths the R3
- * personas actually exercise across all 11 tabs (all 11 tools, one each),
+ * personas actually exercise across all 14 tabs (all 14 tools, one each),
  * plus one chained integration journey.
  * Persona-specific judgment (should an agent broaden a search, how should
  * it phrase a debrief) was already exercised directly against the MCP
@@ -376,13 +376,13 @@ test.describe("/try — Readiness brief", () => {
   });
 });
 
-test.describe("/try — Verify GitHub", () => {
+test.describe("/try — Verify evidence", () => {
   test("checking a real public username renders its already-public signal, with no demographic inference", async ({
     page,
   }) => {
     await page.goto("/try");
-    await switchToTab(page, "Verify GitHub");
-    await page.getByLabel("GitHub username or profile URL").fill("octocat");
+    await switchToTab(page, "Verify evidence");
+    await page.getByLabel("GitHub username, or a GitHub/GitLab/Cosign profile URL").fill("octocat");
     await page.getByRole("button", { name: "Check" }).click();
 
     await expect(page.getByText("@octocat")).toBeVisible({ timeout: LONG_TIMEOUT });
@@ -466,6 +466,69 @@ test.describe("/try — tab strip overflow affordance", () => {
 // that query param at all, so every one of those links silently landed on
 // the default Search roles tab. This is a genuine missing feature, not the
 // click-simulation artifact other round-1/2 findings turned out to be.
+// Regression for DECISIONS.md (judging panel round 7 -- 3 of 5 fresh judges
+// independently): these 3 newest tools (Clearance Lens v2) had no UI entry
+// point in /try at all, despite the README's "try every tool directly"
+// claim. prepare_signed_attestation's tool design assumes the CALLING
+// AGENT generates and signs with a keypair -- /try has no agent, so this
+// tab does the identical thing with the browser's own Web Crypto API
+// (Ed25519), verifying the real mechanism end to end rather than stubbing
+// it out.
+test.describe("/try — Signed attestation", () => {
+  test("generating a keypair in-browser, then signing and verifying a claim, round-trips correctly", async ({
+    page,
+  }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Signed attestation");
+
+    await page.getByRole("button", { name: "Generate a test keypair in this browser" }).click();
+    await expect(page.getByText("Keypair generated in this browser tab.")).toBeVisible();
+
+    await page.getByLabel("Clearance level").selectOption("secret");
+    await page.getByRole("button", { name: "Sign and verify" }).click();
+
+    await expect(page.getByText(/confirms the claim was signed/i)).toBeVisible({ timeout: LONG_TIMEOUT });
+    await expect(page.getByText(/signature_base64/)).toBeVisible();
+    // Never that the claim itself is true -- the hard constraint this tool
+    // exists specifically to respect.
+    await expect(page.getByText(/does not confirm the claim itself is true/i)).toBeVisible();
+  });
+});
+
+test.describe("/try — Contribute signal", () => {
+  test("picking a role and submitting a bucketed contribution confirms it was recorded, with no identifier ever shown", async ({
+    page,
+  }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Contribute signal");
+    const picker = page.locator("div").filter({ hasText: "Pick a role to contribute anonymous signal for" }).first();
+    await pickFirstRole(picker);
+
+    await page.getByLabel("Clearance level").selectOption("secret");
+    await page.getByRole("button", { name: "Contribute anonymously" }).click();
+
+    await expect(page.getByText(/^Recorded for/).first()).toBeVisible({ timeout: LONG_TIMEOUT });
+  });
+});
+
+test.describe("/try — Aggregated signal", () => {
+  test("reading by company renders that company's real name and an honest below-floor message when contributions are too few", async ({
+    page,
+  }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Aggregated signal");
+
+    await page.getByRole("radio", { name: "By company" }).click();
+    await page.getByLabel("Company slug").fill("anduril-industries");
+    await page.getByRole("button", { name: "Read aggregated signal" }).click();
+
+    await expect(page.getByText(/Anduril/i).first()).toBeVisible({ timeout: LONG_TIMEOUT });
+    // Either a real breakdown or the explicit k-anonymity floor message --
+    // never a literal `null` or a blank panel.
+    await expect(page.getByText(/not enough contributions yet|anonymous contributions/i)).toBeVisible();
+  });
+});
+
 test.describe("/try — per-tool deep links (?tool=)", () => {
   test("?tool=estimate_timeline pre-selects the Timeline tab", async ({ page }) => {
     await page.goto("/try?tool=estimate_timeline");
@@ -492,6 +555,21 @@ test.describe("/try — per-tool deep links (?tool=)", () => {
     await expect(page.getByRole("tab", { name: "Search roles" })).toHaveAttribute("data-state", "active");
     await page.goto("/try");
     await expect(page.getByRole("tab", { name: "Search roles" })).toHaveAttribute("data-state", "active");
+  });
+
+  // Regression for DECISIONS.md (judging panel round 7, trust_skeptic):
+  // before these 3 tabs existed, ?tool= for any of them silently fell back
+  // to Search roles with no error or "coming soon" notice -- indistinguishable
+  // from a typo in the URL. Now each has its own dedicated tab to land on.
+  test("?tool=prepare_signed_attestation, ?tool=contribute_anonymous_signal, and ?tool=get_aggregated_signal each pre-select their own dedicated tab", async ({
+    page,
+  }) => {
+    await page.goto("/try?tool=prepare_signed_attestation");
+    await expect(page.getByRole("tab", { name: "Signed attestation" })).toHaveAttribute("data-state", "active");
+    await page.goto("/try?tool=contribute_anonymous_signal");
+    await expect(page.getByRole("tab", { name: "Contribute signal" })).toHaveAttribute("data-state", "active");
+    await page.goto("/try?tool=get_aggregated_signal");
+    await expect(page.getByRole("tab", { name: "Aggregated signal" })).toHaveAttribute("data-state", "active");
   });
 });
 

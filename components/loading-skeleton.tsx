@@ -239,3 +239,43 @@ export function ConsentedCardSkeleton() {
     </SkeletonCard>
   );
 }
+
+/** Mirrors the signed-attestation credential preview: a proof block, a markdown block. */
+export function SignedAttestationSkeleton() {
+  return (
+    <SkeletonCard className="flex flex-col gap-4">
+      <div role="status" aria-label="Verifying signature" className="flex flex-col gap-4">
+        <Bone className="h-4 w-1/2" />
+        <Bone className="h-3 w-full" />
+        <Bone className="h-3 w-5/6" />
+        <Bone className="h-16 w-full" />
+      </div>
+    </SkeletonCard>
+  );
+}
+
+/** Mirrors a simple confirmation message. */
+export function AnonymousSignalSkeleton() {
+  return (
+    <SkeletonCard className="flex flex-col gap-3">
+      <div role="status" aria-label="Recording contribution" className="flex flex-col gap-3">
+        <Bone className="h-4 w-1/3" />
+        <Bone className="h-3 w-full" />
+      </div>
+    </SkeletonCard>
+  );
+}
+
+/** Mirrors the aggregated-signal percentage breakdown: a few labeled bars. */
+export function AggregatedSignalSkeleton() {
+  return (
+    <SkeletonCard className="flex flex-col gap-4">
+      <div role="status" aria-label="Reading aggregated signal" className="flex flex-col gap-3">
+        <Bone className="h-4 w-1/3" />
+        <Bone className="h-3 w-5/6" />
+        <Bone className="h-3 w-2/3" />
+        <Bone className="h-3 w-3/4" />
+      </div>
+    </SkeletonCard>
+  );
+}

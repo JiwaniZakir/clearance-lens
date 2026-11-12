@@ -339,14 +339,17 @@ export interface VerifyEvidenceInput {
 }
 
 export interface VerifyEvidenceOutput {
+  platform: "github" | "gitlab" | "cosign";
   profile: {
     login: string;
     name: string | null;
     profileUrl: string;
     bio: string | null;
     publicRepoCount: number;
-    followers: number;
-    accountCreatedAt: string;
+    // Nullable since D-032: GitLab's and Cosign's public APIs don't expose
+    // these at all (see lib/tools/verify-evidence.ts).
+    followers: number | null;
+    accountCreatedAt: string | null;
   };
   topLanguages: { language: string; repoCount: number }[];
   recentActivity: { repo: string; url: string; pushedAt: string; description: string | null }[];
@@ -379,6 +382,89 @@ export interface PrepareConsentedCardOutput {
   card: { markdown: string; json: Record<string, unknown> };
   notVerifiedNote: string;
   applyLink: { url: string; label: string } | null;
+  sources: SourceRef[];
+  disclaimer: string;
+}
+
+/* ---------------------------------------------------------------------- */
+/* prepare_signed_attestation (lib/tools/prepare-signed-attestation.ts)  */
+/* ---------------------------------------------------------------------- */
+
+export type AttestationClearanceLevel = "none" | "interim" | "secret" | "ts" | "ts_sci";
+export type AttestationCitizenshipStatus = "us_citizen" | "green_card" | "other_protected_individual" | "not_us_person";
+
+export interface AttestationClaims {
+  clearance_level?: AttestationClearanceLevel;
+  citizenship_status?: AttestationCitizenshipStatus;
+  available_from?: string;
+}
+
+export interface PrepareSignedAttestationInput {
+  claims: AttestationClaims;
+  issued_at: string;
+  signed_payload: string;
+  signature_base64: string;
+  public_key_base64: string;
+}
+
+export interface PrepareSignedAttestationOutput {
+  credential: {
+    context: string[];
+    type: string[];
+    issuer: string;
+    issuanceDate: string;
+    credentialSubject: Record<string, unknown>;
+    proof: { type: string; verificationMethod: string; signatureValue: string };
+  };
+  shareableMarkdown: string;
+  whatThisProves: string;
+  sources: SourceRef[];
+  disclaimer: string;
+}
+
+/* ---------------------------------------------------------------------- */
+/* contribute_anonymous_signal (lib/tools/contribute-anonymous-signal.ts) */
+/* ---------------------------------------------------------------------- */
+
+export type SignalExperienceBucket = "0-2" | "3-5" | "6-10" | "10+";
+
+export interface SignalContributionFields {
+  clearance_level?: AttestationClearanceLevel;
+  citizenship_status?: AttestationCitizenshipStatus;
+  years_experience_bucket?: SignalExperienceBucket;
+}
+
+export interface ContributeAnonymousSignalInput {
+  role_id: string;
+  contribution: SignalContributionFields;
+}
+
+export interface ContributeAnonymousSignalOutput {
+  recorded: boolean;
+  roleTitle: string;
+  company: string;
+  sources: SourceRef[];
+  disclaimer: string;
+}
+
+/* ---------------------------------------------------------------------- */
+/* get_aggregated_signal (lib/tools/get-aggregated-signal.ts)            */
+/* ---------------------------------------------------------------------- */
+
+export interface GetAggregatedSignalInput {
+  role_id?: string;
+  company_slug?: string;
+}
+
+export interface GetAggregatedSignalOutput {
+  scope: { type: "role" | "company"; label: string };
+  totalContributions: number;
+  meetsFloor: boolean;
+  percentages: {
+    clearanceLevel: Record<string, number> | null;
+    citizenshipStatus: Record<string, number> | null;
+    yearsExperience: Record<string, number> | null;
+  } | null;
   sources: SourceRef[];
   disclaimer: string;
 }
