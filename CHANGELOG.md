@@ -70,3 +70,22 @@ Round 1 of the frozen panel protocol: trimmed mean **6.69** (fail), no hard-cons
 - Unit suite: 206 → 219.
 - Investigated (4/5 judges' single most-repeated finding) and disproved as a product bug: `/try`'s tabs appeared not to switch on click — a bare JS `.click()` doesn't fire the pointer-event sequence Radix Tabs needs; a real simulated click (this project's own E2E suite, and any real mouse/touch/keyboard user) works every time.
 - `get_company_profile`'s reported 10–14s latency on a near-miss slug — investigated, could not reproduce after 7+ varied live attempts; not fixed.
+
+## [Unreleased] — judging panel round 2 response (2026-11-12)
+
+Round 2: trimmed mean **6.96**, but a **hard-constraint violation** (2/5 judges) capped the effective score at 6.0. Full results `panel/round-2/`, full response DECISIONS.md D-027/D-028.
+
+### fix
+- **Hard constraint:** `prepare_consented_card`'s PII/CUI filter was bypassed by trivial rephrasing of 4 of 5 protected categories — a bare 9-digit number, "Born 03/14/1992" (no "DOB"), "My ID number is..." (no "passport"), e-QIP/case numbers phrased as "request"/"file"/"reference", and real JPAS field jargon ("Owning SMO," "PSQ"). Fixed with targeted regex widenings, a new `credit_card` category, and a new tool-scoped stricter bare-identifier check — zero regressions against the existing 108-case suite.
+- `/try?tool=<name>` deep links never worked — the homepage's own per-tool "Try it" buttons linked there, but the page never read the query param at all.
+- `estimate_timeline`'s `current_status=interim` produced output nearly identical to `none` — now gets its own driver explicitly stating the baseline is a reference point, not their own expected wait.
+- `search_defense_roles` emitted duplicate/redundant clearance signals from a single sentence ("Top Secret security clearance" matched both a specific level and the generic fallback).
+- The citizenship/ITAR inference wasn't geography-aware — tagged a real Sydney, Australia posting (asking for an Australian NV2 clearance) with the same US-person flag applied to domestic roles.
+- Focus-ring contrast fell below WCAG 3:1 on the project's standard `ring-accent-6` focus token — independently re-derived the judge's exact computed ratios via direct luminance calculation; changed to `ring-accent-8` across all 12 files using it.
+- No skip-to-content link existed anywhere — added to the shared `Nav` component.
+- `verify_evidence`'s disclaimer included a non-sequitur "fit"/"criteria" sentence copy-pasted from `get_company_profile`'s own, unrelated design.
+
+### test
+- Investigated and found NOT reproducible: a claim that 200-level-deep nesting bypassed the PII depth guard (tested directly, both in isolation and through the full HTTP pipeline — correctly rejects every time).
+- Investigated and found NOT a real gap: the search keyword field allegedly relying on placeholder-as-label (both actual search inputs already have a proper `<label>` or `aria-label`).
+- Unit suite: 219 → 237. Full E2E suite re-extended and re-verified against production (62 passed, 2 graceful skips, both viewports). Lighthouse still 100/100/100/100 on all 4 pages.
