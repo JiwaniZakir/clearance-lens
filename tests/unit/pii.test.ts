@@ -445,3 +445,43 @@ describe("judging panel round 2: prepare_consented_card's stricter bare-identifi
     expect(scanForBareIdentifierShapes({ headline: "Backend engineer, 6 yrs", availability: "Now" })).toHaveLength(0);
   });
 });
+
+describe("judging panel round 7: hard-constraint finding, now fixed (email/phone had no detector at all)", () => {
+  it.each(["jane.doe@example.com", "contact me at jane.doe@example.com or 555-123-4567", "reach out: j.doe+jobs@sub.example.co.uk"])(
+    "flags an email address: %s",
+    (text) => {
+      expect(categoriesOf(text)).toContain("email");
+    },
+  );
+
+  it.each([
+    "555-123-4567",
+    "(555) 123-4567",
+    "555.123.4567",
+    "+1 555-123-4567",
+    "contact me at jane.doe@example.com or 555-123-4567",
+  ])("flags a formatted phone number: %s", (text) => {
+    expect(categoriesOf(text)).toContain("phone");
+  });
+
+  it("flags both categories when a string contains an email AND a phone number, exactly the reported bypass", () => {
+    const cats = categoriesOf("contact me at jane.doe@example.com or 555-123-4567");
+    expect(cats).toContain("email");
+    expect(cats).toContain("phone");
+  });
+
+  it("does not flag an unformatted, unrelated 10-digit run (a bare phone number needs separators, same conservative stance as the SSN detector)", () => {
+    expect(categoriesOf("my employee id is 5551234567")).not.toContain("phone");
+  });
+
+  it("does not flag ordinary text with no @ sign or phone-shaped digit grouping", () => {
+    const cats = categoriesOf("I'm a US citizen with 5 years of Python experience, available in 2 weeks");
+    expect(cats).not.toContain("email");
+    expect(cats).not.toContain("phone");
+  });
+
+  it("does not flag a role id, dollar comp range, or date as a phone number", () => {
+    const cats = categoriesOf("Role abc-123, $120,000-$180,000, posted 2026-01-15");
+    expect(cats).not.toContain("phone");
+  });
+});

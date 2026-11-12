@@ -2,7 +2,7 @@
 
 A stateless remote **MCP server** + web app that helps people pursue US defense-tech roles **from inside the AI agent they already use** — Claude, Cursor, ChatGPT, Grok, VS Code — instead of joining yet another platform.
 
-**Your agent does the private reasoning. The server is a stateless, public-knowledge toolbox.** It never receives, stores, or logs PII, clearance details, or screenshots — it gives your agent rubrics, rules, timelines, and templates, and your agent evaluates them locally against what it already knows about you.
+**Your agent does the private reasoning. The server is an almost entirely stateless, public-knowledge toolbox.** It never receives, stores, or logs PII, clearance details, or screenshots — it gives your agent rubrics, rules, timelines, and templates, and your agent evaluates them locally against what it already knows about you. (The one opt-in exception, and exactly what it does and doesn't store: see Architecture below.)
 
 - **Production:** https://clearance-lens.vercel.app
 - **MCP endpoint:** `https://clearance-lens.vercel.app/mcp`
@@ -95,7 +95,7 @@ flowchart TB
     style Wrap fill:#2273c3,color:#fff
 ```
 
-**Stateless by design:** no database, no user accounts, no stored queries (see [`DECISIONS.md`](./DECISIONS.md) D-001/D-002). The MCP route and the `/try` playground call the **exact same** `lib/tools/*` implementations through the same `callTool()` pipeline — there is no second copy of any tool's logic.
+**Stateless by design, with one explicit, opt-in exception:** no database, no user accounts, no stored queries for 13 of 14 tools (see [`DECISIONS.md`](./DECISIONS.md) D-001/D-002). The one exception is `contribute_anonymous_signal`/`get_aggregated_signal` (D-037) — a candidate's agent can opt one role-interest into an anonymous, k-anonymity-floored aggregate pool (no identifier of any kind), which anyone can read back as a rounded percentage. Calling neither tool means none of this applies. The MCP route and the `/try` playground call the **exact same** `lib/tools/*` implementations through the same `callTool()` pipeline — there is no second copy of any tool's logic.
 
 ---
 

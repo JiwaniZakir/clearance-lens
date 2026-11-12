@@ -28,6 +28,8 @@ const REFUSAL_CATEGORIES: Record<PiiCategory, string> = {
   unscannable_structure: "Requests structured too deeply (nested many levels deep) for us to safely check",
   credit_card: "Credit or debit card numbers",
   classification_marking: "Classification or control markings (e.g. SECRET//NOFORN), real or described",
+  email: "Email addresses",
+  phone: "Phone numbers",
 };
 
 // A real-shaped request to explain_rule's actual input field ("topic"),
@@ -96,7 +98,15 @@ export default function PrivacyPage() {
           </h2>
           <p className="mt-3 text-base leading-[1.6] text-neutral-11">
             {
-              "Nothing. There is no database of users, accounts, or past queries — every request is handled and immediately forgotten. The only thing that persists on this server at all is the public rules and timelines data every visitor can already see on "
+              "Almost nothing. There is no database of users, accounts, or past queries — every request is handled and immediately forgotten, with one specific, opt-in exception: if you explicitly call "
+            }
+            <code className="rounded bg-neutral-3 px-1 py-0.5 font-mono text-[0.9em]">contribute_anonymous_signal</code>
+            {
+              ", a handful of closed-choice buckets you chose (never a name, contact info, or any other identifier) are added to that role or company's running aggregate, which "
+            }
+            <code className="rounded bg-neutral-3 px-1 py-0.5 font-mono text-[0.9em]">get_aggregated_signal</code>
+            {
+              " can read back later as a rounded percentage — never calling either tool means none of this applies to you at all. Beyond that, the only other thing that persists on this server at all is the public rules and timelines data every visitor can already see on "
             }
             <Link href="/sources" className="text-accent-11 underline underline-offset-2 hover:text-accent-10">
               Sources

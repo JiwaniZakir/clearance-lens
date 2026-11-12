@@ -23,7 +23,9 @@ export type PiiCategory =
   | "binary_data"
   | "unscannable_structure"
   | "credit_card"
-  | "classification_marking";
+  | "classification_marking"
+  | "email"
+  | "phone";
 
 export interface PiiFinding {
   category: PiiCategory;
@@ -42,6 +44,8 @@ const FRIENDLY_BY_CATEGORY: Record<PiiCategory, string> = {
   unscannable_structure: "This request is structured too deeply (nested objects/arrays many levels deep) for Clearance Lens to safely check for sensitive information. Please simplify the request and try again.",
   credit_card: "This looks like it includes a credit card number. Clearance Lens never accepts payment card numbers — please remove it; nothing here needs billing information.",
   classification_marking: "This looks like it includes a classification marking (e.g. SECRET//NOFORN). Clearance Lens never accepts classified or export-controlled content, real or described — please remove it and describe your situation without quoting or paraphrasing any marked material.",
+  email: "This looks like it includes an email address. Clearance Lens never accepts contact info — your own agent already knows how to reach you privately; please remove it and continue without it.",
+  phone: "This looks like it includes a phone number. Clearance Lens never accepts contact info — your own agent already knows how to reach you privately; please remove it and continue without it.",
 };
 
 /** SSN-context keywords that gate the riskier bare-9-digit check. No trailing
@@ -216,6 +220,25 @@ const UUID_SHAPE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 const CLASSIFICATION_MARKING =
   /\b(?:top secret|secret|confidential|unclassified)\s*\/\/\s*(?:noforn|orcon|fouo|rel\s+to|nato|si|tk|hcs|sap|fisa)\b|\(\s*(?:u|c|s|ts)\s*\/\/\s*(?:nf|noforn|orcon|fouo|rel\s+to|nato|si|tk|hcs|sap|fisa)/i;
 
+/** Standard email shape — found live via the spec §6 judging panel round 7
+ *  (function_engineer, reproduced 3 more times in isolation across 3
+ *  different tools/fields): this guard caught every documented category
+ *  (SSN/DOB/passport/credit-card/classification-marking) but had no
+ *  detector at all for contact info, directly contradicting this
+ *  product's own "never receives... PII" claim. Not RFC-5322-complete —
+ *  deliberately so; a looser, common-case pattern catches real emails
+ *  without the edge cases a fully spec-compliant regex invites. */
+const EMAIL_SHAPE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+/** A US-phone-number shape WITH separators (dash/dot/space, optional
+ *  parens around the area code, optional leading +1) — deliberately
+ *  requires a separator, unlike SSN_DASHED's fixed grouping, so this
+ *  can't collide with an unrelated bare-digit-run elsewhere in this file;
+ *  a bare, unformatted 10-digit run is not treated as a phone number on
+ *  structure alone (same conservative stance as BARE_9_DIGITS needing an
+ *  SSN keyword) since nothing in this product's own domain data has a
+ *  legitimate reason to contain one anyway. */
+const PHONE_FORMATTED = /\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/;
+
 /** The actual, un-obfuscated detectors. Operates on already-normalized,
  *  already-decoded plain text — see `scanTextForPiiCui` below, which is the
  *  only caller and the thing that actually runs against raw user input. */
@@ -257,6 +280,9 @@ function scanPlainText(text: string): PiiFinding[] {
   if (CREDIT_CARD_SHAPE.test(text.replace(UUID_SHAPE, ""))) add("credit_card");
 
   if (CLASSIFICATION_MARKING.test(text)) add("classification_marking");
+
+  if (EMAIL_SHAPE.test(text)) add("email");
+  if (PHONE_FORMATTED.test(text)) add("phone");
 
   return findings;
 }
