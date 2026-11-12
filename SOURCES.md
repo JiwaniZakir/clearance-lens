@@ -8,7 +8,7 @@ This project was built end-to-end in one concentrated session, and every citatio
 
 ## From `data/rules.json` and `data/timelines.json`
 
-_Generated from `data/rules.json` (lastVerified 2026-11-11) and `data/timelines.json` (lastVerified 2026-11-11) by `scripts/generate-sources.ts`. Do not hand-edit this section — edit the data files and regenerate._
+_Generated from `data/rules.json` (lastVerified 2026-11-12) and `data/timelines.json` (lastVerified 2026-11-11) by `scripts/generate-sources.ts`. Do not hand-edit this section — edit the data files and regenerate._
 
 ### ITAR & export control, eligibility, clearance process, sponsorship, reciprocity, continuous vetting, verification tech
 
@@ -17,9 +17,15 @@ _Generated from `data/rules.json` (lastVerified 2026-11-11) and `data/timelines.
   - [22 CFR § 120.63 — Foreign Person (eCFR)](https://www.ecfr.gov/current/title-22/chapter-I/subchapter-M/part-120/subpart-C/section-120.63) — verified 2026-11-11
   - [8 U.S.C. § 1324b(a)(3) — "Protected Individual" Defined (Cornell LII)](https://www.law.cornell.edu/uscode/text/8/1324b) — verified 2026-11-11
 
+**Security Clearances Require U.S. Citizenship (Green Card Holders Included)** (`clearance-citizenship`, eligibility)
+  - [Executive Order 12968 — Access to Classified Information, §§ 2.6 and 3.1(b) (Federal Register)](https://www.federalregister.gov/documents/1995/08/07/95-19654/access-to-classified-information) — verified 2026-11-12
+  - [32 CFR § 117.10(k)–(l) — Non-U.S. citizens; temporary eligibility (eCFR)](https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-D/part-117/section-117.10) — verified 2026-11-12
+  - [22 CFR § 120.62 — U.S. Person (eCFR)](https://www.ecfr.gov/current/title-22/chapter-I/subchapter-M/part-120/subpart-C/section-120.62) — verified 2026-11-12
+
 **Limited Access Authorization (LAA) for Non-U.S. Citizens** (`laa-non-citizen`, eligibility)
   - [32 CFR § 117.10 — Determination of Eligibility for Access to Classified Information for Contractor Employees (eCFR)](https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-D/part-117/section-117.10) — verified 2026-11-12
   - [32 CFR § 117.10 — Limited Access Authorization text (Cornell LII mirror)](https://www.law.cornell.edu/cfr/text/32/117.10) — verified 2026-11-12
+  - [Executive Order 12968 — Access to Classified Information, § 2.6 (Federal Register)](https://www.federalregister.gov/documents/1995/08/07/95-19654/access-to-classified-information) — verified 2026-11-12
 
 **EAR "Deemed Export" vs. ITAR** (`deemed-export`, itar)
   - [15 CFR § 734.13 — Export, Reexport, and Release (eCFR)](https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-734/section-734.13) — verified 2026-11-11

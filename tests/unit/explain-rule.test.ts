@@ -74,15 +74,18 @@ describe("explain_rule", () => {
   });
 
   // Regression for DECISIONS.md (judging panel round 6): "green_card",
-  // "lpr", and "permanent resident clearance" all missed itar-us-person
-  // even though that rule's own summary directly answers them, because
-  // matching was exact-keyword over id/title/category only.
+  // "lpr", and "permanent resident clearance" all missed every rule because
+  // matching was exact-keyword over id/title/category only. Since D-046 they
+  // resolve to clearance-citizenship, not itar-us-person: a green card holder
+  // asking about their status needs both answers — ITAR yes, clearance no —
+  // and itar-us-person alone used to tell them the clearance rule didn't
+  // apply to them (judging panel round 9, 4 of 4 judges).
   it.each(["green_card", "green card", "lpr", "permanent resident clearance", "LAWFUL PERMANENT RESIDENT"])(
-    "resolves the natural-language synonym %s to itar-us-person via its keywords list",
+    "resolves the natural-language synonym %s to clearance-citizenship via its keywords list",
     async (topic) => {
       const result = await explainRuleTool.handler({ topic });
       expect(result.found).toBe(true);
-      expect(result.topic?.id).toBe("itar-us-person");
+      expect(result.topic?.id).toBe("clearance-citizenship");
     },
   );
 
@@ -103,11 +106,11 @@ describe("explain_rule", () => {
   // "permanent resident" still missed itar-us-person even after round 6's
   // keyword fix added several OTHER close variants.
   it.each(["permanent_resident", "permanent resident", "PERMANENT_RESIDENT"])(
-    "resolves the natural-language synonym %s to itar-us-person via its keywords list",
+    "resolves the natural-language synonym %s to clearance-citizenship via its keywords list",
     async (topic) => {
       const result = await explainRuleTool.handler({ topic });
       expect(result.found).toBe(true);
-      expect(result.topic?.id).toBe("itar-us-person");
+      expect(result.topic?.id).toBe("clearance-citizenship");
     },
   );
 

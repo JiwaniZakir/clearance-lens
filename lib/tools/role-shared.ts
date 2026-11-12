@@ -98,6 +98,10 @@ export function looksItarRestricted(signals: RequirementSignal[]): boolean {
   return signals.some(
     (s) =>
       s.kind === "citizenship" &&
-      (s.value === "us_person_required" || s.value === "us_citizen_required" || s.value === "us_person_likely"),
+      (s.value === "us_person_required" ||
+        s.value === "us_citizen_required" ||
+        s.value === "us_person_likely" ||
+        // A clearance requires citizenship, which implies U.S.-person status (D-046).
+        s.value === "us_citizen_required_for_clearance"),
   );
 }

@@ -1,41 +1,63 @@
 {
-  "lastVerified": "2026-11-11",
+  "lastVerified": "2026-11-12",
   "rules": [
     {
       "id": "itar-us-person",
       "title": "ITAR \"U.S. Person\" Definition",
       "category": "itar",
-      "summary": "Under ITAR (22 CFR 120.62), a \"U.S. person\" is a U.S. citizen, a lawful permanent resident (green card holder), or a \"protected individual\" under 8 U.S.C. 1324b(a)(3) (which also covers certain asylees/refugees who timely pursue naturalization). Anyone else — including H-1B, L-1, O-1, F-1/OPT, J-1, and TN visa holders — is a \"foreign person\" under 22 CFR 120.63, no matter how long they've lived or worked in the U.S. Most defense-tech roles touching USML-controlled technical data require the worker to be a U.S. person, or the employer to hold a specific DDTC license/exemption for that individual. This is strictly a citizenship/immigration-status test — it has nothing to do with whether someone already holds a security clearance, which is a separate question (see dcsa-timeliness) with its own, much stricter rule for anyone who is NOT a U.S. person (see laa-non-citizen) — green card holders don't need that stricter rule, since they already qualify as U.S. persons here.",
+      "summary": "Under ITAR (22 CFR 120.62), a \"U.S. person\" is a U.S. citizen, a lawful permanent resident (green card holder), or a \"protected individual\" under 8 U.S.C. 1324b(a)(3) (which also covers certain asylees/refugees who timely pursue naturalization). Anyone else — including H-1B, L-1, O-1, F-1/OPT, J-1, and TN visa holders — is a \"foreign person\" under 22 CFR 120.63, no matter how long they've lived or worked in the U.S. Most defense-tech roles touching USML-controlled technical data require the worker to be a U.S. person, or the employer to hold a specific DDTC license/exemption for that individual. This is strictly an export-control test, and it is NOT the test for a security clearance. Clearances are limited to U.S. citizens (Executive Order 12968 § 3.1(b); 32 CFR 117.10(k)): a green card holder is a U.S. person here but still a non-U.S. citizen for clearance purposes, eligible at most for a rare, contract-specific Limited Access Authorization that is never valid for TOP SECRET (see clearance-citizenship and laa-non-citizen). So a green card opens ITAR-only roles, but not roles that require a clearance.",
       "keyPoints": [
         "U.S. person = citizen, green card holder (LPR), or certain protected asylees/refugees (8 U.S.C. 1324b(a)(3))",
         "Does NOT include H-1B, L-1, O-1, F-1/OPT, J-1, TN, or any other non-immigrant visa holder",
         "Green card holders qualify directly as \"lawful permanent resident\" (8 U.S.C. 1101(a)(20)) — no naturalization-timing condition attached to that prong",
         "Asylees/refugees without a green card qualify only if they applied for naturalization within the timeframes 8 U.S.C. 1324b(a)(3) requires",
         "A company can still employ foreign persons under a specific DDTC license or exemption, but that's the exception, not the default",
-        "This is about ITAR access, not about getting an actual security clearance — someone who is NOT a U.S. person faces a separate, much stricter clearance-eligibility rule (see laa-non-citizen)"
+        "This is about ITAR access only. A security clearance has a different, stricter test — U.S. citizenship — so green card holders, though U.S. persons here, cannot hold a regular clearance; the only exception is a rare Limited Access Authorization, never valid for TOP SECRET (see clearance-citizenship)"
       ],
       "sources": [
         { "title": "22 CFR § 120.62 — U.S. Person (eCFR)", "url": "https://www.ecfr.gov/current/title-22/chapter-I/subchapter-M/part-120/subpart-C/section-120.62", "lastVerified": "2026-11-11" },
         { "title": "22 CFR § 120.63 — Foreign Person (eCFR)", "url": "https://www.ecfr.gov/current/title-22/chapter-I/subchapter-M/part-120/subpart-C/section-120.63", "lastVerified": "2026-11-11" },
         { "title": "8 U.S.C. § 1324b(a)(3) — \"Protected Individual\" Defined (Cornell LII)", "url": "https://www.law.cornell.edu/uscode/text/8/1324b", "lastVerified": "2026-11-11" }
       ],
-      "keywords": ["green_card", "green card", "lpr", "permanent resident clearance", "lawful permanent resident", "permanent_resident", "permanent resident"]
+      "keywords": ["us person", "u.s. person", "us_person", "itar us person"]
+    },
+    {
+      "id": "clearance-citizenship",
+      "title": "Security Clearances Require U.S. Citizenship (Green Card Holders Included)",
+      "category": "eligibility",
+      "summary": "A U.S. security clearance is open to U.S. citizens. Executive Order 12968 § 3.1(b) says eligibility for access to classified information \"shall be granted only to employees who are United States citizens,\" with narrow exceptions, and 32 CFR 117.10(k) tells contractors to \"make every effort to ensure that non-U.S. citizens are not employed in duties that may require access to classified information.\" This is where green card holders most often get bad advice: a green card makes you a \"U.S. person\" under ITAR (22 CFR 120.62), which opens ITAR-only roles, but it does not make you eligible for a clearance. The only exception for any non-citizen is a Limited Access Authorization (see laa-non-citizen): granted in \"rare circumstances\" for skills urgently needed on a specific government contract when no cleared or clearable U.S. citizen is available, approved by a government senior official, never valid for TOP SECRET, and never granted on a temporary (interim) basis. In practice: if a posting requires a clearance — including \"eligible to obtain\" one — a green card holder should expect not to qualify; if it requires only U.S.-person status under ITAR, they do.",
+      "keyPoints": [
+        "Clearance eligibility is for U.S. citizens (EO 12968 § 3.1(b)); contractors must make every effort to keep non-U.S. citizens out of duties needing classified access (32 CFR 117.10(k))",
+        "A green card makes you a U.S. person under ITAR (22 CFR 120.62) — enough for ITAR-only roles, not for a clearance",
+        "The only non-citizen exception is a Limited Access Authorization: rare, contract-specific, approved by a government senior official, never valid for TOP SECRET (32 CFR 117.10(k))",
+        "Non-U.S. citizens are never eligible for temporary (interim) access (32 CFR 117.10(l))",
+        "\"Eligible to obtain a clearance\" in a posting therefore includes U.S. citizenship",
+        "Becoming a U.S. citizen is what makes a green card holder clearance-eligible — the green card alone does not"
+      ],
+      "sources": [
+        { "title": "Executive Order 12968 — Access to Classified Information, §§ 2.6 and 3.1(b) (Federal Register)", "url": "https://www.federalregister.gov/documents/1995/08/07/95-19654/access-to-classified-information", "lastVerified": "2026-11-12" },
+        { "title": "32 CFR § 117.10(k)–(l) — Non-U.S. citizens; temporary eligibility (eCFR)", "url": "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-D/part-117/section-117.10", "lastVerified": "2026-11-12" },
+        { "title": "22 CFR § 120.62 — U.S. Person (eCFR)", "url": "https://www.ecfr.gov/current/title-22/chapter-I/subchapter-M/part-120/subpart-C/section-120.62", "lastVerified": "2026-11-12" }
+      ],
+      "keywords": ["green card", "green_card", "green card holder", "green card clearance", "lpr", "permanent resident", "permanent_resident", "permanent resident clearance", "lawful permanent resident", "clearance citizenship", "citizenship requirement", "who can get a clearance", "can a green card holder get a clearance"]
     },
     {
       "id": "laa-non-citizen",
       "title": "Limited Access Authorization (LAA) for Non-U.S. Citizens",
       "category": "eligibility",
-      "summary": "A Limited Access Authorization (LAA) is a separate, much stricter pathway than ITAR's \"U.S. person\" test (see itar-us-person) for a non-U.S. citizen to access U.S. classified information, under 32 CFR § 117.10(k). It is capped at SECRET — never TOP SECRET, Restricted Data/Formerly Restricted Data, COMSEC information, intelligence information, or (except for NATO-member nationals under specific conditions) NATO information. A Cognizant Security Agency may only grant one in \"rare circumstances\": the individual has specialized skills urgently needed for a specific U.S. Government contract AND a cleared or clearable U.S. citizen is not readily available, approved by a Government Contracting Activity senior official — it is not a general clearance and does not transfer between contracts. A green card holder (lawful permanent resident) already qualifies as a U.S. person under ITAR with no special justification needed (see itar-us-person); an LAA pathway is for someone who does NOT qualify as a U.S. person at all.",
+      "summary": "A Limited Access Authorization (LAA) is a separate, much stricter pathway than ITAR's \"U.S. person\" test (see itar-us-person) for a non-U.S. citizen to access U.S. classified information, under 32 CFR § 117.10(k). It is capped at SECRET — never TOP SECRET, Restricted Data/Formerly Restricted Data, COMSEC information, intelligence information, or (except for NATO-member nationals under specific conditions) NATO information. A Cognizant Security Agency may only grant one in \"rare circumstances\": the individual has specialized skills urgently needed for a specific U.S. Government contract AND a cleared or clearable U.S. citizen is not readily available, approved by a Government Contracting Activity senior official — it is not a general clearance and does not transfer between contracts. It applies to every non-U.S. citizen, green card holders included: Executive Order 12968 § 2.6 names \"immigrant alien and foreign national employees\" explicitly, and being a U.S. person under ITAR (see itar-us-person) does not change this (see clearance-citizenship). Non-U.S. citizens are also never eligible for temporary (interim) access (32 CFR 117.10(l)).",
       "keyPoints": [
         "Capped at SECRET — never TOP SECRET, Restricted Data/Formerly Restricted Data, COMSEC information, intelligence information, or (except NATO-member nationals under specific conditions) NATO information (32 CFR § 117.10(k))",
         "Granted only in \"rare circumstances\": specialized skills urgently needed for a specific U.S. Government contract, and a cleared or clearable U.S. citizen is not readily available",
         "Requires approval from a Government Contracting Activity senior official — not an automatic or routine determination",
         "Scoped to the specific contract/program that justified it, not a general-purpose clearance",
-        "A different, stricter test than ITAR's \"U.S. person\" status (see itar-us-person) — a green card holder already qualifies as a U.S. person under ITAR with no special justification, while the LAA pathway is for someone who does NOT qualify as a U.S. person at all"
+        "Applies to every non-U.S. citizen, green card holders included (EO 12968 § 2.6: \"immigrant alien and foreign national employees\") — ITAR \"U.S. person\" status (see itar-us-person) exempts no one from it",
+        "Non-U.S. citizens are never eligible for temporary (interim) access to classified information (32 CFR 117.10(l))"
       ],
       "sources": [
         { "title": "32 CFR § 117.10 — Determination of Eligibility for Access to Classified Information for Contractor Employees (eCFR)", "url": "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-D/part-117/section-117.10", "lastVerified": "2026-11-12" },
-        { "title": "32 CFR § 117.10 — Limited Access Authorization text (Cornell LII mirror)", "url": "https://www.law.cornell.edu/cfr/text/32/117.10", "lastVerified": "2026-11-12" }
+        { "title": "32 CFR § 117.10 — Limited Access Authorization text (Cornell LII mirror)", "url": "https://www.law.cornell.edu/cfr/text/32/117.10", "lastVerified": "2026-11-12" },
+        { "title": "Executive Order 12968 — Access to Classified Information, § 2.6 (Federal Register)", "url": "https://www.federalregister.gov/documents/1995/08/07/95-19654/access-to-classified-information", "lastVerified": "2026-11-12" }
       ],
       "keywords": ["LAA", "limited access authorization", "non-citizen clearance", "non-US citizen clearance", "foreign national clearance"]
     },

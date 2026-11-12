@@ -7,7 +7,7 @@ describe("estimate_timeline", () => {
     const result = await estimateTimelineTool.handler({
       target_level: "secret",
       current_status: "none",
-      employer_has_fcl: "unknown",
+      employer_has_fcl: "unknown", citizenship_status: "unknown",
     });
     expect(result.estimate.minDays).not.toBeNull();
     expect(result.estimate.minDays).toBe(result.estimate.maxDays);
@@ -18,7 +18,7 @@ describe("estimate_timeline", () => {
     const result = await estimateTimelineTool.handler({
       target_level: "secret",
       current_status: "none",
-      employer_has_fcl: "unknown",
+      employer_has_fcl: "unknown", citizenship_status: "unknown",
     });
     const interimDriver = result.keyDrivers.find((d) => d.label.toLowerCase().includes("interim"));
     expect(interimDriver).toBeDefined();
@@ -33,8 +33,8 @@ describe("estimate_timeline", () => {
   // implying someone who already holds interim eligibility faces the same
   // remaining wait as someone starting from zero.
   it("current_status=interim gets its own distinct driver reframing the baseline as a reference point, not their own expected wait", async () => {
-    const none = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "unknown" });
-    const interim = await estimateTimelineTool.handler({ target_level: "secret", current_status: "interim", employer_has_fcl: "unknown" });
+    const none = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "unknown", citizenship_status: "unknown" });
+    const interim = await estimateTimelineTool.handler({ target_level: "secret", current_status: "interim", employer_has_fcl: "unknown", citizenship_status: "unknown" });
 
     // Both are honest point estimates (DCSA gives no range for either) —
     // the numeric value itself is legitimately the same baseline.
@@ -54,7 +54,7 @@ describe("estimate_timeline", () => {
     const result = await estimateTimelineTool.handler({
       target_level: "secret",
       current_status: "active",
-      employer_has_fcl: "unknown",
+      employer_has_fcl: "unknown", citizenship_status: "unknown",
     });
     expect(result.estimate).toEqual({ minDays: null, maxDays: null, medianDays: null });
     expect(result.keyDrivers.some((d) => d.detail.toLowerCase().includes("reciprocity"))).toBe(true);
@@ -64,7 +64,7 @@ describe("estimate_timeline", () => {
     const result = await estimateTimelineTool.handler({
       target_level: "secret",
       current_status: "lapsed_lt_2y",
-      employer_has_fcl: "unknown",
+      employer_has_fcl: "unknown", citizenship_status: "unknown",
     });
     const modifier = TIMELINES.modifiers.find((m) => m.id === "lapsed_lt_2y")!;
     expect(result.estimate.minDays).toBe(modifier.typicalDaysMin);
@@ -78,12 +78,12 @@ describe("estimate_timeline", () => {
     const withUnknownFcl = await estimateTimelineTool.handler({
       target_level: "secret",
       current_status: "none",
-      employer_has_fcl: "unknown",
+      employer_has_fcl: "unknown", citizenship_status: "unknown",
     });
     const withNoFcl = await estimateTimelineTool.handler({
       target_level: "secret",
       current_status: "none",
-      employer_has_fcl: "no",
+      employer_has_fcl: "no", citizenship_status: "unknown",
     });
     // Inverted deliberately (judging panel round 8, DECISIONS.md): this used
     // to assert the two estimates were EQUAL — exactly the behavior flagged
@@ -97,8 +97,8 @@ describe("estimate_timeline", () => {
   });
 
   it("target_level=ts_sci: adds an SCI caveat and reuses the TS baseline (no separate ts_sci data claimed)", async () => {
-    const ts = await estimateTimelineTool.handler({ target_level: "ts", current_status: "none", employer_has_fcl: "unknown" });
-    const tsSci = await estimateTimelineTool.handler({ target_level: "ts_sci", current_status: "none", employer_has_fcl: "unknown" });
+    const ts = await estimateTimelineTool.handler({ target_level: "ts", current_status: "none", employer_has_fcl: "unknown", citizenship_status: "unknown" });
+    const tsSci = await estimateTimelineTool.handler({ target_level: "ts_sci", current_status: "none", employer_has_fcl: "unknown", citizenship_status: "unknown" });
     expect(tsSci.estimate).toEqual(ts.estimate);
     expect(tsSci.keyDrivers.some((d) => d.label.toLowerCase().includes("sci"))).toBe(true);
   });
@@ -107,14 +107,14 @@ describe("estimate_timeline", () => {
     const result = await estimateTimelineTool.handler({
       target_level: "secret",
       current_status: "lapsed_lt_2y",
-      employer_has_fcl: "no",
+      employer_has_fcl: "no", citizenship_status: "unknown",
     });
     const urls = result.sources.map((s) => s.url);
     expect(new Set(urls).size).toBe(urls.length);
   });
 
   it("always includes the not-legal-advice disclaimer", async () => {
-    const result = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "unknown" });
+    const result = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "unknown", citizenship_status: "unknown" });
     expect(result.disclaimer.toLowerCase()).toContain("not legal advice");
   });
 
@@ -132,7 +132,7 @@ describe("estimate_timeline", () => {
     const result = await estimateTimelineTool.handler({
       target_level: "secret",
       current_status: "none",
-      employer_has_fcl: "unknown",
+      employer_has_fcl: "unknown", citizenship_status: "unknown",
     });
     expect(result.estimate.minDays).toBe(result.estimate.maxDays);
     expect(result.uncertaintyNote).toMatch(/single figure, not a min\/max range/);
@@ -143,7 +143,7 @@ describe("estimate_timeline", () => {
     const result = await estimateTimelineTool.handler({
       target_level: "secret",
       current_status: "lapsed_gt_2y",
-      employer_has_fcl: "unknown",
+      employer_has_fcl: "unknown", citizenship_status: "unknown",
     });
     expect(result.estimate.minDays).not.toBe(result.estimate.maxDays);
     expect(result.uncertaintyNote).not.toMatch(/single figure, not a min\/max range/);
@@ -154,8 +154,8 @@ describe("estimate_timeline", () => {
   // no-FCL sponsorship wait only ever appeared as prose.
   describe("employer_has_fcl affects the structured estimate, not just prose", () => {
     it("'no' adds the sourced sponsorship wait to the structured range and exposes it separately", async () => {
-      const yes = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "yes" });
-      const no = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "no" });
+      const yes = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "yes", citizenship_status: "unknown" });
+      const no = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "no", citizenship_status: "unknown" });
       expect(no.employerFclWaitDays).not.toBeNull();
       const wait = no.employerFclWaitDays as { minDays: number; maxDays: number };
       expect(no.estimate.minDays).toBe((yes.estimate.minDays as number) + wait.minDays);
@@ -163,25 +163,25 @@ describe("estimate_timeline", () => {
     });
 
     it("drops medianDays for the combined range rather than show an investigation-only median below its minimum", async () => {
-      const no = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "no" });
+      const no = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "no", citizenship_status: "unknown" });
       expect(no.estimate.medianDays).toBeNull();
     });
 
     it("'yes' and 'unknown' never include a sponsorship wait", async () => {
       for (const fcl of ["yes", "unknown"] as const) {
-        const r = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: fcl });
+        const r = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: fcl, citizenship_status: "unknown" });
         expect(r.employerFclWaitDays).toBeNull();
       }
     });
 
     it("still surfaces the wait as structured data even when the investigation itself has no day count (active clearance)", async () => {
-      const r = await estimateTimelineTool.handler({ target_level: "secret", current_status: "active", employer_has_fcl: "no" });
+      const r = await estimateTimelineTool.handler({ target_level: "secret", current_status: "active", employer_has_fcl: "no", citizenship_status: "unknown" });
       expect(r.estimate.minDays).toBeNull();
       expect(r.employerFclWaitDays).not.toBeNull();
     });
 
     it("says in the driver text that the estimate already includes the wait", async () => {
-      const no = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "no" });
+      const no = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "no", citizenship_status: "unknown" });
       const driver = no.keyDrivers.find((d) => d.label.includes("no Facility Clearance"));
       expect(driver?.detail).toMatch(/estimate above already includes this/i);
     });

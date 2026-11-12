@@ -15,19 +15,34 @@ const SIGNAL_LABELS: Record<string, string> = {
   us_citizen_required: "US citizen required",
   us_person_required: "US person required",
   us_person_likely: "Likely US-person required",
+  us_citizen_required_for_clearance: "US citizen (clearance)",
   no_sponsorship: "No visa sponsorship",
-  clearance_required_unspecified: "Clearance required (level unspecified)",
+  clearance_required_unspecified: "Clearance required",
+  clearance_may_be_required: "Clearance may be required",
   clearance_possibly_required: "Clearance possibly required",
   polygraph_required: "Polygraph required",
   scif_onsite: "Onsite SCIF",
 };
 
-function humanizeSignal(value: string): string {
-  if (SIGNAL_LABELS[value]) return SIGNAL_LABELS[value];
-  return value
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+const STAGE_LABELS: Record<string, string> = {
+  must_already_hold: "must hold",
+  must_be_able_to_obtain: "able to obtain",
+};
+
+function humanizeSignal(signal: RequirementSignal): string {
+  const base =
+    SIGNAL_LABELS[signal.value] ??
+    signal.value
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  // "Secret · able to obtain" tells a new grad they can apply; "Secret · must
+  // hold" tells them they can't yet (D-046). "May be required" is already
+  // in the value's own label, or reads as a preference.
+  const stage = signal.clearanceStage ? STAGE_LABELS[signal.clearanceStage] : undefined;
+  if (stage) return `${base} · ${stage}`;
+  if (signal.clearanceStage === "may_be_required" && signal.value !== "clearance_may_be_required") return `${base} · preferred`;
+  return base;
 }
 
 /** clearance_level/citizenship signals read first — they're the two filters
@@ -47,7 +62,7 @@ function RequirementChip({ signal }: { signal: RequirementSignal }) {
         <TooltipPrimitive.Trigger asChild>
           <button type="button" className="focus-visible:outline-none">
             <Chip border={stated ? "solid" : "dashed"} tone="neutral" className="cursor-default">
-              {humanizeSignal(signal.value)}
+              {humanizeSignal(signal)}
             </Chip>
           </button>
         </TooltipPrimitive.Trigger>

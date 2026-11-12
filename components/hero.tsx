@@ -11,17 +11,24 @@ import rulesData from "@/data/rules.json";
 // The one real rule this demo cites — pulled live from data/rules.json
 // rather than hand-copied, so the hero can never drift out of sync with the
 // actual source of truth (task brief: "cite something real, not invented").
-const ITAR_US_PERSON_RULE = rulesData.rules.find((rule) => rule.id === "itar-us-person");
-const HERO_CITATION = ITAR_US_PERSON_RULE?.sources[0] ?? {
-  title: "22 CFR § 120.62 — U.S. Person (eCFR)",
-  url: "https://www.ecfr.gov/current/title-22/chapter-I/subchapter-M/part-120/subpart-C/section-120.62",
-  lastVerified: "2026-11-11",
+//
+// Found via the spec §6 judging panel round 9 (4 of 4 judges): this answered
+// "Yes — green card holders qualify as U.S. persons under ITAR" for a role
+// whose postings require a Secret clearance. A green card satisfies ITAR,
+// but clearances are limited to U.S. citizens (EO 12968 § 3.1(b); 32 CFR
+// 117.10(k)) — so the flagship example gave a green card holder the wrong
+// answer. It now cites the citizenship rule (DECISIONS.md D-046).
+const CLEARANCE_CITIZENSHIP_RULE = rulesData.rules.find((rule) => rule.id === "clearance-citizenship");
+const HERO_CITATION = CLEARANCE_CITIZENSHIP_RULE?.sources[0] ?? {
+  title: "Executive Order 12968 — Access to Classified Information, §§ 2.6 and 3.1(b) (Federal Register)",
+  url: "https://www.federalregister.gov/documents/1995/08/07/95-19654/access-to-classified-information",
+  lastVerified: "2026-11-12",
 };
 
 const USER_MESSAGE = "can a green card holder work the Anduril Fury role?";
 const TOOL_NAME = "explain_rule";
 const ASSISTANT_TEXT =
-  "Yes — green card holders qualify as U.S. persons under ITAR. Citizenship status is a separate test from holding a clearance.";
+  "Not if it needs a clearance — and Fury postings list one. A green card makes you a U.S. person under ITAR, but clearances are limited to U.S. citizens.";
 
 type Stage = 0 | 1 | 2 | 3;
 

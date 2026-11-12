@@ -70,6 +70,7 @@ import type {
   SearchDefenseRolesOutput,
   ClearanceFilter,
   EstimateTimelineInput,
+  TimelineCitizenshipStatus,
   EstimateTimelineOutput,
   TargetLevel,
   CurrentStatus,
@@ -462,10 +463,16 @@ function TimelineTab() {
   const [targetLevel, setTargetLevel] = React.useState<TargetLevel>("secret");
   const [currentStatus, setCurrentStatus] = React.useState<CurrentStatus>("none");
   const [employerFcl, setEmployerFcl] = React.useState<EmployerFclStatus>("unknown");
+  const [citizenship, setCitizenship] = React.useState<TimelineCitizenshipStatus>("unknown");
   const ranOnce = React.useRef(false);
 
   function runEstimate() {
-    void call({ target_level: targetLevel, current_status: currentStatus, employer_has_fcl: employerFcl });
+    void call({
+      target_level: targetLevel,
+      current_status: currentStatus,
+      employer_has_fcl: employerFcl,
+      citizenship_status: citizenship,
+    });
   }
 
   React.useEffect(() => {
@@ -477,7 +484,7 @@ function TimelineTab() {
 
   return (
     <div className="flex max-w-xl flex-col gap-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="target-level">Target level</FieldLabel>
           <Select id="target-level" value={targetLevel} onChange={(e) => setTargetLevel(e.target.value as TargetLevel)}>
@@ -510,6 +517,20 @@ function TimelineTab() {
             <option value="unknown">Not sure</option>
             <option value="yes">Yes</option>
             <option value="no">No</option>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="timeline-citizenship">Citizenship (optional)</FieldLabel>
+          <Select
+            id="timeline-citizenship"
+            value={citizenship}
+            onChange={(e) => setCitizenship(e.target.value as TimelineCitizenshipStatus)}
+          >
+            <option value="unknown">Prefer not to say</option>
+            <option value="us_citizen">U.S. citizen</option>
+            <option value="green_card">Green card holder</option>
+            <option value="other_protected_individual">Asylee or refugee</option>
+            <option value="not_us_person">Visa holder or other</option>
           </Select>
         </div>
       </div>
@@ -1642,6 +1663,16 @@ function SignedAttestationTab() {
       {!loading && !error && data && (
         <div className="flex flex-col gap-4 rounded-lg border border-neutral-6 bg-neutral-1 p-4 sm:p-5">
           <p className="text-sm font-medium text-neutral-12">{data.whatThisProves}</p>
+          {data.claimNotes.length > 0 && (
+            <div role="note" className="rounded-md border border-caution-6 bg-caution-2 p-3 text-sm leading-[1.5] text-caution-11">
+              <p className="font-medium">Before you share this</p>
+              {data.claimNotes.map((note, i) => (
+                <p key={i} className="mt-1">
+                  {note}
+                </p>
+              ))}
+            </div>
+          )}
           <pre className="whitespace-pre-wrap rounded-md bg-neutral-2 p-3 font-mono text-[0.8125rem] leading-[1.5] text-neutral-12">
             {data.shareableMarkdown}
           </pre>

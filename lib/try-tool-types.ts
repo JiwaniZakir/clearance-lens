@@ -35,11 +35,14 @@ export interface ToolErrorShape {
 
 export type RequirementBasis = "stated" | "inferred";
 
+export type ClearanceStage = "must_already_hold" | "must_be_able_to_obtain" | "may_be_required";
+
 export interface RequirementSignal {
   kind: string;
   value: string;
   basis: RequirementBasis;
   evidence: string;
+  clearanceStage?: ClearanceStage;
 }
 
 export interface RoleResult {
@@ -85,10 +88,13 @@ export type TargetLevel = "secret" | "ts" | "ts_sci";
 export type CurrentStatus = "none" | "interim" | "active" | "lapsed_lt_2y" | "lapsed_gt_2y";
 export type EmployerFclStatus = "yes" | "no" | "unknown";
 
+export type TimelineCitizenshipStatus = "us_citizen" | "green_card" | "other_protected_individual" | "not_us_person" | "unknown";
+
 export interface EstimateTimelineInput {
   target_level: TargetLevel;
   current_status: CurrentStatus;
   employer_has_fcl: EmployerFclStatus;
+  citizenship_status: TimelineCitizenshipStatus;
 }
 
 export interface EstimateTimelineOutput {
@@ -415,10 +421,11 @@ export interface PrepareSignedAttestationOutput {
     issuer: string;
     issuanceDate: string;
     credentialSubject: Record<string, unknown>;
-    proof: { type: string; verificationMethod: string; signatureValue: string };
+    proof: { type: string; verificationMethod: string; signatureValue: string; signedPayload: string; keyFingerprint: string };
   };
   shareableMarkdown: string;
   whatThisProves: string;
+  claimNotes: string[];
   sources: SourceRef[];
   disclaimer: string;
 }

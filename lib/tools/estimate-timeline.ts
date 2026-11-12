@@ -8,6 +8,16 @@ const InputSchema = z.object({
   target_level: z.enum(["secret", "ts", "ts_sci"]),
   current_status: z.enum(["none", "interim", "active", "lapsed_lt_2y", "lapsed_gt_2y"]),
   employer_has_fcl: z.enum(["yes", "no", "unknown"]).default("unknown"),
+  // Found via the spec §6 judging panel round 9 (4 of 4 judges): with no
+  // citizenship input, a green card holder asking the README's own example
+  // question got "~197 days" for a clearance they can't hold. General status
+  // only — the same closed enum the attestation and signal tools use.
+  citizenship_status: z
+    .enum(["us_citizen", "green_card", "other_protected_individual", "not_us_person", "unknown"])
+    .default("unknown")
+    .describe(
+      "Optional general status (never a document or number). Clearances are limited to U.S. citizens, so for a non-citizen this returns the actual rule instead of a timeline.",
+    ),
 });
 
 const OutputSchema = z.object({
@@ -49,7 +59,10 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
     "Estimates how long reaching a target clearance level might realistically take, given current status and whether the employer has a Facility Clearance (FCL) yet. Returns a real range where the underlying DCSA data supports one, or a single clearly-labeled researched figure when that's genuinely all the primary source publishes — plus key drivers and an explicit uncertainty note. Never an invented number.",
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
-  handler: async ({ target_level, current_status, employer_has_fcl }) => {
+  handler: async ({ target_level, current_status, employer_has_fcl, citizenship_status }) => {
+    if (citizenship_status !== "us_citizen" && citizenship_status !== "unknown") {
+      return nonCitizenAnswer(target_level, citizenship_status);
+    }
     const investigationKey = target_level === "ts_sci" ? "ts" : target_level;
     const base = TIMELINES.investigations[investigationKey];
     const drivers: Output["keyDrivers"] = [];
@@ -219,8 +232,18 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
     // itself rather than left for a reader to work out.
     const isPointEstimate = estimate.minDays !== null && estimate.minDays === estimate.maxDays;
     const uncertaintyNote = isPointEstimate
-      ? "These figures come from historical DCSA timeliness reporting and are medians/typical ranges, not guarantees. Individual cases vary with foreign contacts, financial history, prior investigations, and current investigative backlog. Treat this as a planning range, and ask your FSO for a case-specific estimate once you're in process. This specific case (current_status/target_level combination) returns a single figure, not a min/max range, because the cited primary source for it publishes only one quarterly average — not because no range was computed. A genuine min/max range IS returned for other inputs where the source publishes one (e.g. current_status: \"lapsed_gt_2y\")."
-      : "These figures come from historical DCSA timeliness reporting and are medians/typical ranges, not guarantees. Individual cases vary with foreign contacts, financial history, prior investigations, and current investigative backlog. Treat this as a planning range, and ask your FSO for a case-specific estimate once you're in process.";
+      ? "These figures come from historical DCSA timeliness reporting — quarterly averages or published typical ranges, not medians, and not guarantees. Individual cases vary with foreign contacts, financial history, prior investigations, and current investigative backlog. Treat this as a planning range, and ask your FSO for a case-specific estimate once you're in process. This specific case (current_status/target_level combination) returns a single figure, not a min/max range, because the cited primary source for it publishes only one quarterly average — not because no range was computed. A genuine min/max range IS returned for other inputs where the source publishes one (e.g. current_status: \"lapsed_gt_2y\")."
+      : "These figures come from historical DCSA timeliness reporting — quarterly averages or published typical ranges, not medians, and not guarantees. Individual cases vary with foreign contacts, financial history, prior investigations, and current investigative backlog. Treat this as a planning range, and ask your FSO for a case-specific estimate once you're in process.";
+
+    if (citizenship_status === "unknown") {
+      const rule = findRule("clearance-citizenship");
+      drivers.push({
+        label: "Assumes U.S. citizenship",
+        detail:
+          "Clearances are limited to U.S. citizens (Executive Order 12968 § 3.1(b); 32 CFR 117.10(k)), so this estimate assumes you are one. A green card is not enough — if you're a green card holder or on a visa, pass citizenship_status to get the rule that actually applies instead of a timeline.",
+      });
+      if (rule) sources.push(...rule.sources);
+    }
 
     return {
       estimate,
@@ -232,3 +255,47 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
     };
   },
 };
+
+/** No timeline exists for someone who isn't clearance-eligible, so the
+ *  honest answer is the rule itself — never a day count (D-046). */
+function nonCitizenAnswer(
+  targetLevel: "secret" | "ts" | "ts_sci",
+  status: "green_card" | "other_protected_individual" | "not_us_person",
+): Output {
+  const citizenship = findRule("clearance-citizenship");
+  const laa = findRule("laa-non-citizen");
+  const keyDrivers: Output["keyDrivers"] = [
+    {
+      label: "Clearances are limited to U.S. citizens",
+      detail:
+        "Executive Order 12968 § 3.1(b): eligibility for access to classified information \"shall be granted only to employees who are United States citizens,\" with narrow exceptions. 32 CFR 117.10(k) tells contractors to make every effort to keep non-U.S. citizens out of duties that need classified access. There is no standard investigation timeline for a non-citizen because there is no standard path.",
+    },
+    targetLevel === "secret"
+      ? {
+          label: "The one exception: a Limited Access Authorization (LAA)",
+          detail:
+            "An LAA can be granted only in \"rare circumstances\": skills urgently needed on a specific government contract when no cleared or clearable U.S. citizen is available, approved by a government senior official — never on a temporary (interim) basis, and never transferable to another contract (32 CFR 117.10(k)–(l)). No primary source publishes a timeline for one. It is the employer and government who pursue it, not the candidate.",
+        }
+      : {
+          label: "No non-citizen pathway at this level",
+          detail:
+            "An LAA is never valid for TOP SECRET information (32 CFR 117.10(k)(2)(i)), so there is no route to a Top Secret or TS/SCI determination without U.S. citizenship.",
+        },
+  ];
+  if (status !== "not_us_person") {
+    keyDrivers.push({
+      label: "What your status does open",
+      detail:
+        "You are a U.S. person under ITAR (22 CFR 120.62), so roles that require only U.S.-person status — ITAR/export-controlled work with no clearance — are open to you. Look for postings that ask for U.S.-person status rather than a clearance. Becoming a U.S. citizen is what makes you clearance-eligible.",
+    });
+  }
+  return {
+    estimate: { minDays: null, maxDays: null, medianDays: null },
+    employerFclWaitDays: null,
+    keyDrivers,
+    uncertaintyNote:
+      "No estimate is shown because none applies: a standard clearance isn't available without U.S. citizenship. This is the rule as published, not a judgment about you — confirm your specific situation with the employer's Facility Security Officer or counsel.",
+    sources: dedupeSources([...(citizenship?.sources ?? []), ...(laa?.sources ?? [])]),
+    disclaimer: DISCLAIMERS.notLegalAdvice,
+  };
+}

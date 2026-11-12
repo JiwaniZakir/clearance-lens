@@ -52,6 +52,12 @@ function claimsMatchSignedPayload(claims: Claims, issuedAt: string, signedPayloa
     return false;
   }
   if (!parsed || typeof parsed !== "object") return false;
+  // Exactly these two keys. Found via the spec §6 judging panel round 9: a
+  // validly signed payload with an extra "holder": "<name>, <street address>"
+  // field passed, and that name and address were echoed back in
+  // credential.proof.signedPayload — free text in a tool that promises none.
+  const topKeys = Object.keys(parsed).sort();
+  if (topKeys.length !== 2 || topKeys[0] !== "claims" || topKeys[1] !== "issued_at") return false;
   const p = parsed as { claims?: unknown; issued_at?: unknown };
   if (p.issued_at !== issuedAt) return false;
   if (!p.claims || typeof p.claims !== "object") return false;
@@ -59,6 +65,31 @@ function claimsMatchSignedPayload(claims: Claims, issuedAt: string, signedPayloa
   const claimKeys = Object.keys(claims) as (keyof Claims)[];
   if (Object.keys(parsedClaims).length !== claimKeys.length) return false;
   return claimKeys.every((key) => parsedClaims[key] === claims[key]);
+}
+
+const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
+
+/** Flags claim combinations the published rules make impossible or rare,
+ *  so the signer hears it before a recipient does. Found via the spec §6
+ *  judging panel round 9: /try signed "Secret + green_card" with no warning.
+ *  A note, never a refusal — this tool never judges whether a claim is true. */
+function claimNotesFor(claims: Claims): string[] {
+  const nonCitizen = claims.citizenship_status !== undefined && claims.citizenship_status !== "us_citizen";
+  const level = claims.clearance_level;
+  if (!nonCitizen || level === undefined || level === "none") return [];
+  if (level === "ts" || level === "ts_sci") {
+    return [
+      "These claims conflict with the published rules: clearances are limited to U.S. citizens, and the only non-citizen exception (a Limited Access Authorization) is never valid for TOP SECRET (32 CFR 117.10(k)). A recipient will likely read this as an error.",
+    ];
+  }
+  if (level === "interim") {
+    return [
+      "These claims conflict with the published rules: non-U.S. citizens are never eligible for temporary (interim) access (32 CFR 117.10(l)). A recipient will likely read this as an error.",
+    ];
+  }
+  return [
+    "This combination is rare: clearances are limited to U.S. citizens, and a non-citizen can hold Secret-level access only through a Limited Access Authorization — granted in rare, contract-specific circumstances (32 CFR 117.10(k)). Expect a recipient to ask about it.",
+  ];
 }
 
 const InputSchema = z
@@ -83,6 +114,16 @@ const InputSchema = z
         path: ["signed_payload"],
         message:
           'signed_payload does not match claims/issued_at — sign exactly {"claims":<claims>,"issued_at":"<issued_at>"} and resend both the string and its parsed fields.',
+      });
+      return;
+    }
+    // Also round 9: issued_at "2099-…" was accepted, though the credential
+    // claims to prove WHEN it was signed. Allows a few minutes of clock skew.
+    if (Date.parse(data.issued_at) > Date.now() + MAX_CLOCK_SKEW_MS) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["issued_at"],
+        message: "issued_at is in the future — use the current UTC time when signing.",
       });
       return;
     }
@@ -117,6 +158,8 @@ const OutputSchema = z.object({
   }),
   shareableMarkdown: z.string(),
   whatThisProves: z.string(),
+  /** For the signer, not part of the shared credential (D-046). */
+  claimNotes: z.array(z.string()),
   sources: z.array(SourceRefSchema),
   disclaimer: z.string(),
 });
@@ -163,8 +206,12 @@ export const prepareSignedAttestationTool: ToolDef<z.infer<typeof InputSchema>, 
       shareableMarkdown,
       whatThisProves:
         "The claim was signed by whoever holds the private key matching the embedded public key, at the stated time, and the content hasn't been altered since.",
+      claimNotes: claimNotesFor(claims),
       sources: [
         { title: "W3C Verifiable Credentials Data Model v2.0", url: "https://www.w3.org/TR/vc-data-model-2.0/" },
+        ...(claimNotesFor(claims).length > 0
+          ? [{ title: "32 CFR § 117.10(k)–(l) — Non-U.S. citizens; temporary eligibility (eCFR)", url: "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-D/part-117/section-117.10" }]
+          : []),
       ],
       disclaimer: DISCLAIMERS.neverVerifiesAttestationTruth,
     };

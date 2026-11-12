@@ -4,6 +4,7 @@ import { extractSections } from "@/lib/speedrun/extract-sections";
 import { findRule } from "@/lib/rules-data";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
+import type { RequirementSignal } from "@/lib/speedrun/infer";
 
 const InputSchema = z.object({ role_id: z.string().min(1) });
 
@@ -26,7 +27,16 @@ const OutputSchema = z.object({
 });
 
 const SIGNAL_TO_QUESTION: Record<string, { question: string; ruleId?: string }> = {
-  us_citizen_required: { question: "Are you a U.S. citizen?", ruleId: "itar-us-person" },
+  // Found via the spec §6 judging panel round 9 (4 of 4 judges): this
+  // checklist asked about U.S.-person status and clearance as unrelated
+  // items, so a green card holder could answer "yes" to both on a role they
+  // can't take. A clearance requires U.S. citizenship (D-046).
+  us_citizen_required_for_clearance: {
+    question:
+      "Are you a U.S. citizen? This role needs a U.S. security clearance, and clearances are limited to U.S. citizens — a green card satisfies ITAR, but not this.",
+    ruleId: "clearance-citizenship",
+  },
+  us_citizen_required: { question: "Are you a U.S. citizen?", ruleId: "clearance-citizenship" },
   us_person_required: {
     question: "Are you a U.S. person — a citizen, a green card holder, or a qualifying protected individual?",
     ruleId: "itar-us-person",
@@ -44,12 +54,51 @@ const SIGNAL_TO_QUESTION: Record<string, { question: string; ruleId?: string }> 
     question: "Do you currently hold an active security clearance at any level?",
     ruleId: "sead4",
   },
+  clearance_may_be_required: {
+    question: "A security clearance may be required depending on the program — could you obtain one if it is? (That requires U.S. citizenship.)",
+    ruleId: "sead4",
+  },
   clearance_possibly_required: {
     question: "This posting mentions government/classified work without naming a specific clearance level — are you cleared, or comfortable starting unclassified while that's sorted out?",
   },
   polygraph_required: { question: "Are you prepared for a polygraph as part of this process?" },
   scif_onsite: { question: "Are you able to work onsite in a SCIF (no personal phone during the day) if required?" },
 };
+
+const LEVEL_NAMES: Record<string, string> = {
+  secret: "a Secret clearance",
+  ts: "a Top Secret clearance",
+  ts_sci: "Top Secret/SCI access",
+  clearance_required_unspecified: "a security clearance",
+};
+
+/** A clearance question has to say WHEN the clearance is needed — "eligible
+ *  to obtain" means no clearance is needed to apply (D-046). */
+function questionFor(signal: RequirementSignal): { question: string; ruleId?: string } | undefined {
+  const mapped = SIGNAL_TO_QUESTION[signal.value];
+  const level = LEVEL_NAMES[signal.value];
+  if (!mapped || !level || signal.kind !== "clearance_level") return mapped;
+  switch (signal.clearanceStage) {
+    case "must_already_hold":
+      return { ...mapped, question: `Do you currently hold ${level}? The posting asks for one already in place.` };
+    case "must_be_able_to_obtain":
+      return {
+        ...mapped,
+        question: `Could you obtain ${level}? The posting asks only that you be able to — you don't need one to apply. Eligibility requires U.S. citizenship.`,
+      };
+    case "may_be_required":
+      return { ...mapped, question: `${level.charAt(0).toUpperCase()}${level.slice(1)} is preferred or may be required — do you hold one, or could you obtain one? (That requires U.S. citizenship.)` };
+    default:
+      return mapped;
+  }
+}
+
+/** Citizenship-for-clearance first: it decides everything below it. */
+const CHECKLIST_ORDER = ["us_citizen_required_for_clearance", "us_citizen_required"];
+function checklistRank(signal: RequirementSignal): number {
+  const i = CHECKLIST_ORDER.indexOf(signal.value);
+  return i === -1 ? CHECKLIST_ORDER.length : i;
+}
 
 export const getRoleRubricTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typeof OutputSchema>> = {
   name: "get_role_rubric",
@@ -71,8 +120,8 @@ export const getRoleRubricTool: ToolDef<z.infer<typeof InputSchema>, z.infer<typ
     // listed that one citation twice, since `seen` only dedupes by signal
     // value, not by the sources those signals' rules go on to cite.
     const sourcesByUrl = new Map<string, (typeof SPEEDRUN_SOURCE)>([[SPEEDRUN_SOURCE.url, SPEEDRUN_SOURCE]]);
-    for (const signal of role.signals) {
-      const mapped = SIGNAL_TO_QUESTION[signal.value];
+    for (const signal of [...role.signals].sort((a, b) => checklistRank(a) - checklistRank(b))) {
+      const mapped = questionFor(signal);
       if (!mapped || seen.has(signal.value)) continue;
       seen.add(signal.value);
       eligibilityChecklist.push({ question: mapped.question, whyItMatters: signal.evidence, basis: signal.basis });

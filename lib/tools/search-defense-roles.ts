@@ -13,7 +13,7 @@ const InputSchema = z.object({
     .enum(["none", "secret", "ts", "ts_sci"])
     .optional()
     .describe("Filter to roles whose detected clearance signal matches this level. \"none\" = no clearance signal detected."),
-  itar_only: z.boolean().optional().describe("Only roles that appear to require US-person/citizenship status."),
+  itar_only: z.boolean().optional().describe("Only roles that appear to require US-person/citizenship status (including citizenship implied by a required clearance)."),
   location: z.string().max(100).optional(),
   remote: z.boolean().optional(),
   limit: z.number().int().min(1).max(25).optional().default(10),
@@ -24,6 +24,9 @@ const RequirementSignalSchema = z.object({
   value: z.string(),
   basis: z.enum(["stated", "inferred"]),
   evidence: z.string(),
+  // For clearance signals: whether the posting needs the clearance already
+  // held, only the ability to obtain one, or maybe not at all (D-046).
+  clearanceStage: z.enum(["must_already_hold", "must_be_able_to_obtain", "may_be_required"]).optional(),
 });
 
 const RoleResultSchema = z.object({

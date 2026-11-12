@@ -13,6 +13,13 @@
 export type RequirementKind = "clearance_level" | "citizenship" | "polygraph" | "facility_access";
 export type RequirementBasis = "stated" | "inferred";
 
+/** For a clearance signal, WHEN the posting needs it — the difference that
+ *  tells a new grad whether they can apply at all. Found via the spec §6
+ *  judging panel round 9: "Eligible to obtain and maintain an active Top
+ *  Secret clearance" (no clearance needed to apply) was being reported as a
+ *  bare "Top Secret security clearance". Absent when the sentence doesn't say. */
+export type ClearanceStage = "must_already_hold" | "must_be_able_to_obtain" | "may_be_required";
+
 export interface RequirementSignal {
   kind: RequirementKind;
   /** Short machine-friendly value, e.g. "ts_sci" | "secret" | "clearance_required_unspecified" | "us_person_likely" | "polygraph_likely" | "scif_onsite". */
@@ -20,9 +27,62 @@ export interface RequirementSignal {
   basis: RequirementBasis;
   /** `stated`: a verbatim quoted excerpt from the posting. `inferred`: the reasoning, always ending with a prompt to confirm directly. */
   evidence: string;
+  clearanceStage?: ClearanceStage;
 }
 
-const MAX_EXCERPT_LENGTH = 220;
+const MAX_EXCERPT_LENGTH = 300;
+
+/** Words whose trailing period belongs to the word, not the sentence. Found
+ *  via the spec §6 judging panel round 9: 41 of 119 "stated" quotes (34%)
+ *  were cut mid-sentence at an abbreviation — "Must be a U.S. Person due to
+ *  required access to U." — because any "." counted as a sentence end. */
+const ABBREVIATIONS = new Set([
+  "u.s", "u.s.a", "u.s.c", "e.g", "i.e", "etc", "vs", "approx", "inc", "co", "corp", "ltd", "llc", "jr", "sr",
+  "dr", "mr", "mrs", "ms", "no", "st", "dept", "gov", "govt", "a.m", "p.m", "ph.d", "b.s", "m.s", "b.a", "m.a",
+  "sec", "fig", "min", "max", "est", "int'l", "nat'l",
+]);
+
+/** A "." ends a sentence only if whitespace (or the end) follows, the next
+ *  word doesn't start lowercase, and the word it closes isn't an
+ *  abbreviation or a single initial ("J."). */
+function isSentenceEnd(text: string, i: number): boolean {
+  if (text[i] !== ".") return false;
+  const next = text[i + 1];
+  if (next !== undefined && !/\s/.test(next)) return false;
+  const after = text.slice(i + 1).match(/^\s*(\S)/);
+  if (after && /[a-z]/.test(after[1])) return false;
+  let j = i - 1;
+  while (j >= 0 && !/[\s(\[\/"'“]/.test(text[j])) j--;
+  const word = text.slice(j + 1, i).toLowerCase();
+  if (ABBREVIATIONS.has(word)) return false;
+  if (/^[a-z]$/.test(word)) return false;
+  return true;
+}
+
+function sentenceStart(text: string, from: number): number {
+  for (let i = from - 1; i >= 0; i--) {
+    if (text[i] === "\n" || isSentenceEnd(text, i)) return i + 1;
+  }
+  return 0;
+}
+
+function sentenceEnd(text: string, from: number): number {
+  for (let i = from; i < text.length; i++) {
+    if (text[i] === "\n") return i;
+    if (isSentenceEnd(text, i)) return i + 1;
+  }
+  return text.length;
+}
+
+/** The whole sentence/bullet containing a match — used both for the quoted
+ *  excerpt and for reading qualifiers like "eligible to obtain". */
+function sentenceAround(text: string, matchIndex: number, matchLength: number): { sentence: string; matchOffset: number } {
+  const start = sentenceStart(text, matchIndex);
+  const end = sentenceEnd(text, matchIndex + matchLength);
+  const raw = text.slice(start, end);
+  const lead = raw.match(/^[\s\-•*]+/)?.[0].length ?? 0; // a leading bullet marker isn't part of the requirement text
+  return { sentence: raw.slice(lead), matchOffset: matchIndex - start - lead };
+}
 
 /**
  * Expand to the containing sentence/bullet-line where reasonable, else a
@@ -39,23 +99,31 @@ const MAX_EXCERPT_LENGTH = 220;
  * quoted excerpt reads as the requirement text itself, not the list syntax.
  */
 function excerptAround(text: string, matchIndex: number, matchLength: number): string {
-  const lastPeriod = text.lastIndexOf(".", matchIndex);
-  const lastNewline = text.lastIndexOf("\n", matchIndex);
-  const start = Math.max(0, lastPeriod, lastNewline) + 1;
+  const { sentence, matchOffset } = sentenceAround(text, matchIndex, matchLength);
+  const flat = sentence.replace(/\s+/g, " ").trim();
+  if (flat.length <= MAX_EXCERPT_LENGTH) return flat;
+  // A long sentence is windowed around the match rather than cut from its
+  // start, so the matched requirement itself is never the part dropped.
+  const from = Math.max(0, Math.min(matchOffset - 100, flat.length - MAX_EXCERPT_LENGTH));
+  const window = flat.slice(from, from + MAX_EXCERPT_LENGTH - 2).trim();
+  return `${from > 0 ? "…" : ""}${window}${from + MAX_EXCERPT_LENGTH - 2 < flat.length ? "…" : ""}`;
+}
 
-  const searchFrom = matchIndex + matchLength;
-  const nextPeriod = text.indexOf(".", searchFrom);
-  const nextNewline = text.indexOf("\n", searchFrom);
-  const candidates = [nextPeriod, nextNewline].filter((i) => i !== -1);
-  const end = candidates.length > 0 ? Math.min(...candidates) : -1;
-  const sliceEnd = end === -1 ? Math.min(text.length, searchFrom + 120) : end + 1;
+const OBTAIN_QUALIFIER =
+  /\b(?:abl\w*|abilit\w*|eligib\w*|willing\w*|capable)\b[^.]{0,40}?\b(?:obtain|acquire|attain|get|be granted)\b|\bobtain and maintain\b|\bclearable\b|\beligib\w*\s+for\b[^.]{0,30}\bclearance\b/i;
+const MAY_QUALIFIER =
+  /\bmay\s+(?:be\s+)?(?:require|need)\w*|\bdepending on\b|\bif required\b|\bpreferred\b|\bnice to have\b|\ba plus\b|\bbonus\b|\bdesired\b|\bdesirable\b/i;
+const HOLD_QUALIFIER =
+  /\b(?:active|current|existing|in-place|interim)\b[^.]{0,40}?\bclearance\b|\bmust\s+(?:have|hold|possess|currently)\b|\bcurrently\s+hold|\brequired to start\b|\bday one\b/i;
 
-  const raw = text
-    .slice(start, sliceEnd)
-    .replace(/^[\s\-•*]+/, "") // strip a leading bullet marker, not part of the requirement text itself
-    .replace(/\s+/g, " ")
-    .trim();
-  return raw.length > MAX_EXCERPT_LENGTH ? `${raw.slice(0, MAX_EXCERPT_LENGTH - 1)}…` : raw;
+/** Reads the sentence's own qualifier. "Obtain" outranks "active"
+ *  ("obtain and maintain an active Secret clearance" needs no clearance to
+ *  apply), and "preferred"/"may" outranks "active" ("active TS preferred"). */
+function clearanceStageOf(sentence: string): ClearanceStage | undefined {
+  if (OBTAIN_QUALIFIER.test(sentence)) return "must_be_able_to_obtain";
+  if (MAY_QUALIFIER.test(sentence)) return "may_be_required";
+  if (HOLD_QUALIFIER.test(sentence)) return "must_already_hold";
+  return undefined;
 }
 
 interface StatedPattern {
@@ -70,6 +138,11 @@ interface StatedPattern {
 const STATED_PATTERNS: StatedPattern[] = [
   { kind: "clearance_level", value: "ts_sci", pattern: /\btop secret\s*\/?\s*sci\b|\bts\s*\/\s*sci\b/i },
   { kind: "clearance_level", value: "ts", pattern: /\btop secret\b(?!\s*\/?\s*sci)/i },
+  // The common "TS clearance" abbreviation — found while writing the D-046
+  // tests: "Must hold an active TS clearance" produced no clearance signal at
+  // all. Case-sensitive on purpose (no `i` flag) so "ts" inside ordinary text
+  // can't match; only a standalone "TS" within a few words of "clearance".
+  { kind: "clearance_level", value: "ts", pattern: /\bTS\b(?!\s*\/\s*SCI)(?=[^.\n]{0,25}\b[Cc]learance\b)/ },
   // "security" made optional between "secret" and "clearance": found live
   // via the spec §6 judging panel round 3 — "Secret security clearance" (a
   // common real phrasing) failed this pattern's old strict adjacency
@@ -86,10 +159,13 @@ const STATED_PATTERNS: StatedPattern[] = [
     value: "secret",
     pattern: /\b(?:active\s+)?(?<!top )secret (?:security\s+)?clearance\b/i,
   },
+  // "clearance eligibility"/"clearable" added: found via the spec §6 judging
+  // panel round 9 — "U.S. clearance eligibility may be required depending on
+  // program" produced no clearance signal at all.
   {
     kind: "clearance_level",
     value: "clearance_required_unspecified",
-    pattern: /\b(?:security clearance|active clearance|current clearance)\b/i,
+    pattern: /\b(?:security clearance|active clearance|current clearance|clearance eligibility|clearable)\b/i,
   },
   // "us_citizen_required" excludes the case where "citizen" is itself one
   // branch of a broader citizen/national/permanent-resident disjunction —
@@ -131,19 +207,26 @@ export function extractStatedSignals(descriptionText: string): RequirementSignal
     const match = pattern.exec(descriptionText);
     if (match && !seenValues.has(value)) {
       seenValues.add(value);
-      signals.push({
+      const signal: RequirementSignal = {
         kind,
         value,
         basis: "stated",
         evidence: excerptAround(descriptionText, match.index, match[0].length),
-      });
+      };
+      if (kind === "clearance_level") {
+        const stage = clearanceStageOf(sentenceAround(descriptionText, match.index, match[0].length).sentence);
+        if (stage) signal.clearanceStage = stage;
+        // "Clearance may be required" is not "clearance required".
+        if (value === "clearance_required_unspecified" && stage === "may_be_required") signal.value = "clearance_may_be_required";
+      }
+      signals.push(signal);
     }
   }
   // Drop the generic fallback once a specific level is already present —
   // a specific level IS a security clearance, so the unspecified signal
   // adds no information and reads as a second, redundant requirement.
   if (signals.some((s) => s.kind === "clearance_level" && SPECIFIC_CLEARANCE_LEVELS.has(s.value))) {
-    return signals.filter((s) => s.value !== "clearance_required_unspecified");
+    return signals.filter((s) => s.value !== "clearance_required_unspecified" && s.value !== "clearance_may_be_required");
   }
   return signals;
 }
@@ -198,7 +281,34 @@ export function extractInferredSignals(
 
   const looksNonUs = looksNonUsLocation(context.location) || FOREIGN_CLEARANCE_SYSTEM.test(descriptionText);
 
-  if (looksDefenseRelated && !hasStated("citizenship") && !looksNonUs) {
+  // Found via the spec §6 judging panel round 9 (4 of 4 judges): a stated
+  // clearance requirement was never connected to citizenship, so a green
+  // card holder was told only that a role "likely" needed U.S.-person status
+  // — which they have — on roles that require a clearance they can't hold.
+  // A U.S. clearance requires U.S. citizenship (EO 12968 § 3.1(b); 32 CFR
+  // 117.10(k)); a green card satisfies ITAR, not this. That's a rule of law
+  // applied to what the posting states, so it's labeled inferred, with the
+  // reason, rather than presented as a quote.
+  const clearanceSignals = stated.filter((s) => s.kind === "clearance_level");
+  const statesCitizenOnly = stated.some((s) => s.value === "us_citizen_required");
+  const addsClearanceCitizenship = clearanceSignals.length > 0 && !statesCitizenOnly && !looksNonUs;
+  if (addsClearanceCitizenship) {
+    const onlyMaybe = clearanceSignals.every((s) => s.clearanceStage === "may_be_required");
+    inferred.push({
+      kind: "citizenship",
+      value: "us_citizen_required_for_clearance",
+      basis: "inferred",
+      evidence:
+        (onlyMaybe
+          ? "This posting says a U.S. security clearance may be required. If it is, clearances are limited to U.S. citizens"
+          : "This posting asks for a U.S. security clearance, and clearances are limited to U.S. citizens") +
+        " (Executive Order 12968 § 3.1(b); 32 CFR 117.10(k)). A green card makes someone a U.S. person under ITAR, but not clearance-eligible — the only exception for a non-citizen, a Limited Access Authorization, is rare, contract-specific, and never valid for TOP SECRET. Inferred from the clearance requirement, not stated in the posting — confirm with the employer.",
+    });
+  }
+
+  // Citizenship already covers U.S.-person status, so the weaker ITAR
+  // inference would only repeat it.
+  if (looksDefenseRelated && !hasStated("citizenship") && !looksNonUs && !addsClearanceCitizenship) {
     inferred.push({
       kind: "citizenship",
       value: "us_person_likely",
@@ -214,7 +324,7 @@ export function extractInferredSignals(
       value: "clearance_possibly_required",
       basis: "inferred",
       evidence:
-        "This posting mentions government/DoD/classified work but doesn't state a specific clearance requirement. Some roles on a program like this require a clearance even when the individual posting doesn't say so (it may be added at the offer stage). Not stated here — ask the recruiter directly.",
+        "This posting mentions government/DoD/classified work but doesn't state a specific clearance requirement. Some roles on a program like this require a clearance even when the individual posting doesn't say so (it may be added at the offer stage). If one is required, clearances are limited to U.S. citizens (32 CFR 117.10(k)) — a green card is not enough. Not stated here — ask the recruiter directly.",
     });
   }
 
