@@ -159,9 +159,12 @@ User-directed feature work, run alongside the judging-panel loop, not a panel fi
 - **New tool `prepare_signed_attestation`.** Wraps a closed-vocabulary self-asserted claim (clearance level, citizenship status, available-from date — no free text) in an Ed25519-signed, W3C-Verifiable-Credential-shaped object. The candidate's own agent generates the keypair and signs entirely client-side (Node's native `crypto`, no new dependency); this server only verifies the signature and that the claims match what was actually signed — it never receives or sees a private key. Proves who signed a claim and when, never that the claim is true.
 - **`verify_evidence` now also supports GitLab** as a second "already-public evidence" source, activated only by an explicit `gitlab.com` URL — every existing bare-username/github.com call is unaffected. GitLab's anonymous public API exposes meaningfully less than GitHub's (no bio/followers/created_at); those fields are honestly returned as `null` rather than a fabricated placeholder. Output gained a `platform: "github" | "gitlab"` field.
 
+- **Confirmed, no code change (D-034): `prepare_consented_card` already satisfies piece #3, "per-company re-consent."** Every call requires a fresh `fields_user_approved` tied to that call's own `role_id` — there's no store, cache, or any other mechanism that could let one call's consent carry over to another, because the tool was never capable of persisting anything across calls in the first place (stateless architecture, D-001/D-002).
+
 ### test
 - New dedicated test file for `prepare_signed_attestation` (9 cases: valid/multi-claim, tampering, wrong key, mismatched `issued_at`, empty claims, unknown claim key, malformed payload, disclaimer content).
 - `verify_evidence`'s test file extended with a 4-test GitLab block (platform detection, honest-null fields, bare-username still defaults to GitHub, schema-level URL acceptance).
+- New dedicated test file for `prepare_consented_card` (previously untested): basic card generation, the unverified-self-report note, never-submits-on-behalf, its `.strict()` unknown-field rejection, and the D-034 no-persistence regression (two different `role_id` calls never leak one's approved fields into the other's card).
 
 ## [Unreleased] — judging panel round 6 response (2026-11-12)
 
