@@ -32,8 +32,8 @@ const TOOL_CARD_META: Record<string, { blurb: string; fields: string[] }> = {
     fields: ["query", "clearance", "roles"],
   },
   verify_evidence: {
-    blurb: "Summarizes a GitHub profile's already-public signal via GitHub's public REST API only — no scraping.",
-    fields: ["github_username_or_url", "profile", "topLanguages"],
+    blurb: "Summarizes a GitHub, GitLab, or Cosign profile's already-public signal via that platform's own public REST API only — no scraping, never used to rank candidates.",
+    fields: ["github_username_or_url", "platform", "profile"],
   },
   get_company_profile: {
     blurb: "Published facts about a company plus computed work realities from its currently-open roles.",

@@ -6,23 +6,11 @@
  * user's profile: repo count/names, languages, recent activity timestamps.
  */
 
+import { UpstreamApiError } from "@/lib/tools/upstream-error";
+
 const API_BASE = "https://api.github.com";
 
-export class GitHubApiError extends Error {
-  readonly status: number;
-  /** See SpeedrunApiError's identical field (lib/speedrun/client.ts) for why
-   * this exists: lib/tools/wrap.ts's shared callTool() catch previously
-   * used one generic, job-posting-flavored 404 message for every entity
-   * type, including a GitHub profile, which doesn't get "filled" the way a
-   * job posting does. */
-  readonly userMessage?: string;
-  constructor(message: string, status: number, userMessage?: string) {
-    super(message);
-    this.name = "GitHubApiError";
-    this.status = status;
-    this.userMessage = userMessage;
-  }
-}
+export class GitHubApiError extends UpstreamApiError {}
 
 function authHeaders(): HeadersInit {
   const headers: HeadersInit = {

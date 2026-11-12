@@ -3,6 +3,8 @@ import { z } from "zod";
 import { callTool, SourceRefSchema, type ToolDef, type SourceRef } from "@/lib/tools/wrap";
 import { SpeedrunApiError } from "@/lib/speedrun/client";
 import { GitHubApiError } from "@/lib/github/client";
+import { GitLabApiError } from "@/lib/gitlab/client";
+import { CosignApiError } from "@/lib/cosign/client";
 
 const EchoInput = z.object({ message: z.string().max(100) });
 const EchoOutput = z.object({ echoed: z.string(), sources: z.array(SourceRefSchema) });
@@ -101,6 +103,37 @@ describe("callTool pipeline", () => {
     };
     const result = await callTool(tool, { message: "hi" });
     expect(result).toEqual({ ok: false, error: { code: "not_found", message: "Entity-specific GitHub not-found text." } });
+  });
+
+  // Regression: GitLabApiError was added for verify_evidence's GitLab path
+  // (DECISIONS.md D-032) but never added to this file's own instanceof
+  // check, so a nonexistent GitLab username fell through to the fully
+  // generic "Something went wrong... please try again" -- misleading, since
+  // retrying the identical username will always 404 again.
+  it("prefers a GitLabApiError's own userMessage over the generic 404 fallback", async () => {
+    const tool: ToolDef<{ message: string }, { echoed: string; sources: SourceRef[] }> = {
+      ...echoTool,
+      name: "gitlab-404",
+      handler: async () => {
+        throw new GitLabApiError("GitLab user not found", 404, "Entity-specific GitLab not-found text.");
+      },
+    };
+    const result = await callTool(tool, { message: "hi" });
+    expect(result).toEqual({ ok: false, error: { code: "not_found", message: "Entity-specific GitLab not-found text." } });
+  });
+
+  // Regression: same class of gap as above, for CosignApiError
+  // (verify_evidence's Cosign path).
+  it("prefers a CosignApiError's own userMessage over the generic 404 fallback", async () => {
+    const tool: ToolDef<{ message: string }, { echoed: string; sources: SourceRef[] }> = {
+      ...echoTool,
+      name: "cosign-404",
+      handler: async () => {
+        throw new CosignApiError("Cosign path not found", 404, "Entity-specific Cosign not-found text.");
+      },
+    };
+    const result = await callTool(tool, { message: "hi" });
+    expect(result).toEqual({ ok: false, error: { code: "not_found", message: "Entity-specific Cosign not-found text." } });
   });
 
   it("falls back to the generic 404 message when an error class doesn't set its own userMessage", async () => {

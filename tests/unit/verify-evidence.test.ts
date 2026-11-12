@@ -15,8 +15,14 @@ vi.mock("@/lib/gitlab/client", async (importActual) => ({
   getGitLabPublicSignalSummary: vi.fn(),
 }));
 
+vi.mock("@/lib/cosign/client", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/cosign/client")>()),
+  getCosignPublicProfile: vi.fn(),
+}));
+
 import { getPublicSignalSummary } from "@/lib/github/client";
 import { getGitLabPublicSignalSummary } from "@/lib/gitlab/client";
+import { getCosignPublicProfile, CosignApiError } from "@/lib/cosign/client";
 import { verifyEvidenceTool } from "@/lib/tools/verify-evidence";
 
 describe("verify_evidence", () => {
@@ -180,6 +186,77 @@ describe("verify_evidence", () => {
       expect(verifyEvidenceTool.inputSchema.safeParse({ github_username_or_url: "https://gitlab.com/sytses" }).success).toBe(
         true,
       );
+    });
+  });
+
+  // Clearance Lens v2 (D-032/D-035/D-036): Cosign is a third, consent-only
+  // evidence source -- never the referral/ranking mechanism that was
+  // explicitly declined. Only activated by an explicit cosign.co URL.
+  describe("Cosign path (only activated by an explicit cosign.co URL)", () => {
+    it("routes a cosign.co URL to Cosign and reports platform:'cosign'", async () => {
+      vi.mocked(getCosignPublicProfile).mockResolvedValueOnce({
+        entry: {
+          login: "sytses",
+          name: "Sid Sijbrandij",
+          profileUrl: "https://cosign.co/sytses",
+          bio: "@sytses",
+          publicRepoCount: 0,
+          followers: null,
+          accountCreatedAt: null,
+          topLanguages: [],
+          recentActivity: [],
+        },
+        searchExhausted: false,
+      });
+      const result = await verifyEvidenceTool.handler({ github_username_or_url: "https://cosign.co/sytses" });
+      expect(result.platform).toBe("cosign");
+      expect(result.profile.login).toBe("sytses");
+      expect(result.profile.followers).toBeNull();
+      expect(result.sources).toEqual([{ title: "Cosign: https://cosign.co/sytses", url: "https://cosign.co/sytses" }]);
+      expect(result.disclaimer).toMatch(/never.*rank/i);
+      expect(getPublicSignalSummary).not.toHaveBeenCalled();
+    });
+
+    it("throws a specific 'confirmed absent' message when the full directory was searched and no match found", async () => {
+      vi.mocked(getCosignPublicProfile).mockResolvedValueOnce({ entry: null, searchExhausted: true });
+      const err: unknown = await verifyEvidenceTool
+        .handler({ github_username_or_url: "https://cosign.co/nobody-with-this-path" })
+        .catch((e) => e);
+      expect(err).toBeInstanceOf(CosignApiError);
+      expect((err as CosignApiError).userMessage).toMatch(/full public directory/i);
+    });
+
+    it("throws a different, honest 'search incomplete' message when the bound was hit, not a confirmed absence", async () => {
+      vi.mocked(getCosignPublicProfile).mockResolvedValueOnce({ entry: null, searchExhausted: false });
+      const err: unknown = await verifyEvidenceTool
+        .handler({ github_username_or_url: "https://cosign.co/needle" })
+        .catch((e) => e);
+      expect(err).toBeInstanceOf(CosignApiError);
+      expect((err as CosignApiError).userMessage).toMatch(/couldn't confirm/i);
+    });
+
+    it("a bare username (no URL) still defaults to GitHub, not Cosign", async () => {
+      vi.mocked(getPublicSignalSummary).mockResolvedValueOnce({
+        login: "octocat",
+        name: null,
+        profileUrl: "https://github.com/octocat",
+        bio: null,
+        publicRepoCount: 1,
+        followers: 1,
+        accountCreatedAt: "2011-01-01T00:00:00Z",
+        topLanguages: [],
+        recentActivity: [],
+        rateLimitRemaining: null,
+      });
+      const result = await verifyEvidenceTool.handler({ github_username_or_url: "octocat" });
+      expect(result.platform).toBe("github");
+      expect(getCosignPublicProfile).not.toHaveBeenCalled();
+    });
+
+    it("accepts a Cosign path with its category segment at the schema level", () => {
+      expect(
+        verifyEvidenceTool.inputSchema.safeParse({ github_username_or_url: "https://cosign.co/x/esk3nder" }).success,
+      ).toBe(true);
     });
   });
 });

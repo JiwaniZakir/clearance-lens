@@ -51,7 +51,7 @@ No agent handy? Try every tool directly at **[/try](https://clearance-lens.verce
 | `readiness_brief` | A template your agent fills in locally: eligibility, gaps, a 2-week prep plan, recruiter questions |
 | `build_trial_assessment` | A 60/90/180-minute ITAR-safe work-sample exercise built only from the public posting |
 | `explain_rule` | Plain-English ITAR/clearance rule explanations with primary-source links |
-| `verify_evidence` | A GitHub or GitLab profile's already-public signal, via each platform's public API only |
+| `verify_evidence` | A GitHub, GitLab, or Cosign profile's already-public signal, via each platform's public API only |
 | `run_job_preview` | A 6-scene "first week" realistic simulation — played straight, not sanitized |
 | `fit_debrief` | Loved/disliked work-style tags → a summary template and questions to ask the company. Never a score. |
 | `get_company_profile` | Published facts + computed work realities — returns *gaps*, not a guess, when no sourced criteria exist |

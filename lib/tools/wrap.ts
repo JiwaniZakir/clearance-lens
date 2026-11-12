@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { assertNoPiiCui, PiiCuiError } from "@/lib/guard/pii";
-import { SpeedrunApiError } from "@/lib/speedrun/client";
-import { GitHubApiError } from "@/lib/github/client";
+import { UpstreamApiError } from "@/lib/tools/upstream-error";
 import { logServerError } from "@/lib/log";
 
 /** Every tool output that cites a fact includes `sources`; this is the one
@@ -125,7 +124,7 @@ export async function callTool<TInput, TOutput>(
   try {
     result = await def.handler(parsed.data);
   } catch (err) {
-    if (err instanceof SpeedrunApiError || err instanceof GitHubApiError) {
+    if (err instanceof UpstreamApiError) {
       logServerError("upstream_error", def.name, `${err.name}:${err.status}`);
       return {
         ok: false,

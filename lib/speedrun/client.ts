@@ -4,6 +4,7 @@ import type {
   SpeedrunJobSearchParams,
   SpeedrunJobSearchResponse,
 } from "./types";
+import { UpstreamApiError } from "@/lib/tools/upstream-error";
 
 const BASE_URL = "https://speedrun-talent-network.com/api/v1";
 /** Identifies us to the upstream per their fair-use docs ("optional ?source= for
@@ -15,24 +16,11 @@ const SOURCE = "clearance-lens";
 const REVALIDATE_SECONDS = 300;
 const MAX_RETRIES = 3;
 
-export class SpeedrunApiError extends Error {
-  readonly status: number;
+export class SpeedrunApiError extends UpstreamApiError {
   readonly code?: string;
-  /** Found live via the spec §5 judging panel (DECISIONS.md): lib/tools/
-   * wrap.ts's shared callTool() catch block used ONE generic "may have been
-   * filled or removed since you last searched" message for every 404,
-   * regardless of whether the lookup was a job posting (where that phrasing
-   * is accurate) or a company slug (where it reads oddly — a company isn't
-   * "filled"). Each exported client function below (getJob/getCompany) now
-   * sets an entity-appropriate message here; wrap.ts prefers it when
-   * present, falling back to the old generic text only if not set. */
-  readonly userMessage?: string;
   constructor(message: string, status: number, code?: string, userMessage?: string) {
-    super(message);
-    this.name = "SpeedrunApiError";
-    this.status = status;
+    super(message, status, userMessage);
     this.code = code;
-    this.userMessage = userMessage;
   }
 }
 

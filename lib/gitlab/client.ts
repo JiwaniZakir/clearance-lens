@@ -13,18 +13,11 @@
  * handling for how this is surfaced to the caller.
  */
 
+import { UpstreamApiError } from "@/lib/tools/upstream-error";
+
 const API_BASE = "https://gitlab.com/api/v4";
 
-export class GitLabApiError extends Error {
-  readonly status: number;
-  readonly userMessage?: string;
-  constructor(message: string, status: number, userMessage?: string) {
-    super(message);
-    this.name = "GitLabApiError";
-    this.status = status;
-    this.userMessage = userMessage;
-  }
-}
+export class GitLabApiError extends UpstreamApiError {}
 
 interface GitLabUser {
   id: number;
