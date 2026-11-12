@@ -1,9 +1,67 @@
 import { z } from "zod";
 import { getCompany } from "@/lib/speedrun/client";
+import type { SpeedrunCompanyJobSummary } from "@/lib/speedrun/types";
 import { getCuratedCriteria } from "@/lib/companies-data";
 import { SPEEDRUN_SOURCE } from "@/lib/tools/role-shared";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
+
+// Found live via the spec §5 agent-in-the-loop eval (DECISIONS.md D-016):
+// a naive min/max across every job's comp_min/comp_max mixed different pay
+// periods into one meaningless figure (observed live: $29/hour, $1,925/week,
+// and $200,000+/year postings at real companies on the same feed — a naive
+// range across those would read as roughly "$29–$415,000," which is not a
+// real number anyone could use). Annualize first, using the standard
+// full-time convention (2080 hrs/yr = 40hr week * 52 weeks), and exclude —
+// rather than guess at — any period this project hasn't confirmed live.
+// `comp_currency` is deliberately left out: the company-jobs endpoint
+// (SpeedrunCompanyJobSummary) genuinely has no currency field at all, unlike
+// the richer per-job search endpoint — `currency: null` below reflects data
+// that doesn't exist, not a bug to fix with more code.
+const ANNUALIZATION_FACTOR: Record<string, number> = {
+  year: 1,
+  month: 12,
+  week: 52,
+  hour: 2080,
+};
+
+function annualizedComp(value: number, period: string | null): number | null {
+  if (period === null) return value; // observed live: salaried postings report comp_period: null, already annual
+  const factor = ANNUALIZATION_FACTOR[period.toLowerCase()];
+  return factor != null ? value * factor : null;
+}
+
+function computeCompRangeObserved(sample: SpeedrunCompanyJobSummary[]): {
+  compRangeObserved: { min: number; max: number; currency: null } | null;
+  excludedCompCount: number;
+} {
+  let min = Infinity;
+  let max = -Infinity;
+  let includedCount = 0;
+  let excludedCompCount = 0;
+
+  for (const job of sample) {
+    if (job.comp_min == null && job.comp_max == null) continue;
+    const annualMin = job.comp_min != null ? annualizedComp(job.comp_min, job.comp_period) : null;
+    const annualMax = job.comp_max != null ? annualizedComp(job.comp_max, job.comp_period) : null;
+    if (annualMin == null && annualMax == null) {
+      excludedCompCount++;
+      continue;
+    }
+    includedCount++;
+    if (annualMin != null) min = Math.min(min, annualMin);
+    if (annualMax != null) max = Math.max(max, annualMax);
+    // A job with only one of min/max stated still needs the OTHER bound
+    // covered so it doesn't silently narrow the overall range.
+    if (annualMin == null && annualMax != null) min = Math.min(min, annualMax);
+    if (annualMax == null && annualMin != null) max = Math.max(max, annualMin);
+  }
+
+  return {
+    compRangeObserved: includedCount > 0 ? { min, max, currency: null } : null,
+    excludedCompCount,
+  };
+}
 
 const InputSchema = z.object({
   company_slug: z.string().min(1).max(100).describe("The company's speedrun-talent-network.com slug, e.g. \"anduril-industries\"."),
@@ -65,17 +123,14 @@ export const getCompanyProfileTool: ToolDef<z.infer<typeof InputSchema>, z.infer
     // sample isn't documented by the upstream API — compare against its own
     // open_roles count rather than asserting either way.
     const isFullRoster = sample.length === company.open_roles;
-    const compValues = sample.filter((j) => j.comp_min != null || j.comp_max != null);
-    const compRangeObserved =
-      compValues.length > 0
-        ? {
-            min: Math.min(...compValues.map((j) => j.comp_min ?? j.comp_max ?? Infinity)),
-            max: Math.max(...compValues.map((j) => j.comp_max ?? j.comp_min ?? -Infinity)),
-            currency: null,
-          }
-        : null;
+    const { compRangeObserved, excludedCompCount } = computeCompRangeObserved(sample);
 
     const gaps: string[] = [];
+    if (excludedCompCount > 0) {
+      gaps.push(
+        `${excludedCompCount} role(s) with a stated comp figure were left out of the comp range below — either its pay period couldn't be normalized to an annual figure, or its currency didn't match the majority of the other roles. Check each role's own posting for its exact figure.`,
+      );
+    }
     if (criteria.length === 0) {
       gaps.push(
         "Clearance Lens has not independently sourced published hiring criteria for this company. Treat any \"culture fit\" claims you see elsewhere with skepticism — ask the recruiter directly what they evaluate for and why, and ask for a source.",

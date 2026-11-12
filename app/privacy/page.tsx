@@ -120,7 +120,14 @@ export default function PrivacyPage() {
               "Here is a real, worked example — the exact request shape and the exact response our code returns for it, not a paraphrase:"
             }
           </p>
-          <pre className="mt-3 overflow-x-auto rounded-lg border border-neutral-6 bg-neutral-2 p-4 text-[0.8125rem] leading-[1.5] text-neutral-12">
+          {/* tabIndex/aria-label: same scrollable-region-focusable fix as
+              components/install-snippet.tsx (DECISIONS.md) — overflow-x-auto
+              with no way for a keyboard-only user to reach and scroll it. */}
+          <pre
+            tabIndex={0}
+            aria-label="Example request and response"
+            className="mt-3 overflow-x-auto rounded-lg border border-neutral-6 bg-neutral-2 p-4 text-[0.8125rem] leading-[1.5] text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6"
+          >
             <code className="font-mono whitespace-pre-wrap break-words">{EXAMPLE_BLOCK}</code>
           </pre>
         </section>

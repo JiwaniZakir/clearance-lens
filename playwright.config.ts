@@ -23,7 +23,15 @@ export default defineConfig({
   webServer: process.env.BASE_URL
     ? undefined
     : {
-        command: `pnpm build && pnpm start -- -p ${PORT}`,
+        // `pnpm start -- -p ${PORT}` was found to break on this pnpm
+        // version (10.30): pnpm forwards the literal `--` token into the
+        // underlying `next start` invocation instead of stripping it as a
+        // passthrough delimiter, so Next's CLI parser sees `-- -p 3100` and
+        // treats `-p` as a positional project-directory argument rather
+        // than a flag ("Invalid project directory provided, no such
+        // directory: .../-p"). Invoking `next start` directly sidesteps
+        // the pnpm-script indirection entirely.
+        command: `pnpm build && npx next start -p ${PORT}`,
         url: BASE_URL,
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,

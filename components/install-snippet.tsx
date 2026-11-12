@@ -85,7 +85,19 @@ function CommandRow({ value, prompt, className }: { value: string; prompt?: stri
         className,
       )}
     >
-      <code className="min-w-0 flex-1 overflow-x-auto text-[0.9375rem] leading-[1.6] font-mono whitespace-pre text-neutral-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* Found live via Playwright + axe against a production build
+          (DECISIONS.md): a horizontally-scrollable region (overflow-x-auto,
+          needed so a long URL/command scrolls instead of wrapping) with no
+          tabIndex is axe's "scrollable-region-focusable" violation — a
+          keyboard-only user has no way to reach and scroll it to see
+          content past the visible width. tabIndex={0} makes it a real
+          keyboard-operable scroll container; aria-label stands in for the
+          missing visible label a keyboard/screen-reader user would need. */}
+      <code
+        tabIndex={0}
+        aria-label={`Command: ${value}`}
+        className="min-w-0 flex-1 overflow-x-auto text-[0.9375rem] leading-[1.6] font-mono whitespace-pre text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {prompt ? <span className="mr-2 text-neutral-9">{prompt}</span> : null}
         {value}
       </code>
@@ -102,7 +114,15 @@ function JsonBlock({ code, className }: { code: string; className?: string }) {
       <div className="flex items-center justify-end border-b border-neutral-6 bg-neutral-2 px-2 py-1">
         <CopyButton value={code} />
       </div>
-      <pre className="overflow-x-auto px-4 py-3.5 text-[0.9375rem] leading-[1.6] font-mono text-neutral-12">
+      {/* Same scrollable-region-focusable fix as CommandRow's <code> above —
+          this <pre> is the identical overflow-x-auto-without-tabIndex
+          pattern, just not hit by the specific page/viewport combination
+          axe happened to flag first. */}
+      <pre
+        tabIndex={0}
+        aria-label="Code block"
+        className="overflow-x-auto px-4 py-3.5 text-[0.9375rem] leading-[1.6] font-mono text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6"
+      >
         <code>{code}</code>
       </pre>
     </div>

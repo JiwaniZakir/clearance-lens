@@ -5,7 +5,6 @@ import { Building2, MapPin, Globe } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { SourceCitationChip } from "@/components/source-citation-chip";
-import { cn } from "@/lib/cn";
 import type { RequirementSignal, RoleResult } from "@/lib/try-tool-types";
 
 const SIGNAL_LABELS: Record<string, string> = {
@@ -105,23 +104,20 @@ export function RoleSearchResultCard({
   const comp = formatComp(role);
 
   return (
-    <Card
-      interactive={canViewCompany}
-      className={cn("flex flex-col gap-3 p-4 sm:p-5", canViewCompany && "cursor-pointer")}
-      onClick={canViewCompany ? () => onViewCompany?.(role) : undefined}
-      role={canViewCompany ? "button" : undefined}
-      tabIndex={canViewCompany ? 0 : undefined}
-      onKeyDown={
-        canViewCompany
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onViewCompany?.(role);
-              }
-            }
-          : undefined
-      }
-    >
+    // Found live via Playwright + axe against a real production build
+    // (DECISIONS.md): role="button"/tabIndex on this whole card while it
+    // also contains its own focusable descendants (each requirement chip's
+    // tooltip trigger, the source-citation link) is axe's "no-focusable-
+    // content" violation — a widget with role="button" must be atomic, not
+    // contain other independently-focusable controls. It was also a latent
+    // behavior bug: those nested controls don't stopPropagation, so
+    // clicking a chip or the source link to see its tooltip/open the
+    // posting ALSO fired the card's own onClick and opened the company
+    // dialog at the same time. Fixed by making the card a plain
+    // non-interactive container and giving "view company profile" its own
+    // explicit, properly-labeled button below instead of claiming the
+    // whole card as one control.
+    <Card interactive={canViewCompany} className="flex flex-col gap-3 p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-1.5 text-sm text-neutral-11">
@@ -162,7 +158,13 @@ export function RoleSearchResultCard({
       <div className="flex items-center justify-between gap-3">
         <SourceCitationChip source={{ title: `${role.company} posting`, url: role.url }} />
         {canViewCompany ? (
-          <span className="text-xs text-accent-11">View company profile →</span>
+          <button
+            type="button"
+            onClick={() => onViewCompany?.(role)}
+            className="rounded text-xs text-accent-11 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-8"
+          >
+            View {role.company} profile →
+          </button>
         ) : (
           <span className="text-xs text-neutral-9">Stealth posting — no company profile</span>
         )}
