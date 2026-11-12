@@ -103,10 +103,10 @@ describe(`MCP protocol conformance against ${MCP_URL}`, () => {
     expect(parsed.rules.length).toBeGreaterThan(0);
   });
 
-  it("lists the 3 named prompts", async () => {
+  it("lists the 4 named prompts", async () => {
     const { prompts } = await client.listPrompts();
     expect(prompts.map((p) => p.name).sort()).toEqual(
-      ["check_my_eligibility", "prep_for_role", "preview_the_job"].sort(),
+      ["check_my_eligibility", "prep_for_role", "preview_the_job", "share_intro_card"].sort(),
     );
   });
 

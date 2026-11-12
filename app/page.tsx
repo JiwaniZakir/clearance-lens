@@ -69,6 +69,16 @@ const TOOL_CARD_META: Record<string, { blurb: string; fields: string[] }> = {
       "Wraps a self-asserted claim (clearance level, citizenship status, or availability) in a credential your own agent signs locally — proves who signed it and when, never that the claim itself is true.",
     fields: ["claims", "signature_base64", "credential"],
   },
+  contribute_anonymous_signal: {
+    blurb:
+      "Opts one role-interest into an anonymous, aggregated signal pool — no name, contact info, or identifier of any kind, only closed-enum buckets you explicitly choose to include.",
+    fields: ["role_id", "contribution", "recorded"],
+  },
+  get_aggregated_signal: {
+    blurb:
+      "Reads that pool back as rounded percentages for a role or company — never an individual record, and never before at least 5 people have contributed (a k-anonymity floor).",
+    fields: ["role_id", "company_slug", "percentages"],
+  },
 };
 
 export default function Home() {

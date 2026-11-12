@@ -57,6 +57,8 @@ No agent handy? Try every tool directly at **[/try](https://clearance-lens.verce
 | `get_company_profile` | Published facts + computed work realities — returns *gaps*, not a guess, when no sourced criteria exist |
 | `prepare_consented_card` | A shareable intro card from **only** the fields you explicitly approved |
 | `prepare_signed_attestation` | Wraps a self-asserted claim (clearance level, citizenship status, or availability) in a credential your own agent signs locally — proves who signed it and when, never that the claim itself is true |
+| `contribute_anonymous_signal` | Opts one role-interest into an anonymous, aggregated signal pool — no name, contact info, or identifier of any kind |
+| `get_aggregated_signal` | Reads that pool back as rounded percentages for a role or company — never an individual record, never before at least 5 people have contributed |
 
 Every tool call returns `sources[]` and, where relevant, a `disclaimer`. Full specs: [`PLAN.md`](./PLAN.md) §2.
 
@@ -84,7 +86,7 @@ flowchart TB
     end
 
     Wrap --> Registry["lib/tools/registry.ts<br/>(the one shared list — adding a tool here\nexposes it on BOTH surfaces)"]
-    Registry --> Handlers["lib/tools/*.ts — 12 tool handlers"]
+    Registry --> Handlers["lib/tools/*.ts — 14 tool handlers"]
 
     Handlers --> Speedrun["a16z speedrun Talent\nNetwork public API"]
     Handlers --> GitHub["GitHub / GitLab public REST APIs"]

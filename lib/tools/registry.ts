@@ -11,6 +11,8 @@ import { readinessBriefTool } from "@/lib/tools/readiness-brief";
 import { fitDebriefTool } from "@/lib/tools/fit-debrief";
 import { prepareConsentedCardTool } from "@/lib/tools/prepare-consented-card";
 import { prepareSignedAttestationTool } from "@/lib/tools/prepare-signed-attestation";
+import { contributeAnonymousSignalTool } from "@/lib/tools/contribute-anonymous-signal";
+import { getAggregatedSignalTool } from "@/lib/tools/get-aggregated-signal";
 
 /**
  * The single list of every tool this server exposes. Both app/mcp/route.ts
@@ -38,6 +40,8 @@ export const TOOL_REGISTRY: ToolDef<any, any>[] = [
   fitDebriefTool,
   prepareConsentedCardTool,
   prepareSignedAttestationTool,
+  contributeAnonymousSignalTool,
+  getAggregatedSignalTool,
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

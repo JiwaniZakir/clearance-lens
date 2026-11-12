@@ -182,3 +182,19 @@ Round 6: trimmed mean **7.65**, uncapped — the first round with **zero hard-co
 ### test
 - Investigated, not reproducible: a claimed 3.36:1 dark-mode button contrast failure — actual computed color is the `on-solid-dark` token (`rgb(13,16,20)`), not white; hand-computed contrast ≈5.66:1, passes AA. Judge measurement error.
 - Unit suite: 276 → 301 (includes both this round's regression tests and the v2 pieces' own new tests above). Full E2E suite (77 passed, 1 pre-existing skip), protocol suite 14/14, `linkcheck` 130 passed/0 failed, Lighthouse all 4 categories ≥95 on `/` and `/try` (desktop preset) after the tool-card fix.
+
+## [Unreleased] — Clearance Lens v2: Cosign evidence source, aggregated signal, low-friction re-consent (2026-11-12)
+
+The three compliant alternatives offered in place of a declined OAuth-ranking/cross-company-sharing request. Full reasoning: DECISIONS.md D-035 (declined) and D-037 (built).
+
+### feat
+- **`verify_evidence` now also supports Cosign** as a third, consent-only evidence source (activated only by an explicit `cosign.co` URL) — surfaces only the same thin public directory fields (name, linked handle, photo) anyone can already see, never Cosign's separate OAuth-gated endorsement data, never used to rank candidates.
+- **New tools `contribute_anonymous_signal` and `get_aggregated_signal`** — the first stateful piece of this product. A candidate's agent can opt one role-interest into an anonymous pool (no identifier of any kind, only closed-enum buckets); anyone can read it back as rounded percentages, gated by a k-anonymity floor (5 contributors minimum, enforced per-bucket-value too, not just in total). Ships on a graceful in-memory fallback today — not yet durable in production pending a separate decision on provisioning Upstash Redis.
+- **New MCP prompt `share_intro_card`** — makes re-consenting to share an intro card with a new company fast for the human (the agent remembers prior field choices in its own context and re-confirms quickly), while keeping every call's approval genuinely fresh (this server itself still remembers nothing, by design).
+
+### fix
+- `GitLabApiError` was added for the GitLab evidence path but never added to `lib/tools/wrap.ts`'s own error-handling check, so a nonexistent GitLab username silently fell back to a generic "please retry" instead of its own specific message. Fixed architecturally with a shared `UpstreamApiError` base class every upstream client error now extends, rather than naming a fourth (and future fifth) class by hand.
+
+### test
+- New dedicated test files for `lib/cosign/client.ts`, `lib/gitlab/client.ts` (previously untested), `lib/signal/store.ts`'s k-anonymity math, and both new tools.
+- Unit suite: 301 → 344. Full E2E suite, protocol suite 14/14 (including the new prompt), `linkcheck` 130/0, Lighthouse clean on `/` and `/try`. Live-verified end-to-end: a real Cosign profile fetched correctly; 5 real contributions through the signal tools confirmed the k-anonymity suppression behavior matches the unit tests.

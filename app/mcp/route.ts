@@ -152,6 +152,29 @@ const handler = createMcpHandler(
           `Call run_job_preview with role_id="${role_id}" and minutes=${minutes ?? "30"}. Follow its instructionsForAgent exactly: run one scene at a time, withhold each choice's outcome until I actually pick, ask the debrief prompts conversationally, and ask the aggregateDebriefPrompt at the end. Then call fit_debrief with whatever tags I loved/disliked based on how I reacted, and show me the resulting summary, questions to ask the company, and share draft.`,
         ),
     );
+
+    // Clearance Lens v2 piece #3 (D-034/D-036): prepare_consented_card has
+    // no persistence by design -- every call needs fresh, explicit consent
+    // tied to that one role_id, with no shortcut around that. This prompt
+    // makes RE-asking fast for the human, not optional: it tells the agent
+    // to remember the field VALUES the person already gave earlier in this
+    // same conversation (ordinary conversational memory on the agent's own
+    // side -- this server still sees and stores nothing) and re-confirm
+    // with one quick yes/no/edit question per new company, instead of
+    // re-running the whole original interview from scratch every time.
+    server.registerPrompt(
+      "share_intro_card",
+      {
+        title: "Share an intro card with a new company",
+        description:
+          "Builds (or re-shares) a consented intro card for a role -- fast the 2nd+ time, since nothing is stored here between calls.",
+        argsSchema: z.object({ role_id: z.string().describe("A role id from search_defense_roles.") }),
+      },
+      ({ role_id }) =>
+        promptMessage(
+          `I want to share an intro card for role_id="${role_id}". If you already know what I'm comfortable sharing (clearance_status_self_reported, citizenship_status_self_reported, headline, highlights, github_username, availability, notes) from earlier in this conversation, don't re-run the whole interview -- just read back what you'd use, let me quickly say "yes" or tell you what to change for this specific company, then call prepare_consented_card with role_id="${role_id}" and only the fields I've actually approved for THIS company. If this is the first time, ask me which of those fields I want to share, then call it the same way. Every call needs my explicit approval again, even if the values are identical to last time -- this server never remembers a prior answer itself (see DECISIONS.md D-034), so re-confirming quickly is the fast path here, not a workaround to skip.`,
+        ),
+    );
   },
   {
     serverInfo: { name: "clearance-lens", version: "0.1.0" },
