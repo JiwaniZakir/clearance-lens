@@ -72,6 +72,76 @@ describe("search_defense_roles", () => {
     expect(result.sources.length).toBeGreaterThan(0);
   });
 
+  // Regression for DECISIONS.md (judging panel round 8, function_engineer;
+  // root-caused against the live upstream, which intermittently returns
+  // HTTP 500 "query failed" on individual pages): a later page failing used
+  // to fail the whole call and discard every result already fetched.
+  it("keeps earlier pages' results when a later page fails upstream, and says the scan was cut short", async () => {
+    vi.mocked(searchJobs)
+      .mockResolvedValueOnce({
+        total: 100,
+        page: 0,
+        page_size: 50,
+        total_pages: 2,
+        has_more: true,
+        next_page: 1,
+        jobs: [summary({ id: "job-1" })],
+      })
+      .mockRejectedValueOnce(new Error("Speedrun API returned 500"));
+    vi.mocked(getJob).mockResolvedValueOnce(detail("Build autonomy software."));
+
+    const result = await searchDefenseRolesTool.handler({ limit: 10 });
+    expect(result.roles.map((r) => r.id)).toEqual(["job-1"]);
+    expect(result.note).toMatch(/returned an error partway through this scan/i);
+  });
+
+  it("only the first page retries — a later page gets one attempt, since losing it now degrades gracefully", async () => {
+    vi.mocked(searchJobs)
+      .mockResolvedValueOnce({
+        total: 100,
+        page: 0,
+        page_size: 50,
+        total_pages: 2,
+        has_more: true,
+        next_page: 1,
+        jobs: [summary({ id: "job-1" })],
+      })
+      .mockResolvedValueOnce({
+        total: 100,
+        page: 1,
+        page_size: 50,
+        total_pages: 2,
+        has_more: false,
+        next_page: null,
+        jobs: [],
+      });
+    vi.mocked(getJob).mockResolvedValueOnce(detail("Build autonomy software."));
+
+    await searchDefenseRolesTool.handler({ limit: 10 });
+    const calls = vi.mocked(searchJobs).mock.calls;
+    expect(calls.at(-2)?.[1]).toBeUndefined(); // first page: default retry budget
+    expect(calls.at(-1)?.[1]).toEqual({ maxAttempts: 1 }); // later page: one attempt
+  });
+
+  it("still surfaces a real error when the FIRST page fails — there's nothing to return without it", async () => {
+    vi.mocked(searchJobs).mockRejectedValueOnce(new Error("Speedrun API returned 500"));
+    await expect(searchDefenseRolesTool.handler({ limit: 10 })).rejects.toThrow();
+  });
+
+  it("zero-result guidance states that only the a16z speedrun network's companies are searched", async () => {
+    vi.mocked(searchJobs).mockResolvedValueOnce({
+      total: 0,
+      page: 0,
+      page_size: 50,
+      total_pages: 0,
+      has_more: false,
+      next_page: null,
+      jobs: [],
+    });
+    const result = await searchDefenseRolesTool.handler({ query: "some prime contractor", limit: 10 });
+    expect(result.note).toMatch(/only companies in the a16z speedrun Talent Network/i);
+  });
+
   it("stops scanning at the page cap even if has_more stays true (the historical 159-of-209 pagination bug this guards against)", async () => {
     vi.mocked(searchJobs).mockImplementation(async ({ page }) => ({
       total: 1000,

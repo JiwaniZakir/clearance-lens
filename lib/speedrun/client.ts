@@ -35,9 +35,9 @@ function buildUrl(path: string, params: Record<string, string | number | boolean
   return url.toString();
 }
 
-async function fetchJson<T>(url: string, notFoundMessage?: string): Promise<T> {
+async function fetchJson<T>(url: string, notFoundMessage?: string, maxAttempts = MAX_RETRIES): Promise<T> {
   let lastError: unknown;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     let res: Response;
     try {
       res = await fetch(url, {
@@ -59,7 +59,7 @@ async function fetchJson<T>(url: string, notFoundMessage?: string): Promise<T> {
     // 5xx is the upstream's own failure, not ours — retry a bounded number of
     // times before surfacing it. Verified live: a transient 500 here is real,
     // not hypothetical (see DECISIONS.md D-006).
-    if (res.status >= 500 && attempt < MAX_RETRIES - 1) {
+    if (res.status >= 500 && attempt < maxAttempts - 1) {
       await backoff(attempt);
       continue;
     }
@@ -91,7 +91,13 @@ function backoff(attempt: number, explicitMs?: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function searchJobs(params: SpeedrunJobSearchParams): Promise<SpeedrunJobSearchResponse> {
+/** `maxAttempts` lets a caller that can degrade gracefully on failure (a
+ * later page of a multi-page scan) skip the retry backoff, which otherwise
+ * adds seconds of latency for a page whose loss costs that caller little. */
+export async function searchJobs(
+  params: SpeedrunJobSearchParams,
+  options: { maxAttempts?: number } = {},
+): Promise<SpeedrunJobSearchResponse> {
   const url = buildUrl("/jobs", {
     q: params.q,
     industry: params.industry,
@@ -100,7 +106,7 @@ export async function searchJobs(params: SpeedrunJobSearchParams): Promise<Speed
     page: params.page,
     scope: params.scope,
   });
-  return fetchJson<SpeedrunJobSearchResponse>(url);
+  return fetchJson<SpeedrunJobSearchResponse>(url, undefined, options.maxAttempts);
 }
 
 export async function getJob(id: string): Promise<SpeedrunJobDetailResponse> {
