@@ -1,26 +1,203 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Design tokens per research/R2-design-system.md §2.1. Values are exact
+ * conversions from the oklch() triples specified there (computed via the
+ * CSS Color 4 OKLab matrices, contrast-checked against WCAG 2.2 AA) — not
+ * eyeballed. Four hues total, ever: neutral, accent, plus success/caution/
+ * danger for the three-tone aligned/mixed/unclear status system.
+ *
+ * Dark mode is class-based (`.dark` on <html>), driven by next-themes
+ * (attribute="class", its default) — NOT a `prefers-color-scheme` media
+ * query or a `data-theme` attribute. next-themes injects a blocking
+ * inline script that sets the class before first paint, so there's no
+ * flash-of-wrong-theme to guard against with a media-query fallback.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* neutral (hue 258) */
+  --neutral-1: #fdfdfe;
+  --neutral-2: #f8f8fa;
+  --neutral-3: #eef0f3;
+  --neutral-4: #e5e8ec;
+  --neutral-5: #dce0e5;
+  --neutral-6: #d0d4db;
+  --neutral-7: #b9bec6;
+  --neutral-8: #989fa9;
+  --neutral-9: #6d7580;
+  --neutral-10: #5c646f;
+  --neutral-11: #474e57;
+  --neutral-12: #0d1014;
+  /* accent "signal blue" (hue 252) */
+  --accent-1: #f5f9fe;
+  --accent-2: #e9f1fb;
+  --accent-3: #d8e6f7;
+  --accent-4: #c7dbf3;
+  --accent-5: #b3cdec;
+  --accent-6: #9abbe0;
+  --accent-7: #7ba2ce;
+  --accent-8: #5a89be;
+  --accent-9: #2273c3;
+  --accent-10: #1b62a7;
+  --accent-11: #0b5ca3;
+  --accent-12: #0a345c;
+  /* semantic: success (aligned), caution (mixed), danger (errors only, never a fit verdict) */
+  --success-2: #e9f8ed;
+  --success-6: #98d5ac;
+  --success-9: #32794f;
+  --success-11: #1c5434;
+  --caution-2: #faf2e8;
+  --caution-6: #f1bd73;
+  --caution-9: #d9951d;
+  --caution-11: #753b07;
+  --danger-2: #fdf0ef;
+  --danger-6: #f9aea7;
+  --danger-9: #bd413f;
+  --danger-11: #8d2425;
+  --on-solid-light: #ffffff;
+  --on-solid-dark: #0d1014;
+
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  --elevation-1: 0 0 0 1px rgba(13, 16, 20, 0.08);
+  --elevation-2: 0 0 0 1px rgba(13, 16, 20, 0.08), 0 2px 4px rgba(13, 16, 20, 0.04);
+  --elevation-3:
+    0 0 0 1px rgba(13, 16, 20, 0.08), 0 8px 24px rgba(13, 16, 20, 0.1), 0 2px 8px rgba(13, 16, 20, 0.06);
+  --elevation-4: 0 0 0 1px rgba(13, 16, 20, 0.08), 0 24px 48px -12px rgba(13, 16, 20, 0.28);
+  --scrim: rgba(13, 16, 20, 0.4);
+}
+
+.dark {
+  --neutral-1: #090a0c;
+  --neutral-2: #0f1113;
+  --neutral-3: #171a1d;
+  --neutral-4: #202327;
+  --neutral-5: #2a2e33;
+  --neutral-6: #363b41;
+  --neutral-7: #484d55;
+  --neutral-8: #5d646e;
+  --neutral-9: #737b86;
+  --neutral-10: #858d99;
+  --neutral-11: #9ea5af;
+  --neutral-12: #e9ebee;
+  --accent-1: #0b141f;
+  --accent-2: #0e1b2a;
+  --accent-3: #13283e;
+  --accent-4: #183453;
+  --accent-5: #1c4168;
+  --accent-6: #245282;
+  --accent-7: #2b639c;
+  --accent-8: #3677bb;
+  --accent-9: #418fe1;
+  --accent-10: #54a2f5;
+  --accent-11: #6eaff7;
+  --accent-12: #c7e1ff;
+  --success-2: #06150c;
+  --success-6: #115531;
+  --success-9: #1b9155;
+  --success-11: #60bb83;
+  --caution-2: #1d1102;
+  --caution-6: #63471c;
+  --caution-9: #c38c37;
+  --caution-11: #e8aa4e;
+  --danger-2: #200e0d;
+  --danger-6: #72302d;
+  --danger-9: #d55753;
+  --danger-11: #f28881;
+  --elevation-1: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --elevation-2: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 2px 4px rgba(0, 0, 0, 0.4);
+  --elevation-3: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 24px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --elevation-4: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 24px 48px -12px rgba(0, 0, 0, 0.7);
+  --scrim: rgba(0, 0, 0, 0.65);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-neutral-1: var(--neutral-1);
+  --color-neutral-2: var(--neutral-2);
+  --color-neutral-3: var(--neutral-3);
+  --color-neutral-4: var(--neutral-4);
+  --color-neutral-5: var(--neutral-5);
+  --color-neutral-6: var(--neutral-6);
+  --color-neutral-7: var(--neutral-7);
+  --color-neutral-8: var(--neutral-8);
+  --color-neutral-9: var(--neutral-9);
+  --color-neutral-10: var(--neutral-10);
+  --color-neutral-11: var(--neutral-11);
+  --color-neutral-12: var(--neutral-12);
+  --color-accent-1: var(--accent-1);
+  --color-accent-2: var(--accent-2);
+  --color-accent-3: var(--accent-3);
+  --color-accent-4: var(--accent-4);
+  --color-accent-5: var(--accent-5);
+  --color-accent-6: var(--accent-6);
+  --color-accent-7: var(--accent-7);
+  --color-accent-8: var(--accent-8);
+  --color-accent-9: var(--accent-9);
+  --color-accent-10: var(--accent-10);
+  --color-accent-11: var(--accent-11);
+  --color-accent-12: var(--accent-12);
+  --color-success-2: var(--success-2);
+  --color-success-6: var(--success-6);
+  --color-success-9: var(--success-9);
+  --color-success-11: var(--success-11);
+  --color-caution-2: var(--caution-2);
+  --color-caution-6: var(--caution-6);
+  --color-caution-9: var(--caution-9);
+  --color-caution-11: var(--caution-11);
+  --color-danger-2: var(--danger-2);
+  --color-danger-6: var(--danger-6);
+  --color-danger-9: var(--danger-9);
+  --color-danger-11: var(--danger-11);
+  --color-on-solid-light: var(--on-solid-light);
+  --color-on-solid-dark: var(--on-solid-dark);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    border-color: var(--neutral-6);
+  }
+  body {
+    background: var(--neutral-1);
+    color: var(--neutral-12);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .shadow-elevation-1 {
+    box-shadow: var(--elevation-1);
+  }
+  .shadow-elevation-2 {
+    box-shadow: var(--elevation-2);
+  }
+  .shadow-elevation-3 {
+    box-shadow: var(--elevation-3);
+  }
+  .shadow-elevation-4 {
+    box-shadow: var(--elevation-4);
+  }
+}
+
+/* Respect prefers-reduced-motion globally (Do/Don't #1) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
