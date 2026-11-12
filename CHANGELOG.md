@@ -233,3 +233,26 @@ The compliant alternative to "AI recruiter panels that score candidates," recomm
 
 ### test
 - 9 new unit tests; unit suite 365 → 374. E2E 87 passed (1 pre-existing skip), protocol 14/14.
+
+## [Unreleased] — judging panel round 8 response (2026-11-12)
+
+Round 8: trimmed mean **7.61**, median **7.90** (highest median yet), capped at 6.0 by a hard-constraint finding. Full results `panel/round-8/`, full response DECISIONS.md D-042.
+
+### fix
+- **Hard constraint: bare numeric birthdates** ("01/15/1990", "1990-01-15") passed the PII guard without a "DOB"/"born" keyword. Any day-precise date at least 16 years in the past is now caught; recent and future dates are unaffected.
+- **Hard constraint: SSN fragments split across intro-card fields with filler between them** passed the cross-field check. An explicit SSN reference plus 9+ digits anywhere in the card is now rejected — a rule decoy digits can't defeat.
+- `search_defense_roles` discarded every result when one later page failed upstream (the speedrun API intermittently returns HTTP 500 on individual pages). Earlier pages' results now survive with a note, and later pages skip retry backoff that had pushed a failing call to 26 seconds. Zero-result guidance now states only a16z speedrun companies are searched.
+- **The shareable signed credential couldn't be verified by its recipient** — it omitted the exact signed bytes. Now included, with a key fingerprint.
+- `estimate_timeline` returned identical numbers for `employer_has_fcl` "yes" and "no"; the sourced 90–270 day sponsorship wait is now in the structured estimate, and in its own `employerFclWaitDays` field.
+- `/try` server-rendered nothing until JavaScript loaded; it now renders the nav, intro, every tool's name, a loading state, and a `<noscript>` note.
+- A question about "NBIS and DISS record systems" was rejected as pasted record content.
+- The hero transcript read half-typed to screen readers mid-animation (now a static copy for assistive tech), and was labeled "live" though scripted.
+- `/sources` omitted the a16z speedrun data source and two research citations.
+- `readiness_brief.recruiterQuestions` renamed `questionsToAskTheRecruiter` (they're questions to ask, not from).
+
+### feat
+- **New tool `verify_signed_attestation`** — the recipient's half of `prepare_signed_attestation`: checks a credential was signed by the key it names and hasn't been altered, returns its claims and a key fingerprint for recognizing repeat signers. Never that the claim is true. Ships with its `/try` tab.
+
+### test
+- A test now requires every URL any tool cites to appear on `/sources` and in `SOURCES.md` (mutation-checked).
+- Unit suite 374 → 409. E2E 88 passed / 2 skipped, including a real-browser sign → share → verify round trip. Protocol 14/14.
