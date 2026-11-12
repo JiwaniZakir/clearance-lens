@@ -1,36 +1,144 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Clearance Lens
 
-## Getting Started
+A stateless remote **MCP server** + web app that helps people pursue US defense-tech roles **from inside the AI agent they already use** — Claude, Cursor, ChatGPT, Grok, VS Code — instead of joining yet another platform.
 
-First, run the development server:
+**Your agent does the private reasoning. The server is a stateless, public-knowledge toolbox.** It never receives, stores, or logs PII, clearance details, or screenshots — it gives your agent rubrics, rules, timelines, and templates, and your agent evaluates them locally against what it already knows about you.
+
+- **Production:** https://clearance-lens.vercel.app
+- **MCP endpoint:** `https://clearance-lens.vercel.app/mcp`
+- **Playground (no agent needed):** https://clearance-lens.vercel.app/try
+
+---
+
+## 60-second quickstart
+
+**Add it to your agent** (pick one):
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Claude Code — one line
+claude mcp add --transport http clearance-lens https://clearance-lens.vercel.app/mcp
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+```json
+// Claude Desktop / claude.ai connectors, Cursor, VS Code, or any client
+// that reads a generic mcpServers block — paste this and restart
+{
+  "mcpServers": {
+    "clearance-lens": {
+      "url": "https://clearance-lens.vercel.app/mcp"
+    }
+  }
+}
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+For ChatGPT: **Settings → Connectors → Add custom connector**, name it `Clearance Lens`, paste the URL above, and leave authentication as "No auth."
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Then just ask your agent something like:
 
-## Learn More
+> *"I'm a green-card holder — can I work the Anduril Fury role? How long would a Secret clearance realistically take?"*
 
-To learn more about Next.js, take a look at the following resources:
+No agent handy? Try every tool directly at **[/try](https://clearance-lens.vercel.app/try)** — it calls the exact same server, no LLM key required.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## What it does
 
-## Deploy on Vercel
+| Tool | What it's for |
+|---|---|
+| `search_defense_roles` | Live defense/hard-tech roles, with requirement signals labeled **stated** (quoted from the posting) vs **inferred** (a judgment call to confirm) |
+| `get_role_rubric` | An eligibility checklist + skills rubric for your agent to evaluate **privately** |
+| `estimate_timeline` | How long a clearance might realistically take — as a range, never a false-precision number |
+| `readiness_brief` | A template your agent fills in locally: eligibility, gaps, a 2-week prep plan, recruiter questions |
+| `build_trial_assessment` | A 60/90/180-minute ITAR-safe work-sample exercise built only from the public posting |
+| `explain_rule` | Plain-English ITAR/clearance rule explanations with primary-source links |
+| `verify_evidence` | A GitHub profile's already-public signal, via GitHub's public API only |
+| `run_job_preview` | A 6-scene "first week" realistic simulation — played straight, not sanitized |
+| `fit_debrief` | Loved/disliked work-style tags → a summary template and questions to ask the company. Never a score. |
+| `get_company_profile` | Published facts + computed work realities — returns *gaps*, not a guess, when no sourced criteria exist |
+| `prepare_consented_card` | A shareable intro card from **only** the fields you explicitly approved |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Every tool call returns `sources[]` and, where relevant, a `disclaimer`. Full specs: [`PLAN.md`](./PLAN.md) §2.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph clients["Your agent"]
+        A[Claude / Cursor / ChatGPT / VS Code]
+    end
+    subgraph browser["Browser, no agent needed"]
+        B["/try playground"]
+    end
+
+    A -- "Streamable HTTP" --> MCP["app/mcp/route.ts<br/>(mcp-handler + @modelcontextprotocol/server v2)"]
+    B -- "POST JSON" --> API["app/api/tools/[name]/route.ts"]
+
+    MCP --> Wrap
+    API --> Wrap
+
+    subgraph core["lib/tools/wrap.ts — callTool()"]
+        Wrap["1. input-size limit<br/>2. PII/CUI guard<br/>3. zod input validation<br/>4. tool handler<br/>5. zod output validation"]
+    end
+
+    Wrap --> Registry["lib/tools/registry.ts<br/>(the one shared list — adding a tool here\nexposes it on BOTH surfaces)"]
+    Registry --> Handlers["lib/tools/*.ts — 11 tool handlers"]
+
+    Handlers --> Speedrun["a16z speedrun Talent\nNetwork public API"]
+    Handlers --> GitHub["GitHub public REST API"]
+    Handlers --> Data["data/*.json\n(rules, timelines, companies,\nfit-tags, job-preview-scenes)"]
+
+    style Wrap fill:#2273c3,color:#fff
+```
+
+**Stateless by design:** no database, no user accounts, no stored queries (see [`DECISIONS.md`](./DECISIONS.md) D-001/D-002). The MCP route and the `/try` playground call the **exact same** `lib/tools/*` implementations through the same `callTool()` pipeline — there is no second copy of any tool's logic.
+
+---
+
+## Development
+
+```bash
+pnpm install
+pnpm dev                 # http://localhost:3000
+```
+
+```bash
+pnpm verify               # lint + typecheck + unit tests + link check (fast, no server needed)
+pnpm test                 # unit tests only
+MCP_URL=http://localhost:3000/mcp pnpm test:protocol   # real MCP client against a running server
+pnpm test:e2e              # Playwright — needs a build; see playwright.config.ts
+```
+
+Requires Node `>=22.19.0` (see [`DECISIONS.md`](./DECISIONS.md) D-011) and pnpm.
+
+### Project layout
+
+```
+app/
+  mcp/route.ts                 the MCP server (tools, resources, prompts)
+  api/tools/[name]/route.ts    the /try playground's API surface — same tools, same guard
+  api/health/route.ts
+  page.tsx  try/  privacy/  sources/
+lib/
+  tools/*.ts                   one file per MCP tool; tools/registry.ts lists them all
+  tools/wrap.ts                 the shared callTool() pipeline (PII guard, validation, errors)
+  guard/pii.ts                  the PII/CUI detector
+  speedrun/  github/            typed API clients
+data/                           rules.json, timelines.json, companies.json, fit-tags.ts, job-preview-scenes.ts
+components/                     design-system components (see research/R2-design-system.md)
+research/                       Phase R research reports (R1–R5), each fully cited
+tests/
+  unit/      protocol/      e2e/
+```
+
+---
+
+## Privacy, sources, and limitations
+
+- **[/privacy](https://clearance-lens.vercel.app/privacy)** — exactly what's sent, stored (nothing), logged (no bodies), and refused.
+- **[/sources](https://clearance-lens.vercel.app/sources)** — every rule and statistic this product uses, with a primary-source link and a last-verified date. See also [`SOURCES.md`](./SOURCES.md).
+- This is **not legal advice**. Verify anything that matters with your Facility Security Officer or counsel.
+- Clearance Lens never queries DISS/NBIS/DCSA and never asks for clearance screenshots — the only legitimate verification path is your employer's FSO at the offer stage.
+
+Project history, decisions, and the honest current state: [`DECISIONS.md`](./DECISIONS.md), [`CHANGELOG.md`](./CHANGELOG.md), [`STATUS.md`](./STATUS.md).

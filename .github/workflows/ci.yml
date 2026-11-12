@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    name: Lint, typecheck, unit tests, link check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm linkcheck
+
+  integration:
+    name: Protocol, E2E, accessibility, performance
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npx playwright install --with-deps chromium
+      - run: pnpm build
+      - name: Start server
+        run: pnpm start -- -p 3100 &
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3100/api/health && exit 0
+            sleep 2
+          done
+          echo "Server did not become healthy in time" >&2
+          exit 1
+      - name: Protocol conformance
+        env:
+          MCP_URL: http://localhost:3100/mcp
+        run: pnpm test:protocol
+      - name: E2E + accessibility
+        env:
+          BASE_URL: http://localhost:3100
+        run: pnpm test:e2e
+      - name: Lighthouse CI
+        run: npx lhci autorun --collect.url=http://localhost:3100/ --collect.url=http://localhost:3100/try
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
