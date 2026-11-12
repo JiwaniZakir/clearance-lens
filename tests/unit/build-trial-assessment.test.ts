@@ -85,6 +85,17 @@ describe("build_trial_assessment", () => {
     expect(result.itarSafetyNote.length).toBeGreaterThan(0);
   });
 
+  // Regression for DECISIONS.md (judging panel round 6, recruiter_user): a
+  // real posting typo ("Mange the ... Systems Engineering homeroom") was
+  // copied verbatim into a rubric criterion with no caveat anywhere in the
+  // output explaining that this is deliberate, not a quality bug.
+  it("discloses that tracedToQuote is copied verbatim from the posting, typos included", async () => {
+    mockJob();
+    const result = await buildTrialAssessmentTool.handler({ role_id: "job-1", minutes: 60 });
+    expect(result.rubricRefinementNote).toMatch(/verbatim/i);
+    expect(result.rubricRefinementNote.toLowerCase()).toContain("typo");
+  });
+
   it("falls back gracefully when a posting has fewer bullets than the rubric size calls for", async () => {
     vi.mocked(getJob).mockResolvedValueOnce({
       job: {

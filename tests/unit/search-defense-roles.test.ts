@@ -144,6 +144,31 @@ describe("search_defense_roles", () => {
     expect(result.roles.map((r) => r.id)).toEqual(["secret-job"]);
   });
 
+  // Regression for DECISIONS.md (judging panel round 6, candidate_user):
+  // rolesScanned counts every posting matching the search terms, but only
+  // the first MAX_DETAIL_FETCHES (25) of those ever get a detail fetch and
+  // requirement-signal check -- previously that gap was disclosed only in
+  // `note`'s prose, which a caller reading just the headline count could
+  // miss entirely.
+  it("reports requirementSignalsCheckedCount separately from rolesScanned when more postings match than were detail-checked", async () => {
+    const jobs = Array.from({ length: 40 }, (_, i) => summary({ id: `job-${i}` }));
+    vi.mocked(searchJobs).mockResolvedValueOnce({
+      total: 40,
+      page: 0,
+      page_size: 50,
+      total_pages: 1,
+      has_more: false,
+      next_page: null,
+      jobs,
+    });
+    vi.mocked(getJob).mockImplementation(async (id: string) => detail("General engineering role.", { id }));
+
+    const result = await searchDefenseRolesTool.handler({ clearance: "secret", limit: 25 });
+    expect(result.rolesScanned).toBe(40);
+    expect(result.requirementSignalsCheckedCount).toBe(25);
+    expect(result.requirementSignalsCheckedCount).toBeLessThan(result.rolesScanned);
+  });
+
   it("tolerates an individual job-detail fetch failure without failing the whole search", async () => {
     vi.mocked(searchJobs).mockResolvedValueOnce({
       total: 2,

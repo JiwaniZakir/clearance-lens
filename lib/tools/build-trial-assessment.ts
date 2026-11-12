@@ -152,7 +152,8 @@ export const buildTrialAssessmentTool: ToolDef<z.infer<typeof InputSchema>, z.in
       ],
       rubric,
       rubricRefinementNote:
-        "These bands are a deterministic starting shape (so this works with no LLM key in the /try playground). Your own agent may sharpen the band language with more job-specific detail if useful — keep the Exceptional/Developing boundary anchored to the quoted requirement, not a generic trait.",
+        "These bands are a deterministic starting shape (so this works with no LLM key in the /try playground). Your own agent may sharpen the band language with more job-specific detail if useful — keep the Exceptional/Developing boundary anchored to the quoted requirement, not a generic trait. " +
+        "Each criterion's tracedToQuote is copied verbatim from the real posting, including any typo or awkward phrasing already in that posting — this is deliberate (inventing a \"corrected\" version would mean putting words in the employer's mouth), but it does mean you should give the rubric a human read before handing it to a candidate as a finished deliverable.",
       itarSafetyNote: DISCLAIMERS.itarSafeTrial,
       limitsNote:
         "Work-sample tests are a strong predictor of job performance in the research literature when professionally built, standardized, and behaviorally scored at scale (Sackett, Zhang, Berry & Lievens, 2022 — see sources[]) — that evidence licenses the design choices above (job-specific, traceable, behaviorally anchored), not a claim that this specific generated exercise reproduces any particular validity number.",

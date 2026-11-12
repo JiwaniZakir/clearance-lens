@@ -72,4 +72,36 @@ describe("explain_rule", () => {
     const result = await explainRuleTool.handler({ topic: "clearance-process" });
     expect(result.found).toBe(false);
   });
+
+  // Regression for DECISIONS.md (judging panel round 6): "green_card",
+  // "lpr", and "permanent resident clearance" all missed itar-us-person
+  // even though that rule's own summary directly answers them, because
+  // matching was exact-keyword over id/title/category only.
+  it.each(["green_card", "green card", "lpr", "permanent resident clearance", "LAWFUL PERMANENT RESIDENT"])(
+    "resolves the natural-language synonym %s to itar-us-person via its keywords list",
+    async (topic) => {
+      const result = await explainRuleTool.handler({ topic });
+      expect(result.found).toBe(true);
+      expect(result.topic?.id).toBe("itar-us-person");
+    },
+  );
+
+  // Regression for DECISIONS.md (judging panel round 6): no tool explained
+  // that DoD clearance *eligibility* for non-citizens (an LAA) is a
+  // separate, stricter regime than ITAR's "U.S. person" test.
+  it.each(["laa-non-citizen", "LAA", "limited access authorization", "non-citizen clearance"])(
+    "resolves %s to the new laa-non-citizen rule",
+    async (topic) => {
+      const result = await explainRuleTool.handler({ topic });
+      expect(result.found).toBe(true);
+      expect(result.topic?.id).toBe("laa-non-citizen");
+    },
+  );
+
+  it("itar-us-person's own content points a reader toward the separate, stricter LAA rule", async () => {
+    const result = await explainRuleTool.handler({ topic: "itar-us-person" });
+    expect(result.found).toBe(true);
+    const fullText = JSON.stringify(result.topic);
+    expect(fullText).toContain("laa-non-citizen");
+  });
 });

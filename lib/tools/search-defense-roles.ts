@@ -45,6 +45,15 @@ const RoleResultSchema = z.object({
 const OutputSchema = z.object({
   roles: z.array(RoleResultSchema),
   rolesScanned: z.number(),
+  // Found live via the spec §6 judging panel round 6 (candidate_user):
+  // `rolesScanned` counts postings matching the search terms, but only the
+  // first MAX_DETAIL_FETCHES of those ever get their requirement signals
+  // actually checked (bounds latency) -- that gap was previously disclosed
+  // only in `note`'s prose, which a caller reading just the headline count
+  // could miss. Always present as its own number so a calling agent can
+  // detect "rolesScanned > requirementSignalsCheckedCount" programmatically
+  // instead of depending on prose.
+  requirementSignalsCheckedCount: z.number(),
   note: z.string(),
   sources: z.array(SourceRefSchema),
   disclaimer: z.string(),
@@ -182,6 +191,7 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
         requirementSignals: signals,
       })),
       rolesScanned,
+      requirementSignalsCheckedCount: toDetail.length,
       note: notes.join(" "),
       sources: [SPEEDRUN_SOURCE],
       disclaimer: DISCLAIMERS.statedVsInferred,

@@ -19,6 +19,13 @@ export const RuleEntrySchema = z.object({
   summary: z.string(),
   keyPoints: z.array(z.string()),
   sources: z.array(SourceRefSchema).min(1),
+  // Optional, additional natural-language synonyms a user/agent might
+  // reasonably try that don't appear in id/title/category — found live via
+  // the spec §6 judging panel round 6: "green_card", "lpr", and "permanent
+  // resident clearance" all missed itar-us-person even though that rule's
+  // own summary directly answers them, because explain_rule's matching was
+  // exact-keyword over id/title/category only.
+  keywords: z.array(z.string()).optional(),
 });
 export type RuleEntry = z.infer<typeof RuleEntrySchema>;
 
@@ -52,6 +59,8 @@ export function findRule(topic: string): RuleEntry | undefined {
   if (byId) return byId;
   const byTitle = RULES.find((r) => normalizeTopicKey(r.title) === normalized);
   if (byTitle) return byTitle;
+  const byKeyword = RULES.find((r) => r.keywords?.some((k) => normalizeTopicKey(k) === normalized));
+  if (byKeyword) return byKeyword;
   // Match by category, but only when it uniquely identifies one rule —
   // also found live via round 4: the description's other example keyword,
   // "reciprocity," is a *category* value (several rules can share one),
