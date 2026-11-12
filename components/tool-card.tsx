@@ -24,7 +24,11 @@ export function ToolCard({ name, description, fields }: ToolCardProps) {
     <Card className="flex h-full flex-col gap-4 p-5 sm:p-6">
       <div className="flex-1">
         <p className="font-mono text-[0.8125rem] leading-[1.4] font-semibold text-neutral-12">{name}</p>
-        <p className="mt-2 text-[0.875rem] leading-[1.55] text-neutral-11">{description}</p>
+        {/* break-words: a tool's raw `description` (the TOOL_CARD_META
+            fallback) is written to teach an agent and can contain long
+            unbroken code tokens; without this, that silently overflowed
+            the card and the page at mobile widths (found live, round 6). */}
+        <p className="mt-2 text-[0.875rem] leading-[1.55] text-neutral-11 break-words">{description}</p>
         {fields.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {fields.map((field) => (

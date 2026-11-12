@@ -41,6 +41,12 @@ export const DISCLAIMERS = {
 
   exampleDataLabel:
     "Example data for illustration only — not a real role, person, or statistic.",
+
+  // Added for prepare_signed_attestation (Clearance Lens v2): a signature
+  // proves authorship and integrity, never truth — this must never read as
+  // "Clearance Lens verified this."
+  neverVerifiesAttestationTruth:
+    "A valid signature here confirms the claim was signed by whoever holds the matching private key, and that it hasn't been altered since signing — it does NOT confirm the claim itself is true. Clearance Lens cannot verify clearance status and never will — DISS/NBIS lookups are restricted to Facility Security Officers by design. The correct verification path is the employer's FSO at the offer stage, not a signed self-report.",
 } as const;
 
 export type DisclaimerKey = keyof typeof DISCLAIMERS;

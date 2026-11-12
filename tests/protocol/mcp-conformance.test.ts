@@ -64,12 +64,16 @@ describe(`MCP protocol conformance against ${MCP_URL}`, () => {
     expect(actual.headers.get("content-type")).toContain("text/event-stream");
   });
 
-  it("lists exactly the 11 tools in the registry, matching names 1:1", async () => {
+  it("lists exactly the tools in the registry, matching names 1:1", async () => {
     const { tools } = await client.listTools();
     const listedNames = tools.map((t) => t.name).sort();
     const registryNames = TOOL_REGISTRY.map((t) => t.name).sort();
     expect(listedNames).toEqual(registryNames);
-    expect(listedNames).toHaveLength(11);
+    // Derived from the registry itself, not hardcoded — found live (Clearance
+    // Lens v2): a hardcoded "11" here silently went stale the moment a 12th
+    // tool was registered, since toEqual(registryNames) alone would still
+    // pass if BOTH sides were wrong in the same way.
+    expect(listedNames).toHaveLength(TOOL_REGISTRY.length);
   });
 
   it("every tool advertises a non-empty description and an inputSchema", async () => {

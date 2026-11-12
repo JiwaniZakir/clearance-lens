@@ -64,6 +64,11 @@ const TOOL_CARD_META: Record<string, { blurb: string; fields: string[] }> = {
     blurb: "Builds a shareable intro card from only the fields you explicitly approved — nothing added or inferred.",
     fields: ["role_id", "fields_user_approved", "card"],
   },
+  prepare_signed_attestation: {
+    blurb:
+      "Wraps a self-asserted claim (clearance level, citizenship status, or availability) in a credential your own agent signs locally — proves who signed it and when, never that the claim itself is true.",
+    fields: ["claims", "signature_base64", "credential"],
+  },
 };
 
 export default function Home() {

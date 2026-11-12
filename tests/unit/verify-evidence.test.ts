@@ -10,7 +10,13 @@ vi.mock("@/lib/github/client", async (importActual) => ({
   getPublicSignalSummary: vi.fn(),
 }));
 
+vi.mock("@/lib/gitlab/client", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/gitlab/client")>()),
+  getGitLabPublicSignalSummary: vi.fn(),
+}));
+
 import { getPublicSignalSummary } from "@/lib/github/client";
+import { getGitLabPublicSignalSummary } from "@/lib/gitlab/client";
 import { verifyEvidenceTool } from "@/lib/tools/verify-evidence";
 
 describe("verify_evidence", () => {
@@ -105,6 +111,75 @@ describe("verify_evidence", () => {
         verifyEvidenceTool.inputSchema.safeParse({ github_username_or_url: "https://github.com/octocat/Hello-World" })
           .success,
       ).toBe(false);
+    });
+  });
+
+  // Clearance Lens v2: GitLab is only used when a gitlab.com URL is given
+  // explicitly, so every existing (bare-username, github.com-URL) call is
+  // unaffected -- this block is entirely new behavior.
+  describe("GitLab path (only activated by an explicit gitlab.com URL)", () => {
+    it("routes a gitlab.com URL to GitLab and reports platform:'gitlab'", async () => {
+      vi.mocked(getGitLabPublicSignalSummary).mockResolvedValueOnce({
+        login: "sytses",
+        name: "Sid Sijbrandij",
+        profileUrl: "https://gitlab.com/sytses",
+        bio: null,
+        publicRepoCount: 5,
+        followers: null,
+        accountCreatedAt: null,
+        topLanguages: [],
+        recentActivity: [{ repo: "gitlab", url: "https://gitlab.com/sytses/gitlab", pushedAt: "2026-01-01T00:00:00Z", description: null }],
+      });
+      const result = await verifyEvidenceTool.handler({ github_username_or_url: "https://gitlab.com/sytses" });
+      expect(result.platform).toBe("gitlab");
+      expect(result.profile.login).toBe("sytses");
+      expect(result.profile.followers).toBeNull();
+      expect(result.profile.accountCreatedAt).toBeNull();
+      expect(result.sources).toEqual([{ title: "GitLab: https://gitlab.com/sytses", url: "https://gitlab.com/sytses" }]);
+      expect(result.disclaimer).toMatch(/already public on GitLab/i);
+      expect(getPublicSignalSummary).not.toHaveBeenCalled();
+    });
+
+    it("never reports a fabricated 0 for fields GitLab's public API doesn't expose", async () => {
+      vi.mocked(getGitLabPublicSignalSummary).mockResolvedValueOnce({
+        login: "u",
+        name: null,
+        profileUrl: "https://gitlab.com/u",
+        bio: null,
+        publicRepoCount: 0,
+        followers: null,
+        accountCreatedAt: null,
+        topLanguages: [],
+        recentActivity: [],
+      });
+      const result = await verifyEvidenceTool.handler({ github_username_or_url: "https://gitlab.com/u" });
+      expect(result.profile.followers).toBeNull();
+      expect(result.profile.accountCreatedAt).toBeNull();
+      expect(result.disclaimer).toMatch(/doesn't expose a follower count/i);
+    });
+
+    it("a bare username (no URL) still defaults to GitHub, not GitLab", async () => {
+      vi.mocked(getPublicSignalSummary).mockResolvedValueOnce({
+        login: "octocat",
+        name: null,
+        profileUrl: "https://github.com/octocat",
+        bio: null,
+        publicRepoCount: 1,
+        followers: 1,
+        accountCreatedAt: "2011-01-01T00:00:00Z",
+        topLanguages: [],
+        recentActivity: [],
+        rateLimitRemaining: null,
+      });
+      const result = await verifyEvidenceTool.handler({ github_username_or_url: "octocat" });
+      expect(result.platform).toBe("github");
+      expect(getGitLabPublicSignalSummary).not.toHaveBeenCalled();
+    });
+
+    it("accepts a bare GitLab username format at the schema level", () => {
+      expect(verifyEvidenceTool.inputSchema.safeParse({ github_username_or_url: "https://gitlab.com/sytses" }).success).toBe(
+        true,
+      );
     });
   });
 });

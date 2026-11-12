@@ -10,6 +10,7 @@ import { getRoleRubricTool } from "@/lib/tools/get-role-rubric";
 import { readinessBriefTool } from "@/lib/tools/readiness-brief";
 import { fitDebriefTool } from "@/lib/tools/fit-debrief";
 import { prepareConsentedCardTool } from "@/lib/tools/prepare-consented-card";
+import { prepareSignedAttestationTool } from "@/lib/tools/prepare-signed-attestation";
 
 /**
  * The single list of every tool this server exposes. Both app/mcp/route.ts
@@ -36,6 +37,7 @@ export const TOOL_REGISTRY: ToolDef<any, any>[] = [
   readinessBriefTool,
   fitDebriefTool,
   prepareConsentedCardTool,
+  prepareSignedAttestationTool,
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
