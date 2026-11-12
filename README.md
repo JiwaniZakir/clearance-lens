@@ -51,11 +51,12 @@ No agent handy? Try every tool directly at **[/try](https://clearance-lens.verce
 | `readiness_brief` | A template your agent fills in locally: eligibility, gaps, a 2-week prep plan, recruiter questions |
 | `build_trial_assessment` | A 60/90/180-minute ITAR-safe work-sample exercise built only from the public posting |
 | `explain_rule` | Plain-English ITAR/clearance rule explanations with primary-source links |
-| `verify_evidence` | A GitHub profile's already-public signal, via GitHub's public API only |
+| `verify_evidence` | A GitHub or GitLab profile's already-public signal, via each platform's public API only |
 | `run_job_preview` | A 6-scene "first week" realistic simulation — played straight, not sanitized |
 | `fit_debrief` | Loved/disliked work-style tags → a summary template and questions to ask the company. Never a score. |
 | `get_company_profile` | Published facts + computed work realities — returns *gaps*, not a guess, when no sourced criteria exist |
 | `prepare_consented_card` | A shareable intro card from **only** the fields you explicitly approved |
+| `prepare_signed_attestation` | Wraps a self-asserted claim (clearance level, citizenship status, or availability) in a credential your own agent signs locally — proves who signed it and when, never that the claim itself is true |
 
 Every tool call returns `sources[]` and, where relevant, a `disclaimer`. Full specs: [`PLAN.md`](./PLAN.md) §2.
 
@@ -83,10 +84,10 @@ flowchart TB
     end
 
     Wrap --> Registry["lib/tools/registry.ts<br/>(the one shared list — adding a tool here\nexposes it on BOTH surfaces)"]
-    Registry --> Handlers["lib/tools/*.ts — 11 tool handlers"]
+    Registry --> Handlers["lib/tools/*.ts — 12 tool handlers"]
 
     Handlers --> Speedrun["a16z speedrun Talent\nNetwork public API"]
-    Handlers --> GitHub["GitHub public REST API"]
+    Handlers --> GitHub["GitHub / GitLab public REST APIs"]
     Handlers --> Data["data/*.json\n(rules, timelines, companies,\nfit-tags, job-preview-scenes)"]
 
     style Wrap fill:#2273c3,color:#fff
