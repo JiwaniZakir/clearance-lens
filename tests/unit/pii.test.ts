@@ -485,3 +485,75 @@ describe("judging panel round 7: hard-constraint finding, now fixed (email/phone
     expect(cats).not.toContain("phone");
   });
 });
+
+describe("judging panel round 8: hard-constraint findings, now fixed", () => {
+  // A bare birthdate typed the way people normally type one — no "DOB" or
+  // "born" keyword — previously passed every tool.
+  it.each(["01/15/1990", "1990-01-15", "15/01/1990", "Available starting 01/15/1990 full time"])(
+    "flags a day-precise date with a birth-plausible year, with no keyword: %s",
+    (text) => {
+      expect(categoriesOf(text)).toContain("dob");
+    },
+  );
+
+  it.each([
+    "Available 2026-12-01",
+    "Available starting 01/15/2027",
+    "Shipped v2 on 2019-06-01",
+    "Graduated 05/2015",
+    "Active TS since 2008",
+    "issued_at 2026-11-12T20:25:55.634Z",
+    "Role ee11f2da-5d5e-464b-adc3-6e15b7c9942b",
+  ])("does NOT flag a recent/future date, a month-year, a bare year, a timestamp, or a UUID: %s", (text) => {
+    expect(categoriesOf(text)).not.toContain("dob");
+  });
+
+  it("a question about the NBIS/DISS record SYSTEMS is not mistaken for pasted record content", () => {
+    expect(categoriesOf("what is the difference between NBIS and DISS record systems")).not.toContain(
+      "clearance_record",
+    );
+    expect(categoriesOf("DISS recordkeeping rules")).not.toContain("clearance_record");
+  });
+
+  it("actual record content is still rejected", () => {
+    expect(categoriesOf("My DISS record shows eligibility granted")).toContain("clearance_record");
+  });
+});
+
+describe("judging panel round 8: fragmented SSN across prepare_consented_card fields", () => {
+  const ORDER = [
+    "headline",
+    "clearance_status_self_reported",
+    "citizenship_status_self_reported",
+    "highlights",
+    "github_username",
+    "availability",
+    "notes",
+  ];
+
+  it("rejects an SSN split across two fields with filler text between the digit groups (the reported bypass)", async () => {
+    const { scanConcatenatedFields } = await import("@/lib/guard/pii");
+    const cats = scanConcatenatedFields({ headline: "SSN part A 123-45", notes: "SSN part B 6789 thanks" }, ORDER).map(
+      (f) => f.category,
+    );
+    expect(cats).toContain("ssn");
+  });
+
+  it("is not defeated by inserting decoy digits between the fragments", async () => {
+    const { scanConcatenatedFields } = await import("@/lib/guard/pii");
+    const cats = scanConcatenatedFields({ headline: "SSN part 1: 123-45", notes: "part 2 (of 2): 6789" }, ORDER).map(
+      (f) => f.category,
+    );
+    expect(cats).toContain("ssn");
+  });
+
+  it("does not flag an ordinary card with no SSN reference, regardless of how many digits it has", async () => {
+    const { scanConcatenatedFields } = await import("@/lib/guard/pii");
+    expect(
+      scanConcatenatedFields(
+        { headline: "Backend engineer, 6 yrs", availability: "Available 2026-12-01", notes: "Led a 12-person team" },
+        ORDER,
+      ),
+    ).toHaveLength(0);
+  });
+});

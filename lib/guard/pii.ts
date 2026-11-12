@@ -161,8 +161,14 @@ const CASE_ID_SHAPE =
  *  own history (DECISIONS.md D-016) already fixed once — "SON" itself was
  *  deliberately left out despite appearing in the same bypass string,
  *  since it collides with the ordinary English word. */
+// "record" excludes "record system(s)" / "record-keeping" — found live via
+// the spec §6 judging panel round 8 (trust_skeptic): "what is the
+// difference between NBIS and DISS record systems" was rejected as pasted
+// clearance-record text, the same question-about-a-system vs. content-
+// from-one confusion D-016 fixed for the bare system names. "My DISS
+// record shows..." (record followed by content) is still rejected.
 const CLEARANCE_RECORD_CONTEXT =
-  /\b(?:diss|jpas|nbis)\s+(?:record|printout|screenshot|summary|history|shows|says|entry)|e-?adjudication|subject summary|investigation (?:opened|closed)|adjudication (?:result|history)|eqip (?:record|history)|owning\s+smo|\bpsq\b/i;
+  /\b(?:diss|jpas|nbis)\s+(?:record(?!s?\s+systems?\b)(?!\s*-?\s*keeping)|printout|screenshot|summary|history|shows|says|entry)|e-?adjudication|subject summary|investigation (?:opened|closed)|adjudication (?:result|history)|eqip (?:record|history)|owning\s+smo|\bpsq\b/i;
 
 /** Clearance-adjudication jargon, each too short/generic to flag bare (e.g.
  *  "CI" collides with "Continuous Integration" in a tech-hiring context,
@@ -239,6 +245,41 @@ const EMAIL_SHAPE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
  *  legitimate reason to contain one anyway. */
 const PHONE_FORMATTED = /\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/;
 
+/** A full calendar date — day precision AND a 4-digit year — in either
+ *  M/D/YYYY (or M-D-YYYY) or YYYY-M-D order. Found live via the spec §6
+ *  judging panel round 8 (trust_skeptic, reproduced 3 times): the DOB
+ *  detector above requires a birth keyword ("DOB"/"born") next to a date,
+ *  so a bare birthdate typed the way people normally type one
+ *  ("01/15/1990", "1990-01-15") passed every tool, and was echoed into
+ *  prepare_consented_card's shareable card as "Available starting
+ *  01/15/1990." */
+const FULL_NUMERIC_DATE = /\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b|\b(\d{4})[/-](\d{1,2})[/-](\d{1,2})\b/g;
+/** No legitimate input to this product has a reason to carry a day-precise
+ *  date more than this many years in the past: availability and start
+ *  dates are near-future, posting dates are recent, and work history on a
+ *  card is expressed in years or month/year. A day-precise date this old
+ *  is, overwhelmingly, someone's birthdate — 16 being a working-age floor,
+ *  so every working adult's birth year falls at or before it. Deliberately
+ *  NOT applied to month/year or 2-digit-year forms ("05/2015", "1/2/10"),
+ *  which still require a birth keyword, as before — those shapes collide
+ *  with ordinary non-date content too often to flag on structure alone. */
+const BIRTH_PLAUSIBLE_MIN_AGE_YEARS = 16;
+const BIRTH_PLAUSIBLE_MAX_AGE_YEARS = 100;
+
+function hasBirthPlausibleFullDate(text: string): boolean {
+  const currentYear = new Date().getUTCFullYear();
+  for (const m of text.matchAll(FULL_NUMERIC_DATE)) {
+    // Group 1-3: M/D/YYYY (or D/M/YYYY — either order is checked as
+    // plausible below); group 4-6: YYYY-M-D.
+    const [year, a, b] = m[3] ? [Number(m[3]), Number(m[1]), Number(m[2])] : [Number(m[4]), Number(m[5]), Number(m[6])];
+    const age = currentYear - year;
+    if (age < BIRTH_PLAUSIBLE_MIN_AGE_YEARS || age > BIRTH_PLAUSIBLE_MAX_AGE_YEARS) continue;
+    const isCalendarDate = (month: number, day: number) => month >= 1 && month <= 12 && day >= 1 && day <= 31;
+    if (isCalendarDate(a, b) || isCalendarDate(b, a)) return true;
+  }
+  return false;
+}
+
 /** The actual, un-obfuscated detectors. Operates on already-normalized,
  *  already-decoded plain text — see `scanTextForPiiCui` below, which is the
  *  only caller and the thing that actually runs against raw user input. */
@@ -264,6 +305,7 @@ function scanPlainText(text: string): PiiFinding[] {
   ) {
     add("dob");
   }
+  if (hasBirthPlausibleFullDate(text)) add("dob");
 
   if (PASSPORT_CONTEXT.test(text) && ALPHANUM_ID_TOKEN.test(text)) add("passport");
 
@@ -444,7 +486,27 @@ export function scanConcatenatedFields(
       for (const item of value) if (typeof item === "string") parts.push(item);
     }
   }
-  return scanTextForPiiCui(parts.join(" "));
+  const joined = parts.join(" ");
+  const findings = scanTextForPiiCui(joined);
+
+  // Found live via the spec §6 judging panel round 8 (trust_skeptic):
+  // splitting an SSN across fields WITH filler text between the digit
+  // groups (headline "SSN part A 123-45", notes "SSN part B 6789 thanks")
+  // defeated the contiguous-pattern scan of the joined text above, and
+  // both fragments were echoed into the shareable card. Pattern matching
+  // on the digit groups' shapes can always be defeated by inserting more
+  // filler or decoy digits, so this keys on what can't be removed: an
+  // explicit SSN reference plus at least 9 digits anywhere in the card —
+  // inserting decoy digits only makes it MORE likely to fire. Scoped to
+  // this shareable card only: elsewhere, a question like "do I need an
+  // SSN for a clearance?" is legitimate, but an intro card meant for an
+  // employer has no reason to mention an SSN at all, so the false-positive
+  // cost (asking someone to drop an SSN mention) is the right remedy anyway.
+  const digitCount = (joined.match(/\d/g) ?? []).length;
+  if (SSN_CONTEXT.test(normalizeForScan(joined)) && digitCount >= 9 && !findings.some((f) => f.category === "ssn")) {
+    findings.push({ category: "ssn", message: FRIENDLY_BY_CATEGORY.ssn });
+  }
+  return findings;
 }
 
 /** A bare, isolated 9-digit run with NO keyword context at all — the normal
