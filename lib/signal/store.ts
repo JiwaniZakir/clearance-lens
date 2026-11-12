@@ -15,13 +15,21 @@
  * k-anonymity floor so a reader can never learn anything about a group
  * smaller than MIN_CONTRIBUTORS.
  *
- * Backend selection: if UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN are
- * set (via `vercel install upstash` or equivalent), contributions persist
- * durably in Upstash Redis. If not, this falls back to an in-memory Map so
- * local development and tests work with no external account — but that
- * fallback is NOT durable across separate serverless invocations in
- * production, and getAggregate()'s own output says so explicitly rather
- * than silently reporting numbers that could reset without warning.
+ * Backend selection: if KV_REST_API_URL/KV_REST_API_TOKEN are set,
+ * contributions persist durably in Upstash Redis. If not, this falls back
+ * to an in-memory Map so local development and tests work with no external
+ * account — but that fallback is NOT durable across separate serverless
+ * invocations in production, and getAggregate()'s own output says so
+ * explicitly rather than silently reporting numbers that could reset
+ * without warning.
+ *
+ * Env var names, confirmed live against the real provisioned resource (not
+ * assumed): Vercel's marketplace integration for "Upstash for Redis"
+ * injects the legacy Vercel KV naming (KV_REST_API_URL/KV_REST_API_TOKEN/
+ * KV_URL/REDIS_URL), not @upstash/redis's own native UPSTASH_REDIS_REST_*
+ * names — so this constructs the client explicitly from the KV_* names
+ * rather than calling Redis.fromEnv(), which looks for the native names and
+ * would find nothing.
  */
 
 import { Redis } from "@upstash/redis";
@@ -79,7 +87,10 @@ class UpstashSignalStore implements SignalStore {
   readonly backend = "upstash" as const;
   private redis: Redis;
   constructor() {
-    this.redis = Redis.fromEnv();
+    this.redis = new Redis({
+      url: process.env.KV_REST_API_URL as string,
+      token: process.env.KV_REST_API_TOKEN as string,
+    });
   }
   async addContribution(scope: SignalScope, contribution: SignalContribution): Promise<void> {
     const payload = JSON.stringify(contribution);
@@ -119,7 +130,7 @@ let singleton: SignalStore | null = null;
 export function getSignalStore(): SignalStore {
   if (singleton) return singleton;
   singleton =
-    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
       ? new UpstashSignalStore()
       : new InMemorySignalStore();
   return singleton;
