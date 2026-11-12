@@ -907,22 +907,37 @@ export default function TryPage() {
             ))}
           </TabsPrimitive.List>
 
+          {/* Each panel gets a visually-hidden <h2> — found via Lighthouse
+              (DECISIONS.md): the page went straight from its one <h1> to
+              <h3>s inside tab content (role cards, rubric titles) with no
+              <h2> anywhere, an invalid heading order for screen-reader/
+              structural navigation even though nothing here is visually
+              wrong. The tab trigger above already shows the label
+              visually, so a second VISIBLE heading here would just be
+              redundant clutter — sr-only gives the correct semantic
+              structure without changing anything sighted users see. */}
           <TabsPrimitive.Content value="search">
+            <h2 className="sr-only">Search roles</h2>
             <SearchRolesTab onViewCompany={setProfileSlug} />
           </TabsPrimitive.Content>
           <TabsPrimitive.Content value="timeline">
+            <h2 className="sr-only">Timeline</h2>
             <TimelineTab />
           </TabsPrimitive.Content>
           <TabsPrimitive.Content value="trial">
+            <h2 className="sr-only">Trial assessment</h2>
             <TrialAssessmentTab />
           </TabsPrimitive.Content>
           <TabsPrimitive.Content value="rubric">
+            <h2 className="sr-only">Role rubric</h2>
             <RoleRubricTab />
           </TabsPrimitive.Content>
           <TabsPrimitive.Content value="preview">
+            <h2 className="sr-only">Job preview</h2>
             <JobPreviewTab />
           </TabsPrimitive.Content>
           <TabsPrimitive.Content value="explain">
+            <h2 className="sr-only">Explain a rule</h2>
             <ExplainRuleTab />
           </TabsPrimitive.Content>
         </TabsPrimitive.Root>

@@ -94,6 +94,15 @@ export function SourcesTable({ rows }: { rows: SourceRow[] }) {
 
   return (
     <div>
+      {/* sr-only <h2> — found via Lighthouse (DECISIONS.md): Radix's
+          AccordionHeader always renders a bare <h3> (this version has no
+          level-override prop), and this table is the only thing after the
+          page's single <h1>, so every group's h3 was an invalid h1->h3
+          skip. The visible section title already lives in app/sources/
+          page.tsx's own copy above this component, so a second VISIBLE
+          heading here would be redundant — this just gives the correct
+          semantic h1->h2->h3 structure without changing what's on screen. */}
+      <h2 className="sr-only">Source list</h2>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search

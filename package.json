@@ -12,6 +12,7 @@
     "test:protocol": "vitest run --config vitest.protocol.config.ts",
     "test:e2e": "playwright test",
     "linkcheck": "tsx scripts/linkcheck.ts",
+    "lhci": "lhci autorun",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm linkcheck"
   },
   "dependencies": {
