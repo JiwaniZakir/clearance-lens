@@ -79,7 +79,7 @@ describe("SOURCES.md cross-check", () => {
     for (const rule of RULES) for (const s of rule.sources) allUrls.add(s.url);
     allUrls.add(TIMELINES.investigations.secret.source.url);
     allUrls.add(TIMELINES.investigations.ts.source.url);
-    for (const m of TIMELINES.modifiers) allUrls.add(m.source.url);
+    for (const m of TIMELINES.modifiers) for (const s of [m.source, ...(m.additionalSources ?? [])]) allUrls.add(s.url);
 
     const missing = [...allUrls].filter((url) => !sourcesMd.includes(url));
     expect(missing, `URLs missing from SOURCES.md: ${missing.join(", ")}`).toEqual([]);
@@ -106,7 +106,7 @@ describe("every URL a tool cites inline is listed on /sources and in SOURCES.md"
     fs.readFileSync(path.join(process.cwd(), "app/sources/page.tsx"), "utf8"),
     ...RULES.flatMap((r) => r.sources.map((s) => s.url)),
     ...Object.values(TIMELINES.investigations).map((i) => i.source.url),
-    ...TIMELINES.modifiers.map((m) => m.source.url),
+    ...TIMELINES.modifiers.flatMap((m) => [m.source, ...(m.additionalSources ?? [])].map((s) => s.url)),
   ].join("\n");
 
   it("finds a non-trivial number of cited URLs (guards against the scan silently matching nothing)", () => {

@@ -36,5 +36,6 @@ console.log();
 for (const m of timelinesJson.modifiers) {
   console.log(`**Modifier: ${m.id.replace(/_/g, " ")}**`);
   printSource(m.source, "  ");
+  for (const s of m.additionalSources ?? []) printSource(s, "  ");
   console.log();
 }

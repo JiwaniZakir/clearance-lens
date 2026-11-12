@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TIMELINES, findModifier } from "@/lib/timelines-data";
+import { TIMELINES, findModifier, type Modifier } from "@/lib/timelines-data";
 import { findRule } from "@/lib/rules-data";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
@@ -39,6 +39,10 @@ const OutputSchema = z.object({
 
 type Output = z.infer<typeof OutputSchema>;
 
+function modifierSources(m: Modifier): z.infer<typeof SourceRefSchema>[] {
+  return [m.source, ...(m.additionalSources ?? [])];
+}
+
 function dedupeSources(sources: z.infer<typeof SourceRefSchema>[]) {
   const seen = new Set<string>();
   return sources.filter((s) => (seen.has(s.url) ? false : (seen.add(s.url), true)));
@@ -56,7 +60,9 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
     // so minDays/maxDays are genuinely identical there. That's an honest
     // reflection of what the source gives (D-010), not a shortcut — the fix
     // is accurate wording, not a fabricated range.
-    "Estimates how long reaching a target clearance level might realistically take, given current status and whether the employer has a Facility Clearance (FCL) yet. Returns a real range where the underlying DCSA data supports one, or a single clearly-labeled researched figure when that's genuinely all the primary source publishes — plus key drivers and an explicit uncertainty note. Never an invented number.",
+    // D-049: rewritten after a source-by-source check found two day ranges
+    // here (lapsed > 2 years, no-FCL wait) that no cited source contains.
+    "Estimates how long reaching a target clearance level might realistically take, given current status, whether the employer has a Facility Clearance (FCL), and (optionally) citizenship. Returns DCSA's most recent published quarterly average for the target level (a mean, not a median) and returns no number where no primary source publishes one — plus key drivers and an explicit uncertainty note. Never an invented number.",
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
   handler: async ({ target_level, current_status, employer_has_fcl, citizenship_status }) => {
@@ -79,14 +85,14 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
       maxDays: basePoint,
       medianDays: base.medianDays,
     };
-    drivers.push({ label: "Baseline initial investigation", detail: base.notes });
+    drivers.push({ label: "Baseline: initial clearance, end to end (DCSA industry quarterly average)", detail: base.notes });
     sources.push(base.source);
 
     if (target_level === "ts_sci") {
       drivers.push({
         label: "SCI access determination",
         detail:
-          "TS/SCI adds an SCI access determination on top of the TS investigation. We don't have a verified separate figure for that step — the range above reflects the TS investigation only.",
+          "TS/SCI adds an SCI access determination on top of the TS investigation. No primary source publishes a separate figure for that step — the figure above is the Top Secret end-to-end average only.",
       });
     }
 
@@ -115,7 +121,7 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
       drivers.push({
         label: "Already active at or above this level",
         detail:
-          "Under SEAD 7 reciprocity, agencies are generally expected to accept an existing active clearance rather than re-investigate from scratch — typically an administrative transfer, not a new investigation. We don't have a verified day-count for this case; it's usually much faster than an initial investigation.",
+          "Under SEAD 7 reciprocity, agencies are generally expected to accept an existing active eligibility at the same or a higher level rather than re-investigate from scratch — an administrative transfer, not a new investigation. This assumes your active eligibility is at or above the target level: an upgrade (e.g. Secret to Top Secret) needs a new investigation. No primary source publishes an end-to-end day count for a transfer.",
       });
       if (reciprocityRule) sources.push(...reciprocityRule.sources);
     } else if (current_status === "interim") {
@@ -141,7 +147,22 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
           (modifier ? ` ${modifier.effectDescription}` : ""),
       });
       if (modifier) sources.push(modifier.source);
-    } else if (current_status === "lapsed_lt_2y" || current_status === "lapsed_gt_2y") {
+    } else if (current_status === "lapsed_lt_2y") {
+      // Reciprocity, not a new investigation — so the initial-investigation
+      // baseline doesn't apply, and no source publishes an end-to-end figure
+      // (SEAD 7's five business days covers only the determination step).
+      // The baseline is dropped rather than shown misleadingly (D-049).
+      const modifier = findModifier("lapsed_lt_2y");
+      estimate = { minDays: null, maxDays: null, medianDays: null };
+      const sciNote = drivers.find((d) => d.label === "SCI access determination");
+      drivers.length = 0;
+      sources.length = 0;
+      if (modifier) {
+        drivers.push({ label: "Break in service of 24 months or less", detail: modifier.effectDescription });
+        sources.push(...modifierSources(modifier));
+      }
+      if (sciNote) drivers.push(sciNote);
+    } else if (current_status === "lapsed_gt_2y") {
       const modifier = findModifier(current_status);
       if (!modifier) {
         // Data genuinely lacks this modifier (shouldn't happen once research/R4
@@ -158,7 +179,7 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
         estimate = { minDays: modifier.typicalDaysMin, maxDays: modifier.typicalDaysMax, medianDays: null };
         drivers.length = 0;
         drivers.push({ label: modifier.id.replace(/_/g, " "), detail: modifier.effectDescription });
-        sources.push(modifier.source);
+        sources.push(...modifierSources(modifier));
       } else {
         // Defensive fallback: both lapsed_lt_2y/lapsed_gt_2y currently have
         // real day-count modifiers (unit-tested), so this path is dead on
@@ -167,8 +188,8 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
         // narrative instead of a silent crash. ("interim" used to be the
         // motivating example here; it now has its own dedicated branch
         // above, split out for the reason in that branch's own comment.)
-        drivers.push({ label: modifier.id.replace(/_/g, " "), detail: modifier.effectDescription });
-        sources.push(modifier.source);
+        drivers.push({ label: "Break in service of more than 24 months", detail: modifier.effectDescription });
+        sources.push(...modifierSources(modifier));
       }
     }
 
@@ -230,10 +251,13 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
     // what the primary source publishes, never invented), only whether the
     // reason for a given case's shape is stated plainly in the output
     // itself rather than left for a reader to work out.
-    const isPointEstimate = estimate.minDays !== null && estimate.minDays === estimate.maxDays;
-    const uncertaintyNote = isPointEstimate
-      ? "These figures come from historical DCSA timeliness reporting — quarterly averages or published typical ranges, not medians, and not guarantees. Individual cases vary with foreign contacts, financial history, prior investigations, and current investigative backlog. Treat this as a planning range, and ask your FSO for a case-specific estimate once you're in process. This specific case (current_status/target_level combination) returns a single figure, not a min/max range, because the cited primary source for it publishes only one quarterly average — not because no range was computed. A genuine min/max range IS returned for other inputs where the source publishes one (e.g. current_status: \"lapsed_gt_2y\")."
-      : "These figures come from historical DCSA timeliness reporting — quarterly averages or published typical ranges, not medians, and not guarantees. Individual cases vary with foreign contacts, financial history, prior investigations, and current investigative backlog. Treat this as a planning range, and ask your FSO for a case-specific estimate once you're in process.";
+    // D-049: the old note said the source "publishes only one quarterly
+    // average" (it publishes several per level) and pointed to lapsed_gt_2y
+    // as a sourced range (its 180–270 came from no cited source).
+    const uncertaintyNote =
+      estimate.minDays === null
+        ? "No day count is shown for this case because no primary source publishes one — the key drivers below say what does apply. Ask your FSO for a case-specific estimate once you're in process."
+        : "The baseline is DCSA's most recent published quarterly average for initial industry clearances (a mean, not a median) — a planning figure, not a guarantee. It moves from quarter to quarter (the baseline driver lists recent quarters), and individual cases vary with foreign contacts, financial history, prior investigations, and backlog. Ask your FSO for a case-specific estimate once you're in process.";
 
     if (citizenship_status === "unknown") {
       const rule = findRule("clearance-citizenship");

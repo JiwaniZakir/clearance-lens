@@ -16,6 +16,9 @@ export const ModifierSchema = z.object({
   typicalDaysMin: z.number().nullable(),
   typicalDaysMax: z.number().nullable(),
   source: SourceRefSchema,
+  // When one modifier's text rests on two primary sources (D-049: the
+  // 24-month rule is in 32 CFR 156.5, the five-business-day deadline in SEAD 7).
+  additionalSources: z.array(SourceRefSchema).optional(),
 });
 export type Modifier = z.infer<typeof ModifierSchema>;
 

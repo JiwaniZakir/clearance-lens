@@ -68,13 +68,15 @@ function ruleAndTimelineRows(): SourceRow[] {
   }
 
   for (const modifier of TIMELINES.modifiers) {
-    rows.push({
-      title: modifier.source.title,
-      url: modifier.source.url,
-      lastVerified: modifier.source.lastVerified,
-      tag: modifier.id,
-      category: "Clearance process & timelines",
-    });
+    for (const source of [modifier.source, ...(modifier.additionalSources ?? [])]) {
+      rows.push({
+        title: source.title,
+        url: source.url,
+        lastVerified: source.lastVerified,
+        tag: modifier.id,
+        category: "Clearance process & timelines",
+      });
+    }
   }
 
   const seen = new Map<string, SourceRow>();

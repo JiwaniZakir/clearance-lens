@@ -8,7 +8,7 @@ This project was built end-to-end in one concentrated session, and every citatio
 
 ## From `data/rules.json` and `data/timelines.json`
 
-_Generated from `data/rules.json` (lastVerified 2026-11-12) and `data/timelines.json` (lastVerified 2026-11-11) by `scripts/generate-sources.ts`. Do not hand-edit this section — edit the data files and regenerate._
+_Generated from `data/rules.json` (lastVerified 2026-11-12) and `data/timelines.json` (lastVerified 2026-11-12) by `scripts/generate-sources.ts`. Do not hand-edit this section — edit the data files and regenerate._
 
 ### ITAR & export control, eligibility, clearance process, sponsorship, reciprocity, continuous vetting, verification tech
 
@@ -50,6 +50,7 @@ _Generated from `data/rules.json` (lastVerified 2026-11-12) and `data/timelines.
   - [SEAD 7 — Reciprocity of Background Investigations and National Security Adjudications (Federation of American Scientists mirror)](https://sgp.fas.org/othergov/intel/sead-7.pdf) — verified 2026-11-11
   - [ICPG 704.4 — Reciprocity of Personnel Security Clearance and Access Determinations (April 6, 2022)](https://archive.dni.gov/files/documents/ICPG/ICPG-704-4-Reciprocity-of-Personnel-Security-Clearance-and-Access-Determinations-20220406.pdf) — verified 2026-11-11
   - [32 CFR § 117.10 — Determination of Eligibility for Access to Classified Information for Contractor Employees (Cornell LII)](https://www.law.cornell.edu/cfr/text/32/117.10) — verified 2026-11-11
+  - [32 CFR § 156.5(h)(3) — DoD Personnel Security Program: reciprocal acceptance (eCFR)](https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-F/part-156/section-156.5) — verified 2026-11-12
 
 **Continuous Vetting (Trusted Workforce 2.0)** (`continuous-vetting`, continuous-vetting)
   - [Trusted Workforce 2.0 Quarterly Progress Report, FY2026 Q3 (Performance Accountability Council)](https://assets.performance.gov/files/Personnel_Vetting_QPR_(FY26-Q3).pdf) — verified 2026-11-11
@@ -91,16 +92,17 @@ _Generated from `data/rules.json` (lastVerified 2026-11-12) and `data/timelines.
   - [DCSA Inventory & Timeliness | Industry — NISPPAC Public Meeting Slides, September 2, 2026 (data as of Aug. 17, 2026)](https://www.archives.gov/files/isoo/oversight-groups/nisppac/20260902-nisppac-public-meeting-slides.pdf) — verified 2026-11-11
 
 **Modifier: interim**
-  - [32 CFR § 117.10 — Determination of Eligibility for Access to Classified Information for Contractor Employees (Cornell LII)](https://www.law.cornell.edu/cfr/text/32/117.10) — verified 2026-11-11
+  - [32 CFR § 117.10 — Determination of Eligibility for Access to Classified Information for Contractor Employees (Cornell LII)](https://www.law.cornell.edu/cfr/text/32/117.10) — verified 2026-11-12
 
 **Modifier: lapsed lt 2y**
-  - [SEAD 7 — Reciprocity of Background Investigations and National Security Adjudications (Federation of American Scientists mirror)](https://sgp.fas.org/othergov/intel/sead-7.pdf) — verified 2026-11-11
+  - [32 CFR § 156.5(h)(3) — DoD Personnel Security Program: reciprocal acceptance (eCFR)](https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-F/part-156/section-156.5) — verified 2026-11-12
+  - [SEAD 7 — Reciprocity of Background Investigations and National Security Adjudications (Federation of American Scientists mirror)](https://sgp.fas.org/othergov/intel/sead-7.pdf) — verified 2026-11-12
 
 **Modifier: lapsed gt 2y**
-  - [SEAD 7 — Reciprocity of Background Investigations and National Security Adjudications (Federation of American Scientists mirror)](https://sgp.fas.org/othergov/intel/sead-7.pdf) — verified 2026-11-11
+  - [32 CFR § 156.5(h)(3) — DoD Personnel Security Program: reciprocal acceptance (eCFR)](https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-F/part-156/section-156.5) — verified 2026-11-12
 
 **Modifier: no fcl**
-  - [DCSA — Facility Clearance Orientation Handbook (August 2026)](https://www.dcsa.mil/Portals/128/Documents/CTP/fc/DCSA%20FCL_Orientation_Handbook_20260828.pdf) — verified 2026-11-11
+  - [32 CFR § 117.9 — Entity eligibility determination for access to classified information (eCFR)](https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-D/part-117/section-117.9) — verified 2026-11-12
 
 ---
 
