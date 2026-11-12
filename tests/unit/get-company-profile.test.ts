@@ -45,6 +45,17 @@ describe("get_company_profile", () => {
     expect(result.gaps.some((g) => g.includes("not independently sourced"))).toBe(true);
   });
 
+  // Regression for DECISIONS.md (judging panel round 2): the "fit"/criteria
+  // sentence was split out of the shared noDemographicInference disclaimer
+  // (since it was a non-sequitur on verify_evidence) — this tool is the one
+  // place it actually applies and must keep it.
+  it("still states the 'fit' reflects only published, sourced criteria (the addendum this tool specifically needs)", async () => {
+    vi.mocked(getCompany).mockResolvedValueOnce(company([{}]));
+    const result = await getCompanyProfileTool.handler({ company_slug: "acme-defense" });
+    expect(result.disclaimer.toLowerCase()).toContain("fit");
+    expect(result.disclaimer.toLowerCase()).toContain("criteria the company has published");
+  });
+
   it("correctly reports isFullRoster when the job sample matches open_roles exactly", async () => {
     vi.mocked(getCompany).mockResolvedValueOnce(company([{}, {}], 2));
     const result = await getCompanyProfileTool.handler({ company_slug: "acme-defense" });

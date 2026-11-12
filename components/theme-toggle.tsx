@@ -25,7 +25,7 @@ export function ThemeToggle() {
       checked={isDark}
       onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
       aria-label="Toggle dark mode"
-      className="relative inline-flex h-8 w-14 shrink-0 cursor-pointer items-center rounded-full border border-neutral-7 bg-neutral-2 transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6"
+      className="relative inline-flex h-8 w-14 shrink-0 cursor-pointer items-center rounded-full border border-neutral-7 bg-neutral-2 transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8"
     >
       <Sun className="absolute left-1.5 h-4 w-4 text-neutral-9" aria-hidden />
       <Moon className="absolute right-1.5 h-4 w-4 text-neutral-9" aria-hidden />

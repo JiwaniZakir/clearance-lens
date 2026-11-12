@@ -72,7 +72,7 @@ export default function PrivacyPage() {
       {/* One narrow column, ~680px max-width, left-aligned, no sidebar — no
           disclaimer-banner wrapper here, the whole page already is the
           disclaimer (R2 §5's own note; Do/Don't #3). */}
-      <main className="mx-auto w-full max-w-[680px] flex-1 px-6 py-16 sm:py-20">
+      <main id="main-content" className="mx-auto w-full max-w-[680px] flex-1 px-6 py-16 sm:py-20">
         <h1 className="text-[1.875rem] leading-[1.25] font-semibold tracking-[-0.005em] text-neutral-12">Privacy</h1>
         <p className="mt-3 text-[1.125rem] leading-[1.6] text-neutral-11">
           Stateless by design. No account, no database, no PII.
@@ -127,7 +127,7 @@ export default function PrivacyPage() {
           <pre
             tabIndex={0}
             aria-label="Example request and response"
-            className="mt-3 overflow-x-auto rounded-lg border border-neutral-6 bg-neutral-2 p-4 text-[0.8125rem] leading-[1.5] text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6"
+            className="mt-3 overflow-x-auto rounded-lg border border-neutral-6 bg-neutral-2 p-4 text-[0.8125rem] leading-[1.5] text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8"
           >
             <code className="font-mono whitespace-pre-wrap break-words">{EXAMPLE_BLOCK}</code>
           </pre>

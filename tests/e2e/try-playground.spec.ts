@@ -389,6 +389,40 @@ test.describe("/try — Consented card", () => {
   });
 });
 
+// Found via the spec §6 judging panel round 2 (DECISIONS.md D-028):
+// components/tool-card.tsx's homepage "Try it" buttons link to
+// /try?tool=<registry-tool-name> for all 11 tools, but /try never read
+// that query param at all, so every one of those links silently landed on
+// the default Search roles tab. This is a genuine missing feature, not the
+// click-simulation artifact other round-1/2 findings turned out to be.
+test.describe("/try — per-tool deep links (?tool=)", () => {
+  test("?tool=estimate_timeline pre-selects the Timeline tab", async ({ page }) => {
+    await page.goto("/try?tool=estimate_timeline");
+    await expect(page.getByRole("tab", { name: "Timeline" })).toHaveAttribute("data-state", "active");
+  });
+
+  test("?tool=prepare_consented_card pre-selects the Consented card tab", async ({ page }) => {
+    await page.goto("/try?tool=prepare_consented_card");
+    await expect(page.getByRole("tab", { name: "Consented card" })).toHaveAttribute("data-state", "active");
+  });
+
+  test("?tool=fit_debrief and ?tool=get_company_profile fall back to their actual entry points (no dedicated tab)", async ({
+    page,
+  }) => {
+    await page.goto("/try?tool=fit_debrief");
+    await expect(page.getByRole("tab", { name: "Job preview" })).toHaveAttribute("data-state", "active");
+    await page.goto("/try?tool=get_company_profile");
+    await expect(page.getByRole("tab", { name: "Search roles" })).toHaveAttribute("data-state", "active");
+  });
+
+  test("an unrecognized or absent ?tool= value falls back to the default Search roles tab", async ({ page }) => {
+    await page.goto("/try?tool=not_a_real_tool");
+    await expect(page.getByRole("tab", { name: "Search roles" })).toHaveAttribute("data-state", "active");
+    await page.goto("/try");
+    await expect(page.getByRole("tab", { name: "Search roles" })).toHaveAttribute("data-state", "active");
+  });
+});
+
 test.describe("/try — chained persona journey", () => {
   test("search -> inspect timeline -> check a rubric, as a single continuous session (integration smoke test)", async ({
     page,

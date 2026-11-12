@@ -100,7 +100,30 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
           "Under SEAD 7 reciprocity, agencies are generally expected to accept an existing active clearance rather than re-investigate from scratch — typically an administrative transfer, not a new investigation. We don't have a verified day-count for this case; it's usually much faster than an initial investigation.",
       });
       if (reciprocityRule) sources.push(...reciprocityRule.sources);
-    } else if (current_status === "interim" || current_status === "lapsed_lt_2y" || current_status === "lapsed_gt_2y") {
+    } else if (current_status === "interim") {
+      // Found live via the spec §6 judging panel round 2 (DECISIONS.md):
+      // this used to share the generic "modifier exists but has no day
+      // count" branch below with lapsed_lt_2y/lapsed_gt_2y, which just
+      // appends the interim modifier's own driver ON TOP of the unchanged
+      // baseline — producing output nearly identical to current_status=
+      // "none" (which, since D-017, ALSO surfaces the same interim-
+      // modifier content as an informational note). Someone who already
+      // HOLDS interim eligibility has already completed real progress
+      // toward final adjudication; treating their remaining wait as
+      // identical to someone starting from zero is misleading even though
+      // no fabricated number is involved. Gets its own bespoke driver that
+      // explicitly reframes the baseline as a reference point their own
+      // remaining wait is shorter than — directionally honest without
+      // inventing a day count we don't have.
+      const modifier = findModifier("interim");
+      drivers.push({
+        label: "Already holding interim eligibility",
+        detail:
+          "The baseline figure above is the typical END-TO-END time for a brand-new investigation, start to finish. Since you already hold an interim determination, you've already completed a meaningful part of that process — your own remaining wait (for final adjudication) is typically shorter than the full baseline shown, though no primary source publishes a verified figure for just the remaining portion. Ask your FSO how much of the process is left in your specific case." +
+          (modifier ? ` ${modifier.effectDescription}` : ""),
+      });
+      if (modifier) sources.push(modifier.source);
+    } else if (current_status === "lapsed_lt_2y" || current_status === "lapsed_gt_2y") {
       const modifier = findModifier(current_status);
       if (!modifier) {
         // Data genuinely lacks this modifier (shouldn't happen once research/R4
@@ -119,10 +142,13 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
         drivers.push({ label: modifier.id.replace(/_/g, " "), detail: modifier.effectDescription });
         sources.push(modifier.source);
       } else {
-        // A real modifier exists but has no day-count by nature (e.g. "interim"
-        // is a parallel enablement, not a change to the underlying investigation
-        // timeline) — keep the baseline estimate, but explain with the REAL
-        // researched narrative rather than a generic placeholder.
+        // Defensive fallback: both lapsed_lt_2y/lapsed_gt_2y currently have
+        // real day-count modifiers (unit-tested), so this path is dead on
+        // today's data — kept rather than asserted unreachable, so a future
+        // data change that removes a day-count degrades to an honest
+        // narrative instead of a silent crash. ("interim" used to be the
+        // motivating example here; it now has its own dedicated branch
+        // above, split out for the reason in that branch's own comment.)
         drivers.push({ label: modifier.id.replace(/_/g, " "), detail: modifier.effectDescription });
         sources.push(modifier.source);
       }

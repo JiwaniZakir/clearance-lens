@@ -16,7 +16,7 @@ const MINUTE_OPTIONS: { value: `${TrialMinutes}`; label: string }[] = [
 ];
 
 const tabTriggerClass =
-  "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium text-neutral-11 transition-colors duration-150 ease-out hover:text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6 data-[state=active]:border-accent-9 data-[state=active]:text-neutral-12";
+  "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium text-neutral-11 transition-colors duration-150 ease-out hover:text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8 data-[state=active]:border-accent-9 data-[state=active]:text-neutral-12";
 
 /**
  * Renders build_trial_assessment (R2 §3.7). A disclaimer-banner pinned

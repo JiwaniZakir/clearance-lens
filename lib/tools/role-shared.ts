@@ -39,7 +39,10 @@ export async function resolveRole(roleId: string): Promise<ResolvedRole> {
   const { job } = await getJob(roleId);
   // Every role surfaced by search_defense_roles comes from an industry=defense_space
   // query, so this context is always true for a role reached through this product.
-  const signals = extractRequirementSignals(job.description_text, { industry: "defense_space" });
+  const signals = extractRequirementSignals(job.description_text, {
+    industry: "defense_space",
+    location: job.location,
+  });
   return {
     id: job.id,
     title: job.title,

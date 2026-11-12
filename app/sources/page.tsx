@@ -229,7 +229,7 @@ export default function SourcesPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <Nav />
-      <main className="mx-auto w-full max-w-[1120px] flex-1 px-6 py-16 sm:py-20">
+      <main id="main-content" className="mx-auto w-full max-w-[1120px] flex-1 px-6 py-16 sm:py-20">
         <h1 className="text-[1.875rem] leading-[1.25] font-semibold tracking-[-0.005em] text-neutral-12">Sources</h1>
         <p className="mt-2 text-[0.8125rem] leading-[1.4] font-medium text-neutral-10">
           {rows.length} sources · all checked live on {lastVerified}

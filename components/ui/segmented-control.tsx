@@ -28,7 +28,7 @@ export function SegmentedControl<T extends string>({
             aria-checked={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6",
+              "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8",
               active ? "bg-neutral-1 text-neutral-12 shadow-elevation-1" : "text-neutral-11 hover:text-neutral-12",
             )}
           >

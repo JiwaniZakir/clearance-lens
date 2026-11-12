@@ -84,7 +84,10 @@ export const searchDefenseRolesTool: ToolDef<z.infer<typeof InputSchema>, z.infe
     const detailed = await Promise.allSettled(
       toDetail.map(async (summary) => {
         const { job } = await getJob(summary.id);
-        const signals = extractRequirementSignals(job.description_text, { industry: "defense_space" });
+        const signals = extractRequirementSignals(job.description_text, {
+          industry: "defense_space",
+          location: job.location,
+        });
         return { summary, signals };
       }),
     );

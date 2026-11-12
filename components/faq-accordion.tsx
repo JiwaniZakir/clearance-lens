@@ -50,7 +50,7 @@ export function FaqAccordion() {
           <AccordionPrimitive.Header>
             <AccordionPrimitive.Trigger
               className={cn(
-                "group flex w-full items-center justify-between gap-4 py-4 text-left text-[1.0625rem] leading-[1.4] font-semibold text-neutral-12 transition-colors duration-150 ease-out hover:text-accent-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6",
+                "group flex w-full items-center justify-between gap-4 py-4 text-left text-[1.0625rem] leading-[1.4] font-semibold text-neutral-12 transition-colors duration-150 ease-out hover:text-accent-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8",
               )}
             >
               {item.question}

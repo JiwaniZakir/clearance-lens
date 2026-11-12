@@ -20,8 +20,18 @@ export const DISCLAIMERS = {
   neverVerifiesClearance:
     "Clearance Lens cannot verify clearance status and never will — DISS/NBIS lookups are restricted to Facility Security Officers by design. The correct verification path is the employer's FSO at the offer stage, not a screenshot or a self-report.",
 
+  // Found live via the spec §6 judging panel round 2 (DECISIONS.md):
+  // verify_evidence's disclaimer included this constant's own "'Fit'
+  // reflects only criteria the company has published..." sentence as a
+  // non-sequitur — that sentence describes get_company_profile's own
+  // criteria/sourceUrl/jobRelevanceReason design specifically; verify_evidence
+  // has no concept of "fit" or "criteria" at all. Split into a generic base
+  // (reusable by any tool) and a get_company_profile-specific addendum.
   noDemographicInference:
-    "This tool never infers or asks about protected characteristics (e.g. age, race, sex, national origin, disability, veteran status beyond what's job-relevant). \"Fit\" reflects only criteria the company has published, each with a source link and a stated job-relevance reason.",
+    "This tool never infers or asks about protected characteristics (e.g. age, race, sex, national origin, disability, veteran status beyond what's job-relevant).",
+
+  noDemographicInferenceFitAddendum:
+    "\"Fit\" reflects only criteria the company has published, each with a source link and a stated job-relevance reason.",
 
   statedVsInferred:
     "Requirements marked \"stated\" are quoted directly from the public posting. Requirements marked \"inferred\" are a pattern-based judgment call, not a fact — confirm directly with the employer before relying on them.",

@@ -96,7 +96,7 @@ function CommandRow({ value, prompt, className }: { value: string; prompt?: stri
       <code
         tabIndex={0}
         aria-label={`Command: ${value}`}
-        className="min-w-0 flex-1 overflow-x-auto text-[0.9375rem] leading-[1.6] font-mono whitespace-pre text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="min-w-0 flex-1 overflow-x-auto text-[0.9375rem] leading-[1.6] font-mono whitespace-pre text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {prompt ? <span className="mr-2 text-neutral-9">{prompt}</span> : null}
         {value}
@@ -121,7 +121,7 @@ function JsonBlock({ code, className }: { code: string; className?: string }) {
       <pre
         tabIndex={0}
         aria-label="Code block"
-        className="overflow-x-auto px-4 py-3.5 text-[0.9375rem] leading-[1.6] font-mono text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6"
+        className="overflow-x-auto px-4 py-3.5 text-[0.9375rem] leading-[1.6] font-mono text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8"
       >
         <code>{code}</code>
       </pre>
@@ -191,7 +191,7 @@ export function InstallSnippet() {
             <TabsPrimitive.Trigger
               key={tab.value}
               value={tab.value}
-              className="shrink-0 border-b-2 border-transparent px-3.5 py-2.5 text-[0.9375rem] font-medium text-neutral-11 transition-colors duration-150 ease-out hover:text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6 data-[state=active]:border-accent-9 data-[state=active]:text-neutral-12"
+              className="shrink-0 border-b-2 border-transparent px-3.5 py-2.5 text-[0.9375rem] font-medium text-neutral-11 transition-colors duration-150 ease-out hover:text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8 data-[state=active]:border-accent-9 data-[state=active]:text-neutral-12"
             >
               {tab.label}
             </TabsPrimitive.Trigger>
@@ -250,7 +250,7 @@ export function InstallSnippet() {
       <AccordionPrimitive.Root type="single" collapsible className="mt-2 border-t border-neutral-6">
         <AccordionPrimitive.Item value="manual-json">
           <AccordionPrimitive.Header>
-            <AccordionPrimitive.Trigger className="group flex w-full items-center justify-between gap-3 py-3.5 text-left text-[0.9375rem] font-medium text-neutral-11 transition-colors duration-150 ease-out hover:text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6">
+            <AccordionPrimitive.Trigger className="group flex w-full items-center justify-between gap-3 py-3.5 text-left text-[0.9375rem] font-medium text-neutral-11 transition-colors duration-150 ease-out hover:text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8">
               Manual setup (JSON)
               <ChevronDown
                 className="h-4 w-4 flex-none transition-transform duration-150 ease-out group-data-[state=open]:rotate-180"

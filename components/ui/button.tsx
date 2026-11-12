@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
  * styling never forks between the two cases (§4, the Slot row).
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-[0.9375rem] font-medium transition-[box-shadow,transform,background-color,border-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-1 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded-md text-[0.9375rem] font-medium transition-[box-shadow,transform,background-color,border-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-1 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {

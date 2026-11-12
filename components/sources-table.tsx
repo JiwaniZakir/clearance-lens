@@ -157,7 +157,7 @@ export function SourcesTable({ rows }: { rows: SourceRow[] }) {
                 setQuery("");
                 setCategoryFilter("all");
               }}
-              className="mt-3 text-sm font-medium text-accent-11 underline underline-offset-2 hover:text-accent-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6"
+              className="mt-3 text-sm font-medium text-accent-11 underline underline-offset-2 hover:text-accent-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8"
             >
               Clear filters
             </button>
@@ -178,7 +178,7 @@ export function SourcesTable({ rows }: { rows: SourceRow[] }) {
                 className="overflow-hidden rounded-lg border border-neutral-6 bg-neutral-1 shadow-elevation-1"
               >
                 <AccordionPrimitive.Header>
-                  <AccordionPrimitive.Trigger className="group flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors duration-150 ease-out hover:bg-neutral-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6">
+                  <AccordionPrimitive.Trigger className="group flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors duration-150 ease-out hover:bg-neutral-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8">
                     <span className="flex min-w-0 items-center gap-2.5">
                       <span className="truncate text-[1.0625rem] leading-[1.4] font-semibold text-neutral-12">
                         {group.category}

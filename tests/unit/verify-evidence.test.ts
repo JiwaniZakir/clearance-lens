@@ -51,6 +51,29 @@ describe("verify_evidence", () => {
     expect(result.disclaimer).toMatch(/not a verification of employment/i);
   });
 
+  // Regression for DECISIONS.md (judging panel round 2): this tool's
+  // disclaimer used to include a sentence about "fit" reflecting "criteria
+  // the company has published" -- a non-sequitur copy-pasted from
+  // get_company_profile's own, unrelated design; verify_evidence has no
+  // concept of "fit" or "criteria" at all.
+  it("does not include get_company_profile's unrelated 'fit'/criteria sentence", async () => {
+    vi.mocked(getPublicSignalSummary).mockResolvedValueOnce({
+      login: "u",
+      name: null,
+      profileUrl: "https://github.com/u",
+      bio: null,
+      publicRepoCount: 0,
+      followers: 0,
+      accountCreatedAt: "2026-01-01T00:00:00Z",
+      topLanguages: [],
+      recentActivity: [],
+      rateLimitRemaining: null,
+    });
+    const result = await verifyEvidenceTool.handler({ github_username_or_url: "u" });
+    expect(result.disclaimer.toLowerCase()).not.toContain("fit");
+    expect(result.disclaimer.toLowerCase()).not.toContain("criteria");
+  });
+
   // Regression for DECISIONS.md (judging panel round 1): a syntactically
   // invalid username/URL used to reach the handler, throw a plain Error
   // from parseGitHubUsername, and fall through callTool()'s generic

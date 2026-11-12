@@ -36,6 +36,25 @@ describe("extractStatedSignals", () => {
       expect("We require an active Secret clearance.").toContain(s.evidence.replace("…", ""));
     }
   });
+
+  // Regression for DECISIONS.md (judging panel round 2): "an active Top
+  // Secret security clearance" independently matched both the specific
+  // "ts" pattern (via "Top Secret") and the generic
+  // "clearance_required_unspecified" fallback (via "security clearance"),
+  // citing the identical evidence quote twice as if they were two
+  // distinct, possibly-conflicting requirements rather than one.
+  it("does not also emit the generic clearance_required_unspecified signal once a specific level is already detected", () => {
+    const text = "Must hold an active Top Secret security clearance to be considered.";
+    const values = extractStatedSignals(text).map((s) => s.value);
+    expect(values).toContain("ts");
+    expect(values).not.toContain("clearance_required_unspecified");
+    expect(values.filter((v) => v === "ts" || v === "clearance_required_unspecified")).toHaveLength(1);
+  });
+
+  it("still emits clearance_required_unspecified on its own when no specific level is stated", () => {
+    const values = extractStatedSignals("Must hold an active security clearance.").map((s) => s.value);
+    expect(values).toContain("clearance_required_unspecified");
+  });
 });
 
 describe("extractInferredSignals via extractRequirementSignals", () => {
@@ -62,6 +81,35 @@ describe("extractInferredSignals via extractRequirementSignals", () => {
       industry: "computer_software",
     });
     expect(signals).toHaveLength(0);
+  });
+
+  // Regression for DECISIONS.md (judging panel round 2): a real posting
+  // based in Sydney, Australia (asking for an Australian NV2 clearance,
+  // not a US one) was tagged with the same inferred ITAR/US-person flag
+  // this function applies to domestic roles — ITAR's "US person" test is
+  // a US-law-specific concept that doesn't apply to a role based abroad.
+  it("does NOT infer us_person_likely for a defense-industry role explicitly based in a non-US location", () => {
+    const signals = extractRequirementSignals("We build autonomous systems for national security.", {
+      industry: "defense_space",
+      location: "Sydney, Australia",
+    });
+    expect(signals.find((s) => s.value === "us_person_likely")).toBeUndefined();
+  });
+
+  it("does NOT infer us_person_likely when the posting itself names a foreign clearance system", () => {
+    const signals = extractRequirementSignals(
+      "This role requires an Australian NV2 clearance due to program requirements.",
+      { industry: "defense_space", location: "Remote" },
+    );
+    expect(signals.find((s) => s.value === "us_person_likely")).toBeUndefined();
+  });
+
+  it("still infers us_person_likely normally for a domestic (or location-unspecified) defense role", () => {
+    const signals = extractRequirementSignals("We build autonomous systems for national security.", {
+      industry: "defense_space",
+      location: "Austin, TX",
+    });
+    expect(signals.find((s) => s.value === "us_person_likely")).toBeDefined();
   });
 
   it("every inferred signal explicitly says to confirm with the employer", () => {

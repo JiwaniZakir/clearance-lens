@@ -139,7 +139,7 @@ export function JobPreviewScenePlayer({
               value={rationaleDraft}
               onChange={(e) => setRationaleDraft(e.target.value)}
               rows={2}
-              className="w-full rounded-sm border border-neutral-7 bg-neutral-1 px-3 py-2 text-sm text-neutral-12 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-6"
+              className="w-full rounded-sm border border-neutral-7 bg-neutral-1 px-3 py-2 text-sm text-neutral-12 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-8"
               placeholder="Because…"
             />
             <Button
@@ -176,7 +176,7 @@ export function JobPreviewScenePlayer({
                 onChange={(e) => setReflectionNotes((prev) => ({ ...prev, [scene.id]: e.target.value }))}
                 rows={2}
                 placeholder="Your reflection (optional — stays on this page only, nothing is sent anywhere)"
-                className="w-full rounded-sm border border-neutral-7 bg-neutral-1 px-3 py-2 text-sm text-neutral-12 placeholder:text-neutral-9 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-6"
+                className="w-full rounded-sm border border-neutral-7 bg-neutral-1 px-3 py-2 text-sm text-neutral-12 placeholder:text-neutral-9 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-8"
               />
             </div>
           </div>

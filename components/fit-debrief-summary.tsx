@@ -127,7 +127,7 @@ export function FitDebriefSummary({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           rows={7}
-          className="w-full rounded-md border border-neutral-7 bg-neutral-1 px-3 py-2.5 font-mono text-[0.8125rem] leading-[1.5] text-neutral-12 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-6"
+          className="w-full rounded-md border border-neutral-7 bg-neutral-1 px-3 py-2.5 font-mono text-[0.8125rem] leading-[1.5] text-neutral-12 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-8"
         />
         <p className="text-[0.8125rem] leading-[1.4] text-neutral-10">{data.shareDraft.note}</p>
       </div>

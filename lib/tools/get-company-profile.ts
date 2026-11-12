@@ -164,7 +164,7 @@ export const getCompanyProfileTool: ToolDef<z.infer<typeof InputSchema>, z.infer
       },
       gaps,
       sources: [SPEEDRUN_SOURCE, { title: `${company.name} on speedrun`, url: company.url }, ...criteria.map((c) => ({ title: c.criterion, url: c.sourceUrl }))],
-      disclaimer: DISCLAIMERS.noDemographicInference,
+      disclaimer: `${DISCLAIMERS.noDemographicInference} ${DISCLAIMERS.noDemographicInferenceFitAddendum}`,
     };
   },
 };

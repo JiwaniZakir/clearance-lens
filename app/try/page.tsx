@@ -5,18 +5,21 @@
  * calling the app's own /api/tools/{name} directly (research/R2-design-
  * system.md §3.4-3.10, §3.13-3.15, §5's /try wireframe, §6 Do/Don't rules).
  *
- * Six tabs. The wireframe names five (Search roles / Timeline / Trial
- * assessment / Job preview / Explain a rule); a sixth, "Role rubric", is
- * added here because get_role_rubric is one of the tool files this page was
- * explicitly scoped to call, and rubric-checklist's own spec (§3.6)
- * describes exactly how to render that tool's output — it needed a real
- * place to be called from.
+ * 9 tabs covering all 11 tools (get_company_profile and fit_debrief are
+ * reachable via embedded flows — a dialog, and the Job Preview debrief step
+ * — rather than their own tabs). The wireframe named five (Search roles /
+ * Timeline / Trial assessment / Job preview / Explain a rule); "Role
+ * rubric" was added because get_role_rubric is one of the tool files this
+ * page was explicitly scoped to call; "Readiness brief" / "Verify GitHub" /
+ * "Consented card" were added after the spec §6 judging panel found those 3
+ * tools had no UI path anywhere in /try (DECISIONS.md D-026).
  */
 
 import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
+import { useSearchParams } from "next/navigation";
 import { Search, SearchX, X, Heart, ThumbsDown, RotateCcw } from "lucide-react";
 
 import { Nav } from "@/components/nav";
@@ -109,8 +112,37 @@ const TAB_DEFS = [
   { id: "card", label: "Consented card" },
 ] as const;
 
+type TabId = (typeof TAB_DEFS)[number]["id"];
+
+// Found live via the spec §6 judging panel round 2 (DECISIONS.md): the
+// homepage's own per-tool "Try it" buttons (components/tool-card.tsx) link
+// to /try?tool=<registry-tool-name> for all 11 tools — confirmed real,
+// not a judge's misreading — but this page never read that query param at
+// all, so every one of those links silently landed on the default Search
+// roles tab regardless of which tool was clicked. Maps each registry tool
+// name to its tab; the 2 tools without their own tab (get_company_profile,
+// fit_debrief) fall back to the tab they're actually reachable from.
+const TOOL_NAME_TO_TAB: Record<string, TabId> = {
+  search_defense_roles: "search",
+  estimate_timeline: "timeline",
+  build_trial_assessment: "trial",
+  get_role_rubric: "rubric",
+  run_job_preview: "preview",
+  explain_rule: "explain",
+  readiness_brief: "readiness",
+  verify_evidence: "verify",
+  prepare_consented_card: "card",
+  get_company_profile: "search", // reachable via a dialog from search results
+  fit_debrief: "preview", // reachable via the Job Preview flow's debrief step
+};
+
+function tabFromToolParam(toolParam: string | null): TabId {
+  if (toolParam && toolParam in TOOL_NAME_TO_TAB) return TOOL_NAME_TO_TAB[toolParam];
+  return "search";
+}
+
 const tabTriggerClass =
-  "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3.5 py-2.5 text-sm font-medium text-neutral-11 transition-colors duration-150 ease-out hover:text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6 data-[state=active]:border-accent-9 data-[state=active]:text-neutral-12";
+  "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3.5 py-2.5 text-sm font-medium text-neutral-11 transition-colors duration-150 ease-out hover:text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8 data-[state=active]:border-accent-9 data-[state=active]:text-neutral-12";
 
 const filterFieldClass = "flex shrink-0 flex-col gap-1.5 min-w-[160px] lg:min-w-0 lg:w-full";
 
@@ -157,7 +189,7 @@ function LabeledSwitch({
         checked={checked}
         onCheckedChange={onCheckedChange}
         aria-label={label}
-        className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full bg-neutral-5 transition-colors duration-150 ease-out data-[state=checked]:bg-accent-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-6"
+        className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full bg-neutral-5 transition-colors duration-150 ease-out data-[state=checked]:bg-accent-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8"
       >
         <SwitchPrimitive.Thumb className="block h-4 w-4 translate-x-0.5 rounded-full bg-neutral-1 shadow-elevation-1 transition-transform duration-150 ease-out data-[state=checked]:translate-x-[18px]" />
       </SwitchPrimitive.Root>
@@ -1156,7 +1188,7 @@ function ConsentedCardTab() {
               maxLength={1600}
               value={highlightsDraft}
               onChange={(e) => setHighlightsDraft(e.target.value)}
-              className="w-full rounded-sm border border-neutral-7 bg-neutral-1 px-3 py-2 text-sm text-neutral-12 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-6"
+              className="w-full rounded-sm border border-neutral-7 bg-neutral-1 px-3 py-2 text-sm text-neutral-12 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-8"
             />
           </div>
           <div className={filterFieldClass}>
@@ -1166,7 +1198,7 @@ function ConsentedCardTab() {
               rows={2}
               maxLength={500}
               onChange={(e) => updateField("notes", e.target.value)}
-              className="w-full rounded-sm border border-neutral-7 bg-neutral-1 px-3 py-2 text-sm text-neutral-12 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-6"
+              className="w-full rounded-sm border border-neutral-7 bg-neutral-1 px-3 py-2 text-sm text-neutral-12 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-8"
             />
           </div>
           <Button type="submit" className="self-start">
@@ -1269,13 +1301,18 @@ function CompanyProfileDialog({ slug, onClose }: { slug: string | null; onClose:
 /* Page                                                                      */
 /* ------------------------------------------------------------------------ */
 
-export default function TryPage() {
+// useSearchParams() requires a Suspense boundary around whatever reads it
+// (Next.js's own documented pattern) — split out so the default export
+// below can wrap just this part, not force the whole page to deopt.
+function TryPageInner() {
+  const toolParam = useSearchParams().get("tool");
+  const initialTab = React.useMemo(() => tabFromToolParam(toolParam), [toolParam]);
   const [profileSlug, setProfileSlug] = React.useState<string | null>(null);
 
   return (
     <div className="flex min-h-screen flex-col">
       <Nav />
-      <main className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-6 px-6 py-10 sm:py-12">
+      <main id="main-content" className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-6 px-6 py-10 sm:py-12">
         <div className="flex flex-col gap-2">
           <p className="text-[0.75rem] font-semibold uppercase tracking-wide text-accent-11">
             Playground · no agent required
@@ -1291,7 +1328,7 @@ export default function TryPage() {
           Role data is cached from public postings — see Sources for what&rsquo;s verified.
         </DisclaimerBanner>
 
-        <TabsPrimitive.Root defaultValue="search" className="flex flex-col gap-6">
+        <TabsPrimitive.Root defaultValue={initialTab} className="flex flex-col gap-6">
           <TabsPrimitive.List className="flex gap-1 overflow-x-auto border-b border-neutral-6 [scrollbar-width:none]">
             {TAB_DEFS.map((t) => (
               <TabsPrimitive.Trigger key={t.id} value={t.id} className={tabTriggerClass}>
@@ -1350,5 +1387,13 @@ export default function TryPage() {
       <Footer />
       <CompanyProfileDialog slug={profileSlug} onClose={() => setProfileSlug(null)} />
     </div>
+  );
+}
+
+export default function TryPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <TryPageInner />
+    </React.Suspense>
   );
 }

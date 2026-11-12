@@ -26,15 +26,31 @@ for (const path of PAGES) {
   });
 }
 
-test("keyboard-only navigation reaches the primary CTA on the landing page", async ({ page }) => {
+test("keyboard-only navigation never loses focus to the page body", async ({ page }) => {
   await page.goto("/");
-  // Tab through the page and confirm focus is visible and reaches a real
-  // interactive element, not lost to the body.
+  // Tab through the page N times and confirm focus is always visible and on
+  // a real interactive element, never lost to <body>/null. The exact
+  // sequence of elements is intentionally not pinned down to a fixed count
+  // or a specific target — it has already legitimately shifted twice from
+  // genuine accessibility improvements (D-019's scrollable <code> blocks
+  // gaining tabIndex, and the skip-to-content link added after the spec §6
+  // judging panel) and will keep shifting as the page evolves; CODE is a
+  // real, valid tab stop here precisely because of that earlier fix.
   for (let i = 0; i < 15; i++) {
     await page.keyboard.press("Tab");
+    const active = await page.evaluate(() => {
+      const el = document.activeElement;
+      return { tag: el?.tagName, role: el?.getAttribute("role"), tabIndex: el instanceof HTMLElement ? el.tabIndex : null };
+    });
+    // A real interactive element OR a DIV/[role=tabpanel] with an explicit
+    // tabIndex (Radix Tabs automatically makes the active panel focusable
+    // for AT users per the ARIA tabpanel pattern — a legitimate tab stop,
+    // not a focus-loss bug) counts as "reached a real element."
+    const isRealInteractiveElement =
+      ["A", "BUTTON", "INPUT", "CODE", "TEXTAREA", "SELECT"].includes(active.tag ?? "") ||
+      (active.tag === "DIV" && active.role === "tabpanel" && active.tabIndex === 0);
+    expect(isRealInteractiveElement, `unexpected focus target: ${JSON.stringify(active)}`).toBe(true);
   }
-  const activeTag = await page.evaluate(() => document.activeElement?.tagName);
-  expect(["A", "BUTTON", "INPUT"]).toContain(activeTag);
 });
 
 test("theme toggle works via keyboard (Enter/Space) and persists the choice", async ({ page }) => {

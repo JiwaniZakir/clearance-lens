@@ -27,6 +27,29 @@ describe("estimate_timeline", () => {
     expect(result.estimate.minDays).toBe(result.estimate.maxDays);
   });
 
+  // Regression for DECISIONS.md (judging panel round 2): current_status=
+  // "interim" used to produce output nearly identical to "none" (same
+  // baseline estimate, same interim-modifier driver content), misleadingly
+  // implying someone who already holds interim eligibility faces the same
+  // remaining wait as someone starting from zero.
+  it("current_status=interim gets its own distinct driver reframing the baseline as a reference point, not their own expected wait", async () => {
+    const none = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "unknown" });
+    const interim = await estimateTimelineTool.handler({ target_level: "secret", current_status: "interim", employer_has_fcl: "unknown" });
+
+    // Both are honest point estimates (DCSA gives no range for either) —
+    // the numeric value itself is legitimately the same baseline.
+    expect(interim.estimate).toEqual(none.estimate);
+
+    // But the DRIVER TEXT must differ: "interim" gets a bespoke driver
+    // explicitly saying their own remaining wait is shorter than the
+    // baseline shown, which "none" (correctly) never claims, since a
+    // zero-history caller's remaining wait really is the full baseline.
+    const interimDriver = interim.keyDrivers.find((d) => d.label.toLowerCase().includes("already holding interim"));
+    expect(interimDriver).toBeDefined();
+    expect(interimDriver?.detail.toLowerCase()).toContain("shorter than the full baseline");
+    expect(none.keyDrivers.some((d) => d.label.toLowerCase().includes("already holding interim"))).toBe(false);
+  });
+
   it("current_status=active: never fabricates a day-count, cites SEAD 7 reciprocity", async () => {
     const result = await estimateTimelineTool.handler({
       target_level: "secret",

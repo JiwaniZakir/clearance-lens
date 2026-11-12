@@ -100,6 +100,15 @@ const STATED_PATTERNS: StatedPattern[] = [
   { kind: "facility_access", value: "scif_onsite", pattern: /\bscif\b/i },
 ];
 
+// Specific clearance levels whose detection makes the generic
+// "clearance_required_unspecified" fallback redundant — found live via the
+// spec §6 judging panel round 2 (DECISIONS.md): "an active Top Secret
+// security clearance" independently matches BOTH the `ts` pattern (via
+// "Top Secret") AND the `clearance_required_unspecified` pattern (via
+// "security clearance"), citing the same evidence quote twice as if they
+// were two distinct, possibly-conflicting requirements rather than one.
+const SPECIFIC_CLEARANCE_LEVELS = new Set(["ts_sci", "ts", "secret"]);
+
 export function extractStatedSignals(descriptionText: string): RequirementSignal[] {
   const signals: RequirementSignal[] = [];
   const seenValues = new Set<string>();
@@ -115,15 +124,39 @@ export function extractStatedSignals(descriptionText: string): RequirementSignal
       });
     }
   }
+  // Drop the generic fallback once a specific level is already present —
+  // a specific level IS a security clearance, so the unspecified signal
+  // adds no information and reads as a second, redundant requirement.
+  if (signals.some((s) => s.kind === "clearance_level" && SPECIFIC_CLEARANCE_LEVELS.has(s.value))) {
+    return signals.filter((s) => s.value !== "clearance_required_unspecified");
+  }
   return signals;
 }
+
+// Found live via the spec §6 judging panel round 2 (DECISIONS.md): a real
+// Anduril posting based in Sydney, Australia (asking for an Australian NV2
+// clearance, not a US one) was tagged with the same inferred
+// "us_person_likely" ITAR flag this function applies to domestic roles —
+// ITAR's "US person" test (22 CFR 120.62) is a US-law-specific concept
+// that doesn't straightforwardly apply to a role explicitly based abroad.
+// Deliberately conservative: a short, curated list of countries where an
+// a16z-portfolio defense-tech company plausibly has a real office (not an
+// attempt at general geography parsing, which free-text location strings
+// don't support reliably), checked against BOTH the location field and
+// the description text (which is how the Australian NV2 mention itself
+// was found — a foreign clearance-system name is a stronger, more direct
+// signal than the location string alone).
+const NON_US_LOCATION_SIGNAL =
+  /\b(?:australia|sydney|melbourne|canberra|united kingdom|\buk\b|london|canada|toronto|ottawa|germany|berlin|munich|japan|tokyo|singapore|new zealand)\b/i;
+const FOREIGN_CLEARANCE_SYSTEM =
+  /\b(?:nv1|nv2|baseline clearance|negative vetting|positive vetting|\bsc clearance\b|\bdv clearance\b|developed vetting)\b/i;
 
 /** Adds cautious, clearly-labeled inferred signals ONLY to fill gaps the stated
  * extraction left open — never contradicts or duplicates a stated signal. */
 export function extractInferredSignals(
   descriptionText: string,
   stated: RequirementSignal[],
-  context: { industry?: string | null; companyBlurb?: string | null },
+  context: { industry?: string | null; companyBlurb?: string | null; location?: string | null },
 ): RequirementSignal[] {
   const inferred: RequirementSignal[] = [];
   const hasStated = (kind: RequirementKind) => stated.some((s) => s.kind === kind);
@@ -132,7 +165,10 @@ export function extractInferredSignals(
     context.industry === "defense_space" ||
     /\bdefense\b|\bmilitary\b|\bmunitions\b|\bnational security\b/i.test(context.companyBlurb ?? "");
 
-  if (looksDefenseRelated && !hasStated("citizenship")) {
+  const looksNonUs =
+    NON_US_LOCATION_SIGNAL.test(context.location ?? "") || FOREIGN_CLEARANCE_SYSTEM.test(descriptionText);
+
+  if (looksDefenseRelated && !hasStated("citizenship") && !looksNonUs) {
     inferred.push({
       kind: "citizenship",
       value: "us_person_likely",
@@ -157,7 +193,7 @@ export function extractInferredSignals(
 
 export function extractRequirementSignals(
   descriptionText: string,
-  context: { industry?: string | null; companyBlurb?: string | null } = {},
+  context: { industry?: string | null; companyBlurb?: string | null; location?: string | null } = {},
 ): RequirementSignal[] {
   const stated = extractStatedSignals(descriptionText);
   const inferred = extractInferredSignals(descriptionText, stated, context);
