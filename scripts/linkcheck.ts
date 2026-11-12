@@ -148,6 +148,18 @@ async function checkUrl(url: string): Promise<CheckResult> {
       }
     }
   }
+  // Exhausted all retries on a thrown network-level error as the FINAL
+  // attempt specifically (not an HTTP status). Found live: a URL that
+  // legitimately returns 401 every time can still throw a transient
+  // network error on just its last retry, and without this check that
+  // stale-but-real earlier 401 silently downgraded to a hard FAIL — purely
+  // because of which attempt happened to be last, not because the link is
+  // actually dead. Trust an earlier real HTTP response in the
+  // "not necessarily dead" bucket over a later transient network blip.
+  if (lastStatus !== null && NOT_NECESSARILY_DEAD_CODES.includes(lastStatus)) {
+    const reason = lastStatus === 405 ? "live API endpoint, bare GET not supported" : "likely bot-blocked";
+    return { url, status: "WARN", detail: `${lastStatus} (${reason}, not necessarily dead; final retry hit a network error)` };
+  }
   return {
     url,
     status: "FAIL",
