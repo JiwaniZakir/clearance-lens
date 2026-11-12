@@ -6,7 +6,13 @@ import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 
 const InputSchema = z.object({
   role_id: z.string().min(1),
-  minutes: z.union([z.literal(60), z.literal(90), z.literal(180)]),
+  // Explicit error message: found live via the spec §6 judging panel round
+  // 4 — a numeric literal union's default error ("Invalid input") doesn't
+  // name the allowed values the way a string z.enum's does elsewhere in
+  // this file.
+  minutes: z.union([z.literal(60), z.literal(90), z.literal(180)], {
+    error: "minutes must be one of 60, 90, or 180",
+  }),
 });
 
 const BandsSchema = z.object({

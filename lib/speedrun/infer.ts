@@ -75,7 +75,17 @@ const STATED_PATTERNS: StatedPattern[] = [
   // common real phrasing) failed this pattern's old strict adjacency
   // requirement, falling through to only the generic
   // clearance_required_unspecified fallback below instead of "secret".
-  { kind: "clearance_level", value: "secret", pattern: /\b(?:active\s+)?secret (?:security\s+)?clearance\b/i },
+  // `(?<!top )` added: found live via round 4 — that same widening made
+  // this pattern ALSO match inside "Top Secret security clearance" (a
+  // literal substring starting at "Secret"), double-counting one phrase as
+  // both "ts" and "secret" with identical evidence text — the exact
+  // redundant-signal bug D-028 already fixed once for ts+unspecified,
+  // reintroduced here between ts+secret instead.
+  {
+    kind: "clearance_level",
+    value: "secret",
+    pattern: /\b(?:active\s+)?(?<!top )secret (?:security\s+)?clearance\b/i,
+  },
   {
     kind: "clearance_level",
     value: "clearance_required_unspecified",

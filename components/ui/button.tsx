@@ -9,7 +9,20 @@ import { cn } from "@/lib/cn";
  * styling never forks between the two cases (§4, the Slot row).
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-[0.9375rem] font-medium transition-[box-shadow,transform,background-color,border-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-1 disabled:pointer-events-none disabled:opacity-50",
+  // box-shadow deliberately excluded from the transitioned properties —
+  // found live via the spec §6 judging panel round 4 (product_designer):
+  // reproduced via getComputedStyle immediately after a keyboard Tab vs.
+  // after a 250ms wait — the focus ring IS correctly defined (the
+  // underlying --tw-ring-* variables were set correctly in both captures)
+  // but was ANIMATING in over this component's own 150ms transition
+  // duration, unlike every other focusable element on the site (skip-link,
+  // toggles, tab triggers), none of which use this transition system and
+  // so render their ring instantly. A keyboard user tabbing faster than
+  // 150ms per stop would genuinely see no ring on this component's
+  // buttons specifically — not a missing ring, a late one. No Button
+  // variant below sets its own box-shadow, so this only affects how fast
+  // the focus ring appears/disappears, nothing else.
+  "inline-flex items-center justify-center gap-2 rounded-md text-[0.9375rem] font-medium transition-[transform,background-color,border-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-1 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {

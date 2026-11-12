@@ -66,6 +66,17 @@ describe("extractStatedSignals", () => {
     expect(values).toContain("secret");
     expect(values).not.toContain("clearance_required_unspecified");
   });
+
+  // Regression for DECISIONS.md (judging panel round 4): the fix above
+  // (making "security" optional between "secret" and "clearance") made the
+  // "secret" pattern ALSO match inside "Top Secret security clearance",
+  // double-counting the same phrase as both "ts" and "secret" signals.
+  it("classifies 'Top Secret security clearance' as only 'ts', not also 'secret'", () => {
+    const values = extractStatedSignals("Requires an active Top Secret security clearance.").map((s) => s.value);
+    expect(values).toContain("ts");
+    expect(values).not.toContain("secret");
+    expect(values.filter((v) => v === "ts" || v === "secret")).toHaveLength(1);
+  });
 });
 
 describe("extractInferredSignals via extractRequirementSignals", () => {

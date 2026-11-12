@@ -6,7 +6,11 @@ import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 
 const InputSchema = z.object({
   role_id: z.string().min(1),
-  minutes: z.union([z.literal(20), z.literal(30)]),
+  // Explicit error message: found live via the spec §6 judging panel round
+  // 4 — a numeric literal union's default error ("Invalid input") doesn't
+  // name the allowed values the way a string z.enum's does elsewhere in
+  // this file, which product_designer flagged as noticeably less helpful.
+  minutes: z.union([z.literal(20), z.literal(30)], { error: "minutes must be one of 20 or 30" }),
 });
 
 const SceneOutputSchema = z.object({

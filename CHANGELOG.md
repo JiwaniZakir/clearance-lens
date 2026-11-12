@@ -114,3 +114,21 @@ Round 3: trimmed mean **6.82**, another **hard-constraint violation** (2/5 judge
 - Reconfirmed, not a new finding: the recurring "/try tabs don't switch" claim, via the same click-simulation-limited tool D-026 already root-caused — this round is the clearest confirmation yet, since the one judge using real Playwright screenshots did not reproduce it and instead found the real, different mobile-overflow bug above on the identical control.
 - Fixed a pre-existing, intermittent flake in the homepage's own axe scan (caught live during this round's verification, not from the panel) — traced to `components/hero.tsx`'s one-time staged-reveal animation; scanning mid-CSS-transition could transiently change a chat bubble's computed contrast. Added a settle wait before scanning the homepage specifically; stable across 3 repeated runs.
 - Unit suite: 237 → 251. Full E2E suite (70 passed, both viewports) against a fresh production build.
+
+## [Unreleased] — judging panel round 4 response (2026-11-12)
+
+Round 4: trimmed mean **7.49** (up from 6.82), median **7.90**, still capped at 6.0 by a hard-constraint flag from 1/5 judges. Full results `panel/round-4/`, full response DECISIONS.md D-030.
+
+### fix
+- **Architectural fix for the "/try tabs don't switch" finding, recurring across rounds 1, 3, and 4**: made tab switching robust to a bare `click` event (no preceding pointerdown/mousedown) directly, rather than keep re-investigating the same tooling artifact every round. `Tabs.Root` is now explicitly controlled with a belt-and-suspenders `onClick` on each trigger.
+- **Self-inflicted regression**: D-029's "secret security clearance" fix made that pattern also match inside "Top Secret security clearance," double-counting one phrase as both `ts` and `secret` signals. Added a negative lookbehind.
+- **2 more PII/CUI bypasses**: "DCSA case 2024-0045678" (bare "case" directly followed by a digit, no dash before the year); a fully spelled-out date ("born march second nineteen ninety two") with no digits at all for any numeric date-shape check to match.
+- `explain_rule`'s own input description names "reciprocity" and "continuous_vetting" as example keywords, but neither resolved — the first is a category value, not a rule id; the second used an underscore where the real id uses a dash. Normalized separators before comparing and added a category-match tier that only resolves when a category uniquely identifies one rule.
+- A 320px/375px homepage horizontal-overflow bug, traced to the header's wordmark+toggle+CTA cluster — shortened the CTA button's label below the `sm:` breakpoint.
+- The nav CTA button's (and every other Button-component instance's) focus ring was correctly defined but animated in over the component's own 150ms transition, unlike every other focusable element on the site. Removed `box-shadow` from the transitioned properties.
+- `run_job_preview`/`build_trial_assessment`'s `minutes` field gave a bare "Invalid input" on a bad value — added an explicit message naming the allowed values to both.
+
+### test
+- Investigated and found NOT reproducible: a claim that a too-long PII-containing string triggers the length-validation error instead of the PII-specific one — `wrap.ts`'s own pipeline order runs the PII guard strictly before zod validation, confirmed by direct re-reading and reproduction against production.
+- Confirmed as deliberate, pre-existing design choices, not new bugs: a bare 9-digit number not being flagged on tools other than `prepare_consented_card` (D-027's own documented, reasoned scoping); an unrecognized top-level key being silently dropped while one nested inside `prepare_consented_card` is strictly rejected (that tool's own deliberate `.strict()`, not an accidental inconsistency).
+- Unit suite: 251 → 260. Full E2E suite (78 passed, both viewports), protocol suite 14/14, Lighthouse 100/100/100/100/100 on all 4 pages.

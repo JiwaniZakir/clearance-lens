@@ -380,6 +380,23 @@ describe("judging panel round 3: PII bypasses found via rephrasing, now fixed", 
   });
 });
 
+describe("judging panel round 4: PII bypasses found via rephrasing, now fixed", () => {
+  it.each([
+    ["DCSA case 2024-0045678, autonomy engineer", "case_number"],
+    ["born march second nineteen ninety two, autonomy engineer", "dob"],
+  ])("now catches: %s -> %s", (text, expectedCategory) => {
+    expect(categoriesOf(text)).toContain(expectedCategory);
+  });
+
+  it("does not flag an ordinary mention of a month and day with no birth context", () => {
+    expect(categoriesOf("the posting closes march second, autonomy engineer")).not.toContain("dob");
+  });
+
+  it("does not flag ordinary case/investigation talk with a nearby unrelated number", () => {
+    expect(categoriesOf("in case the company has over 50000 employees")).not.toContain("case_number");
+  });
+});
+
 describe("judging panel round 3: credit-card false positive on UUID-shaped identifiers, now fixed", () => {
   it.each([
     "00000000-0000-4000-8000-000000000000",

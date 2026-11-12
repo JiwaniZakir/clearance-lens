@@ -78,3 +78,35 @@ test("theme toggle works via keyboard (Enter/Space) and persists the choice", as
   await page.keyboard.press("Enter");
   await expect(page.locator("html")).toHaveClass(/dark/);
 });
+
+// Regression for DECISIONS.md (judging panel round 4): the nav CTA button's
+// focus ring was correctly defined but animated in over the Button
+// component's own 150ms transition, unlike every other focusable element on
+// the site (which render their ring instantly) — a keyboard user tabbing
+// faster than that would see no ring at all on this component's buttons.
+// Checked with NO wait after focusing, specifically to catch the delay
+// coming back.
+test("a Button component's focus ring renders instantly, with no transition delay", async ({ page }) => {
+  await page.goto("/");
+  const button = page.getByRole("link", { name: /add to your agent|install/i }).first();
+  await button.focus();
+  const boxShadow = await button.evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(boxShadow).not.toMatch(/^(none|rgba\(0, 0, 0, 0\) 0px 0px 0px 0px(, rgba\(0, 0, 0, 0\) 0px 0px 0px 0px)*)$/);
+});
+
+// Regression for DECISIONS.md (judging panel round 4): the header's
+// wordmark + theme-toggle + CTA cluster overflowed the page's horizontal
+// scroll width at narrow phone widths (measured: 9px at 375px, 64px at
+// 320px) once the nav links row (already on its own line below sm:) no
+// longer shared space with them.
+for (const width of [320, 375]) {
+  test(`no page-level horizontal overflow at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/");
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(scrollWidth, `scrollWidth (${scrollWidth}) should equal clientWidth (${clientWidth})`).toBe(clientWidth);
+  });
+}

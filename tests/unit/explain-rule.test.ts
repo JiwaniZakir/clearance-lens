@@ -49,4 +49,27 @@ describe("explain_rule", () => {
     expect(explainRuleTool.inputSchema.safeParse({ topic: "" }).success).toBe(false);
     expect(explainRuleTool.inputSchema.safeParse({ topic: "x".repeat(61) }).success).toBe(false);
   });
+
+  // Regression for DECISIONS.md (judging panel round 4): the input
+  // schema's own description names "reciprocity" and "continuous_vetting"
+  // as example topic keywords, but neither resolved — "reciprocity" is a
+  // *category* value, not a rule id (the real id is "sead7"), and
+  // "continuous_vetting" (underscore) didn't match the real id
+  // "continuous-vetting" (dash). This list is kept manually in sync with
+  // InputSchema's own `.describe()` text above (not parsed from it) —
+  // if the description's examples change, update this list to match.
+  it("every example keyword named in the tool's own input description actually resolves", async () => {
+    const exampleKeywords = ["itar", "fcl", "reciprocity", "interim", "sf86", "continuous_vetting"];
+    for (const keyword of exampleKeywords) {
+      const result = await explainRuleTool.handler({ topic: keyword });
+      expect(result.found, `example keyword "${keyword}" (from the tool's own description) should resolve`).toBe(
+        true,
+      );
+    }
+  });
+
+  it("a bare category guess does not resolve when it's genuinely ambiguous (several rules share it)", async () => {
+    const result = await explainRuleTool.handler({ topic: "clearance-process" });
+    expect(result.found).toBe(false);
+  });
 });

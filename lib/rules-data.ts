@@ -35,13 +35,34 @@ const parsed = RulesFileSchema.parse(rulesJson);
 export const RULES: RuleEntry[] = parsed.rules;
 export const RULES_LAST_VERIFIED: string = parsed.lastVerified;
 
+// Collapses -/_/whitespace runs to a single "-" so "continuous_vetting",
+// "continuous vetting", and the real id "continuous-vetting" all normalize
+// identically — found live via the spec §6 judging panel round 4: the
+// tool's own input description suggests "continuous_vetting" (underscore)
+// as an example keyword, but the real id uses a dash, and a plain
+// lowercase-only comparison treated them as different strings.
+function normalizeTopicKey(s: string): string {
+  return s.trim().toLowerCase().replace(/[-_\s]+/g, "-");
+}
+
 export function findRule(topic: string): RuleEntry | undefined {
-  const normalized = topic.trim().toLowerCase();
+  const normalized = normalizeTopicKey(topic);
   if (!normalized) return undefined;
-  return (
-    RULES.find((r) => r.id.toLowerCase() === normalized) ??
-    RULES.find((r) => r.title.toLowerCase() === normalized) ??
-    RULES.find((r) => r.id.toLowerCase().includes(normalized) || normalized.includes(r.id.toLowerCase()))
+  const byId = RULES.find((r) => normalizeTopicKey(r.id) === normalized);
+  if (byId) return byId;
+  const byTitle = RULES.find((r) => normalizeTopicKey(r.title) === normalized);
+  if (byTitle) return byTitle;
+  // Match by category, but only when it uniquely identifies one rule —
+  // also found live via round 4: the description's other example keyword,
+  // "reciprocity," is a *category* value (several rules can share one),
+  // not a rule id, so the id-only matcher above never found it either.
+  // Several categories here (e.g. "clearance-process") have multiple
+  // member rules, where a bare category guess is genuinely ambiguous — in
+  // that case this intentionally falls through rather than guess which one.
+  const categoryMatches = RULES.filter((r) => normalizeTopicKey(r.category) === normalized);
+  if (categoryMatches.length === 1) return categoryMatches[0];
+  return RULES.find(
+    (r) => normalizeTopicKey(r.id).includes(normalized) || normalized.includes(normalizeTopicKey(r.id)),
   );
 }
 

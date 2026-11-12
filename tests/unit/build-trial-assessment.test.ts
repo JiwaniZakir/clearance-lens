@@ -115,4 +115,16 @@ describe("build_trial_assessment", () => {
     // Still returns a valid (possibly shorter) rubric rather than throwing.
     expect(result.rubric.length).toBeGreaterThan(0);
   });
+
+  // Regression for DECISIONS.md (judging panel round 4): an invalid
+  // `minutes` value produced a bare "Invalid input" with no indication of
+  // what values ARE valid, unlike this product's string-enum fields
+  // elsewhere, which name their allowed options.
+  it("names the allowed values when minutes is invalid", () => {
+    const result = buildTrialAssessmentTool.inputSchema.safeParse({ role_id: "job-1", minutes: 45 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => /60, 90, or 180/.test(i.message))).toBe(true);
+    }
+  });
 });

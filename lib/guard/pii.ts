@@ -80,6 +80,24 @@ const DATE_DAY_MONTH_YEAR = new RegExp(
   "i",
 );
 const BARE_YEAR = /\b(19|20)\d{2}\b/;
+// A fully spelled-out date ("born march second nineteen ninety two") has no
+// digits at all, so none of the numeric date-shape checks above can ever
+// match it — found live via the spec §6 judging panel round 4 (2 of 5
+// judges, independently). Requires a month name, an ordinal (the day), and
+// two more number-words (the year, spelled as two "teens/tens" words) all
+// clustered within a bounded window — specific enough that ordinary prose
+// is very unlikely to coincidentally match, while still catching this exact
+// evasion. Still gated by BIRTH_CONTEXT below, same as every other DOB
+// check here — a month name alone (e.g. "the posting closes March 2nd")
+// must never flag on its own.
+const ORDINAL_WORDS =
+  "first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|thirtieth|thirty-first";
+const CARDINAL_NUMBER_WORDS =
+  "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred";
+const SPELLED_OUT_DATE = new RegExp(
+  `\\b(?:${MONTH_NAMES})\\b.{0,30}?\\b(?:${ORDINAL_WORDS})\\b.{0,40}?\\b(?:${CARDINAL_NUMBER_WORDS})\\b.{0,20}?\\b(?:${CARDINAL_NUMBER_WORDS})\\b`,
+  "i",
+);
 
 const PASSPORT_CONTEXT = /\bpassport(?:\s*(?:number|no\.?|#))?\b/i;
 /** 6-9 char alphanumeric token containing at least one digit (excludes plain words). */
@@ -90,8 +108,12 @@ const ALPHANUM_ID_TOKEN = /\b(?=[A-Za-z0-9]{6,9}\b)(?=[A-Za-z0-9]*\d)[A-Za-z0-9]
 // "request" added to the e-QIP branch: found live via the spec §6 judging
 // panel round 2 — "my e-QIP request number is 2024-SEC-0098765" bypassed
 // this because the context list only had case/id/submission, not "request".
+// A bare digit directly after "case"/"investigation" (no "number"/"no"/"#"/
+// "id" word in between) added as a further alternative: found live via
+// round 4 — "DCSA case 2024-0045678" bypassed this because "case" went
+// straight into the number with no qualifying word at all.
 const CASE_NUMBER_CONTEXT =
-  /\b(case\s*(?:number|no\.?|#|id)|investigation\s*(?:number|no\.?|#|id)|e-?qip\s*(?:case|id|submission|request)|opm\s*case)/i;
+  /\b(case\s*(?:number|no\.?|#|id|\d)|investigation\s*(?:number|no\.?|#|id|\d)|e-?qip\s*(?:case|id|submission|request)|opm\s*case)/i;
 const DIGIT_RUN_5PLUS = /\b[A-Za-z]?\d{5,}\b/;
 // A standalone pattern (no keyword context needed): a 4-digit year, a dash,
 // 2-4 letters, a dash, 4+ digits — the shape of a real government case ID
@@ -197,7 +219,8 @@ function scanPlainText(text: string): PiiFinding[] {
       DATE_ISO.test(text) ||
       DATE_MONTH_DAY_YEAR.test(text) ||
       DATE_DAY_MONTH_YEAR.test(text) ||
-      BARE_YEAR.test(text))
+      BARE_YEAR.test(text) ||
+      SPELLED_OUT_DATE.test(text))
   ) {
     add("dob");
   }
