@@ -36,6 +36,34 @@ describe(`MCP protocol conformance against ${MCP_URL}`, () => {
     expect(version?.name).toBe("clearance-lens");
   });
 
+  it("sets CORS headers for a browser-based MCP client (found missing live, D-012 — mcp-handler doesn't add these by default)", async () => {
+    const preflight = await fetch(MCP_URL, {
+      method: "OPTIONS",
+      headers: { Origin: "https://example.com", "Access-Control-Request-Method": "POST" },
+    });
+    expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
+    expect(preflight.headers.get("access-control-allow-methods")).toContain("POST");
+    expect(preflight.headers.get("access-control-allow-headers")).toContain("Mcp-Session-Id");
+
+    const actual = await fetch(MCP_URL, {
+      method: "POST",
+      headers: {
+        Origin: "https://example.com",
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "cors-test", version: "1.0" } },
+      }),
+    });
+    expect(actual.headers.get("access-control-allow-origin")).toBe("*");
+    // The CORS wrapper must not break the streaming transport it wraps.
+    expect(actual.headers.get("content-type")).toContain("text/event-stream");
+  });
+
   it("lists exactly the 11 tools in the registry, matching names 1:1", async () => {
     const { tools } = await client.listTools();
     const listedNames = tools.map((t) => t.name).sort();

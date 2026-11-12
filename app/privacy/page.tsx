@@ -25,6 +25,7 @@ const REFUSAL_CATEGORIES: Record<PiiCategory, string> = {
   clearance_record: "Clearance record or adjudication-system text (e.g. a DISS, JPAS, or NBIS record)",
   image_upload: "Image uploads or screenshots of any kind",
   binary_data: "Embedded files or other binary data",
+  unscannable_structure: "Requests structured too deeply (nested many levels deep) for us to safely check",
 };
 
 // A real-shaped request to explain_rule's actual input field ("topic"),

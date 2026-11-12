@@ -149,4 +149,49 @@ const handler = createMcpHandler(
   },
 );
 
-export { handler as GET, handler as POST };
+/**
+ * mcp-handler does NOT add CORS headers to the main endpoint by default —
+ * confirmed live (curl against a running dev server showed neither the
+ * OPTIONS preflight nor an actual POST response carried an
+ * Access-Control-Allow-Origin header at all). Its only built-in CORS helper
+ * (`metadataCorsOptionsRequestHandler`) is for the separate OAuth
+ * protected-resource metadata route, which this server doesn't use (no auth
+ * required). Without this, any browser-based MCP client would be blocked by
+ * the browser's own CORS enforcement, even though non-browser clients
+ * (Claude Desktop, Claude Code, curl, this project's own tests) are
+ * unaffected by CORS at all — which is exactly why this gap wasn't caught by
+ * any of the many direct @modelcontextprotocol/client smoke tests run during
+ * build; none of them run in a browser. Spec §3.3 explicitly requires
+ * correct CORS for MCP clients, so this is fixed here rather than left.
+ */
+const ALLOWED_REQUEST_HEADERS = [
+  "Content-Type",
+  "Accept",
+  "Mcp-Session-Id",
+  "Mcp-Protocol-Version",
+  "Last-Event-ID",
+].join(", ");
+
+function withCors(response: Response): Response {
+  const merged = new Headers(response.headers);
+  merged.set("Access-Control-Allow-Origin", "*");
+  merged.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  merged.set("Access-Control-Allow-Headers", ALLOWED_REQUEST_HEADERS);
+  // The SDK's stateless mode doesn't assign a session id a browser client
+  // would need to read back, but exposing it is harmless and future-proof.
+  merged.set("Access-Control-Expose-Headers", "Mcp-Session-Id");
+  merged.set("Access-Control-Max-Age", "86400");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers: merged });
+}
+
+async function corsGET(request: Request) {
+  return withCors(await handler(request));
+}
+async function corsPOST(request: Request) {
+  return withCors(await handler(request));
+}
+function OPTIONS() {
+  return withCors(new Response(null, { status: 204 }));
+}
+
+export { corsGET as GET, corsPOST as POST, OPTIONS };

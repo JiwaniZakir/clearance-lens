@@ -6,6 +6,7 @@ import { getRoleRubricTool } from "@/lib/tools/get-role-rubric";
 import { readinessBriefTool } from "@/lib/tools/readiness-brief";
 import { fitDebriefTool } from "@/lib/tools/fit-debrief";
 import { prepareConsentedCardTool } from "@/lib/tools/prepare-consented-card";
+import { callTool } from "@/lib/tools/wrap";
 
 function mockJob(descriptionText: string) {
   vi.mocked(getJob).mockResolvedValueOnce({
@@ -155,5 +156,28 @@ describe("prepare_consented_card", () => {
         fields_user_approved: { not_a_real_field: "x" },
       }),
     ).rejects.toBeTruthy();
+  });
+});
+
+describe("prepare_consented_card — cross-field PII evasion (BLOCKERS.md B-001)", () => {
+  it("catches an SSN deliberately split across two sibling fields", async () => {
+    mockJob("desc");
+    const result = await callTool(prepareConsentedCardTool, {
+      role_id: "job-1",
+      fields_user_approved: { headline: "call me at 123-45", notes: "6789 thanks" },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("pii_cui_rejected");
+  });
+
+  it("does not flag ordinary, unrelated field values that merely concatenate into something SSN-shaped only under forced adjacency it would never otherwise see", async () => {
+    mockJob("desc");
+    // headline/notes are the two fields actually joined; an ordinary
+    // headline and an ordinary availability note must still pass.
+    const result = await callTool(prepareConsentedCardTool, {
+      role_id: "job-1",
+      fields_user_approved: { headline: "Senior SDET", availability: "Available in 2 weeks" },
+    });
+    expect(result.ok).toBe(true);
   });
 });

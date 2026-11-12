@@ -20,7 +20,8 @@ export type PiiCategory =
   | "case_number"
   | "clearance_record"
   | "image_upload"
-  | "binary_data";
+  | "binary_data"
+  | "unscannable_structure";
 
 export interface PiiFinding {
   category: PiiCategory;
@@ -36,6 +37,7 @@ const FRIENDLY_BY_CATEGORY: Record<PiiCategory, string> = {
   clearance_record: "This looks like it includes clearance record or adjudication-system text (e.g. a DISS/JPAS/NBIS record). Clearance Lens never accepts clearance record text or screenshots — recruiters must verify clearance through an FSO, not self-reported record text. Please remove it.",
   image_upload: "Clearance Lens does not accept image uploads or screenshots of any kind, including clearance record screenshots. Please describe your situation in text instead.",
   binary_data: "This looks like it includes an embedded file or binary data. Clearance Lens only accepts plain text fields — please remove any attached file data.",
+  unscannable_structure: "This request is structured too deeply (nested objects/arrays many levels deep) for Clearance Lens to safely check for sensitive information. Please simplify the request and try again.",
 };
 
 /** SSN-context keywords that gate the riskier bare-9-digit check. No trailing
@@ -95,7 +97,10 @@ const BINARY_DATA_URI = /data:[a-z0-9/+.-]+;base64,/i;
  *  heuristic catch-all for a pasted file/image with no explicit MIME prefix. */
 const LONG_BASE64_RUN = /[A-Za-z0-9+/]{200,}={0,2}/;
 
-function scanTextForPiiCui(text: string): PiiFinding[] {
+/** The actual, un-obfuscated detectors. Operates on already-normalized,
+ *  already-decoded plain text — see `scanTextForPiiCui` below, which is the
+ *  only caller and the thing that actually runs against raw user input. */
+function scanPlainText(text: string): PiiFinding[] {
   const findings: PiiFinding[] = [];
   const add = (category: PiiCategory) => {
     if (!findings.some((f) => f.category === category)) {
@@ -129,13 +134,183 @@ function scanTextForPiiCui(text: string): PiiFinding[] {
   return findings;
 }
 
+/** Invisible/zero-width characters sometimes spliced into a digit run to break
+ *  a pattern match without changing how the text visually reads (e.g.
+ *  "123​-45-6789"). Stripped before scanning — red-team-found gap, see
+ *  tests/unit/pii.test.ts and DECISIONS.md. */
+const INVISIBLE_CHARS = /[​‌‍⁠﻿­]/g;
+
+/** Unicode dash/hyphen lookalikes that read identically to "-" but aren't in
+ *  SSN_DASHED's `[-.\s]` character class, and — verified directly, not
+ *  assumed — aren't folded to ASCII "-" by NFKC normalization either (NFKC
+ *  DOES fold FULLWIDTH HYPHEN-MINUS U+FF0D, since that block exists purely
+ *  for compatibility with ASCII/JIS; it does NOT fold general-punctuation
+ *  dashes like U+2010/2011/2013/2014 or the math minus sign U+2212, which
+ *  Unicode treats as semantically distinct from "-"). */
+const DASH_LOOKALIKES = /[‐‑‒–—−]/g;
+
+/** Normalizes text before any detector runs: NFKC folds full-width digits and
+ *  FULLWIDTH HYPHEN-MINUS to standard ASCII; the two replace()s close the
+ *  remaining gaps NFKC doesn't cover (verified empirically — see above). */
+function normalizeForScan(text: string): string {
+  return text.normalize("NFKC").replace(INVISIBLE_CHARS, "").replace(DASH_LOOKALIKES, "-");
+}
+
+/** Self-inverse: rot13(rot13(x)) === x. Digits/punctuation pass through
+ *  unchanged, which is exactly why this is worth trying as its own pass — it
+ *  specifically defeats "obfuscate just the trigger keyword" (e.g. "ssn" ->
+ *  "ffa") while a bare digit run sails through untouched, which would
+ *  otherwise slip past this guard's keyword-gated checks (SSN_CONTEXT +
+ *  BARE_9_DIGITS, CASE_NUMBER_CONTEXT, etc). */
+function rot13(text: string): string {
+  return text.replace(/[a-zA-Z]/g, (c) => {
+    const base = c <= "Z" ? 65 : 97;
+    return String.fromCharCode(((c.charCodeAt(0) - base + 13) % 26) + base);
+  });
+}
+
+/** One layer of percent-decoding. Returns null (rather than throwing or
+ *  looping forever) when the escape sequences are malformed, or when decoding
+ *  made no difference — both mean "nothing more to decode here." */
+function tryUriDecode(text: string): string | null {
+  try {
+    const decoded = decodeURIComponent(text);
+    return decoded === text ? null : decoded;
+  } catch {
+    return null;
+  }
+}
+
+/** Bounds the percent-decode loop below — defeats double-encoding (verified:
+ *  2 passes fully resolves a double-percent-encoded SSN) without looping
+ *  unboundedly on adversarial input. */
+const MAX_URI_DECODE_PASSES = 3;
+
+/** A base64-alphabet run long enough to plausibly be an encoded short PII
+ *  phrase, as distinct from LONG_BASE64_RUN's 200+-char "there's clearly some
+ *  large blob in here" catch-all — this is specifically for a short phrase
+ *  (e.g. "my ssn is 123-45-6789" is 28 chars of base64) hidden with no
+ *  visible keyword and too short to trip that heuristic. */
+const EMBEDDED_BASE64_TOKEN = /[A-Za-z0-9+/]{12,}={0,2}/g;
+
+/** Decodes a candidate base64 token and returns its text ONLY when decoding
+ *  is clearly correct and clearly plain text. Two checks, both load-bearing:
+ *  (1) re-encoding the decoded bytes must reproduce the exact original token
+ *  — Node's `Buffer.from(str, "base64")` silently tolerates non-base64 input,
+ *  so without this round-trip check almost any alphanumeric run would
+ *  "decode" to something; (2) the decoded bytes must be printable ASCII —
+ *  real PII hidden this way is always a plain-text phrase, never binary.
+ *  Verified empirically against realistic non-PII tokens (a role-id-shaped
+ *  string, a GitHub-username-shaped string, a long run-on sentence with no
+ *  spaces, a repeated-letter run, a plain digit run) — zero false decodes. */
+function tryBase64Decode(token: string): string | null {
+  try {
+    const buf = Buffer.from(token, "base64");
+    const reencoded = buf.toString("base64").replace(/=+$/, "");
+    if (reencoded !== token.replace(/=+$/, "")) return null;
+    const text = buf.toString("utf8");
+    if (text.length < 4 || !/^[\t\r\n\x20-\x7E]*$/.test(text)) return null;
+    return text;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The real entry point for scanning one string (scanValueForPiiCui below
+ * calls this on every string it finds). Runs scanPlainText against the plain
+ * text AND a small, fixed set of cheap, reversible transforms a motivated
+ * user could type into an ordinary string field to hide PII from a naive
+ * scan — there is no file upload or binary channel here, everything arrives
+ * as JSON strings, so this is the actual threat surface. Each transform is
+ * tried independently (not composed/chained with the others — that's an
+ * unbounded rabbit hole, not a real product need) and every finding merges,
+ * deduplicated by category:
+ *  - Unicode normalization + invisible-character stripping + dash-lookalike
+ *    folding (normalizeForScan), applied first, unconditionally.
+ *  - ROT13 of the whole normalized text.
+ *  - Percent-decoding, repeated to a fixed point (bounded).
+ *  - Any embedded base64-looking token, decoded and re-scanned.
+ * Found via red-teaming (spec §5) — all four were confirmed live bypasses
+ * before this fix; see tests/unit/pii.test.ts for the regression cases and
+ * DECISIONS.md for the write-up. Verified this doesn't introduce new false
+ * positives against this file's existing "does NOT flag" corpus.
+ */
+function scanTextForPiiCui(text: string): PiiFinding[] {
+  const normalized = normalizeForScan(text);
+  const findings = scanPlainText(normalized);
+  const merge = (more: PiiFinding[]) => {
+    for (const f of more) {
+      if (!findings.some((existing) => existing.category === f.category)) findings.push(f);
+    }
+  };
+
+  merge(scanPlainText(rot13(normalized)));
+
+  let current = normalized;
+  for (let i = 0; i < MAX_URI_DECODE_PASSES; i++) {
+    const decoded = tryUriDecode(current);
+    if (decoded === null) break;
+    merge(scanPlainText(decoded));
+    current = decoded;
+  }
+
+  for (const token of normalized.match(EMBEDDED_BASE64_TOKEN) ?? []) {
+    const decodedToken = tryBase64Decode(token);
+    if (decodedToken) merge(scanPlainText(decodedToken));
+  }
+
+  return findings;
+}
+
+/**
+ * Scans a flat record's string/string[] values JOINED TOGETHER in a fixed,
+ * caller-specified key order, in addition to (never instead of) the normal
+ * per-field scan every tool already gets via `scanValueForPiiCui`. This
+ * exists for one documented, narrow case: a tool whose output deliberately
+ * echoes the raw input verbatim (`prepare_consented_card`) is worth the
+ * false-positive cost of catching PII a user split across two sibling
+ * fields (e.g. "123-45" in one field, "6789" in another) specifically
+ * because that output is about to be shared externally — see
+ * BLOCKERS.md B-001 / DECISIONS.md for why this is NOT applied globally
+ * (demonstrated false positive: an ordinary search query plus an ordinary
+ * street address can concatenate into an SSN shape; most tools' fields
+ * don't describe one person's identity the way a share-card's do).
+ * `keyOrder` should be the field order from a real published schema, fixed,
+ * not derived from object insertion order (which a client controls).
+ */
+export function scanConcatenatedFields(
+  fields: Record<string, unknown>,
+  keyOrder: string[],
+): PiiFinding[] {
+  const parts: string[] = [];
+  for (const key of keyOrder) {
+    const value = fields[key];
+    if (typeof value === "string") parts.push(value);
+    else if (Array.isArray(value)) {
+      for (const item of value) if (typeof item === "string") parts.push(item);
+    }
+  }
+  return scanTextForPiiCui(parts.join(" "));
+}
+
 const MAX_SCAN_DEPTH = 8;
 
 /** Recursively walks any JSON-ish value (tool inputs are plain objects/arrays/
  *  strings/numbers), scanning every string found. Depth-limited as a defensive
  *  bound, not an expected real-world case for our flat tool schemas. */
 export function scanValueForPiiCui(value: unknown, depth = 0): PiiFinding[] {
-  if (depth > MAX_SCAN_DEPTH) return [];
+  if (depth > MAX_SCAN_DEPTH) {
+    // Fail CLOSED, not open — matches this module's own stated design
+    // principle ("prefer a false positive... over a false negative"). A
+    // structure nested deeper than we scan is exactly the ambiguous case
+    // that principle is about; silently returning [] here (as this used to)
+    // let a 9+-level-deep payload bypass the guard entirely (confirmed live
+    // during red-teaming, spec §5 — see tests/unit/pii.test.ts). No
+    // legitimate tool input (every schema here is flat objects/short arrays)
+    // comes anywhere near this depth, so this never fires on real traffic.
+    return [{ category: "unscannable_structure", message: FRIENDLY_BY_CATEGORY.unscannable_structure }];
+  }
   if (typeof value === "string") return scanTextForPiiCui(value);
   if (Array.isArray(value)) {
     return value.flatMap((item) => scanValueForPiiCui(item, depth + 1));

@@ -21,6 +21,22 @@ export interface ToolDef<TInput = unknown, TOutput = unknown> {
   inputSchema: z.ZodType<TInput>;
   outputSchema: z.ZodType<TOutput>;
   handler: (input: TInput) => Promise<TOutput>;
+  /**
+   * Optional, per-tool extra PII/CUI check beyond the standard per-field scan
+   * every tool already gets. Runs after zod validation, before the handler,
+   * inside the same error handling as the main guard (throw PiiCuiError to
+   * reject). Exists for exactly one documented case so far: a tool whose
+   * output deliberately echoes raw user-approved text verbatim
+   * (`prepare_consented_card`) is the one place PII fragmented across
+   * sibling fields (e.g. half an SSN in `headline`, the other half in
+   * `notes`) is worth the false-positive cost of also scanning fields
+   * joined together — a cost that is NOT worth paying globally (demonstrated
+   * false positive: `search_defense_roles({query: "software engineer
+   * 123-45", location: "6789 Main St"})` is two completely ordinary values
+   * that happen to concatenate into an SSN shape). See BLOCKERS.md B-001 for
+   * the full reasoning and DECISIONS.md for the resolution.
+   */
+  extraGuard?: (input: TInput) => void;
 }
 
 export type ToolErrorCode =
@@ -92,6 +108,17 @@ export async function callTool<TInput, TOutput>(
   const parsed = def.inputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: { code: "invalid_input", message: formatZodError(parsed.error) } };
+  }
+
+  if (def.extraGuard) {
+    try {
+      def.extraGuard(parsed.data);
+    } catch (err) {
+      if (err instanceof PiiCuiError) {
+        return { ok: false, error: { code: "pii_cui_rejected", message: err.message } };
+      }
+      throw err;
+    }
   }
 
   let result: TOutput;

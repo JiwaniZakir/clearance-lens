@@ -2,6 +2,20 @@ import { z } from "zod";
 import { resolveRole, SPEEDRUN_SOURCE } from "@/lib/tools/role-shared";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
+import { scanConcatenatedFields, PiiCuiError } from "@/lib/guard/pii";
+
+// Fixed, declared order — NOT derived from the client's own object key
+// order (which it controls) — see lib/guard/pii.ts's scanConcatenatedFields
+// doc comment and BLOCKERS.md B-001 for why this exists only on this tool.
+const APPROVED_FIELD_ORDER = [
+  "headline",
+  "clearance_status_self_reported",
+  "citizenship_status_self_reported",
+  "highlights",
+  "github_username",
+  "availability",
+  "notes",
+];
 
 // .strict() deliberately: unlike most tool inputs, every field here is
 // something the user is about to make public. An unknown key should be a
@@ -52,6 +66,10 @@ export const prepareConsentedCardTool: ToolDef<z.infer<typeof InputSchema>, z.in
     "Builds a shareable intro card from ONLY the fields the user explicitly approved — nothing is added, inferred, or verified. States plainly what wasn't verified. Never submits anything on the user's behalf; at most links to the role's own apply flow.",
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
+  extraGuard: ({ fields_user_approved }) => {
+    const findings = scanConcatenatedFields(fields_user_approved, APPROVED_FIELD_ORDER);
+    if (findings.length > 0) throw new PiiCuiError(findings);
+  },
   handler: async ({ role_id, fields_user_approved }) => {
     const role = await resolveRole(role_id);
 

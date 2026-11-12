@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
     return [
       {
         // Security headers on every route. CORS for /mcp is set explicitly
-        // in app/[transport]/route.ts because MCP clients need permissive
+        // in app/mcp/route.ts because MCP clients need permissive
         // cross-origin access that the rest of the site should not have.
         source: "/:path*",
         headers: [
