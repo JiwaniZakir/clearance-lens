@@ -341,3 +341,42 @@ describe("red-team: obfuscation-defeat passes do not introduce new false positiv
     expect(categoriesOf(text)).toHaveLength(0);
   });
 });
+
+// Regression for DECISIONS.md (judging panel round 2, hard-constraint
+// finding): prepare_consented_card's filter was bypassed by trivial
+// rephrasing of 4 of 5 protected categories, found live by two independent
+// judges using the MCP endpoint and the REST API.
+describe("judging panel round 2: PII bypasses found via rephrasing, now fixed", () => {
+  it.each([
+    ["Born 03/14/1992, happy to relocate", "dob"],
+    ["My e-QIP request number is 2024-SEC-0098765", "case_number"],
+    ["JPAS Owning SMO: 123456, PSQ submitted", "clearance_record"],
+    ["My file 2024-ABC-56789 is in review", "case_number"],
+    ["Reference number 2024-ABC-56789", "case_number"],
+    ["card 4111 1111 1111 1111 exp 12/27", "credit_card"],
+  ])("now catches: %s -> %s", (text, expectedCategory) => {
+    expect(categoriesOf(text)).toContain(expectedCategory);
+  });
+
+  it("does not reintroduce the nbis-diss bare-mention false positive while adding JPAS field-jargon detection", () => {
+    expect(categoriesOf("nbis-diss")).toHaveLength(0);
+    expect(categoriesOf("explain DISS to me")).toHaveLength(0);
+  });
+});
+
+describe("judging panel round 2: prepare_consented_card's stricter bare-identifier check (scanForBareIdentifierShapes)", () => {
+  it("rejects a bare, unlabeled 9-digit SSN-shaped number with no keyword context at all", async () => {
+    const { scanForBareIdentifierShapes } = await import("@/lib/guard/pii");
+    expect(scanForBareIdentifierShapes({ notes: "123456789" })).toHaveLength(1);
+  });
+
+  it("rejects a bare, unlabeled 9-digit ID-shaped number with no keyword context at all", async () => {
+    const { scanForBareIdentifierShapes } = await import("@/lib/guard/pii");
+    expect(scanForBareIdentifierShapes({ headline: "My ID number is 912345678" })).toHaveLength(1);
+  });
+
+  it("does not flag an ordinary field with no 9-digit run", async () => {
+    const { scanForBareIdentifierShapes } = await import("@/lib/guard/pii");
+    expect(scanForBareIdentifierShapes({ headline: "Backend engineer, 6 yrs", availability: "Now" })).toHaveLength(0);
+  });
+});

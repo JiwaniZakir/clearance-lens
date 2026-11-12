@@ -21,7 +21,8 @@ export type PiiCategory =
   | "clearance_record"
   | "image_upload"
   | "binary_data"
-  | "unscannable_structure";
+  | "unscannable_structure"
+  | "credit_card";
 
 export interface PiiFinding {
   category: PiiCategory;
@@ -38,6 +39,7 @@ const FRIENDLY_BY_CATEGORY: Record<PiiCategory, string> = {
   image_upload: "Clearance Lens does not accept image uploads or screenshots of any kind, including clearance record screenshots. Please describe your situation in text instead.",
   binary_data: "This looks like it includes an embedded file or binary data. Clearance Lens only accepts plain text fields — please remove any attached file data.",
   unscannable_structure: "This request is structured too deeply (nested objects/arrays many levels deep) for Clearance Lens to safely check for sensitive information. Please simplify the request and try again.",
+  credit_card: "This looks like it includes a credit card number. Clearance Lens never accepts payment card numbers — please remove it; nothing here needs billing information.",
 };
 
 /** SSN-context keywords that gate the riskier bare-9-digit check. No trailing
@@ -59,7 +61,12 @@ const SSN_DASHED = /\b\d{3}[-.\s]\d{2}[-.\s]\d{4}\b/;
  *  somewhere in the same field. */
 const BARE_9_DIGITS = /\b\d{9}\b/;
 
-const BIRTH_CONTEXT = /\b(dob|d\.o\.b\.?|date of birth|born on|born in|birth\s*date|birthday)\b/i;
+// Found live via the spec §6 judging panel round 2 (DECISIONS.md): "Born
+// 03/14/1992, happy to relocate" — bare "Born" directly followed by a date,
+// no "on"/"in" preposition — bypassed this guard entirely. Still gated by
+// requiring an adjacent date pattern below, so bare "born" alone (no date
+// nearby) still can't fire on its own.
+const BIRTH_CONTEXT = /\b(dob|d\.o\.b\.?|date of birth|born|birth\s*date|birthday)\b/i;
 const DATE_NUMERIC = /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/;
 const DATE_ISO = /\b\d{4}-\d{2}-\d{2}\b/;
 const MONTH_NAMES =
@@ -80,9 +87,20 @@ const ALPHANUM_ID_TOKEN = /\b(?=[A-Za-z0-9]{6,9}\b)(?=[A-Za-z0-9]*\d)[A-Za-z0-9]
 
 // No trailing `\b` — same reasoning as SSN_CONTEXT above: the `#` alternatives
 // end in a non-word char, so a trailing boundary assertion can silently fail.
+// "request" added to the e-QIP branch: found live via the spec §6 judging
+// panel round 2 — "my e-QIP request number is 2024-SEC-0098765" bypassed
+// this because the context list only had case/id/submission, not "request".
 const CASE_NUMBER_CONTEXT =
-  /\b(case\s*(?:number|no\.?|#|id)|investigation\s*(?:number|no\.?|#|id)|e-?qip\s*(?:case|id|submission)|opm\s*case)/i;
+  /\b(case\s*(?:number|no\.?|#|id)|investigation\s*(?:number|no\.?|#|id)|e-?qip\s*(?:case|id|submission|request)|opm\s*case)/i;
 const DIGIT_RUN_5PLUS = /\b[A-Za-z]?\d{5,}\b/;
+// A standalone pattern (no keyword context needed): a 4-digit year, a dash,
+// 2-4 letters, a dash, 4+ digits — the shape of a real government case ID
+// ("2024-ABC-56789", "2024-SEC-0098765") distinctive enough to flag on
+// structure alone, found live via the same round: "my file 2024-ABC-56789
+// is in review" and "reference number 2024-ABC-56789" both used generic
+// framing words (file/reference) the keyword list was never going to cover
+// exhaustively, but the ID's own shape is a reliable independent signal.
+const CASE_ID_SHAPE = /\b(19|20)\d{2}-[A-Za-z]{2,4}-\d{4,}\b/;
 
 /** Specific adjudication/records-system jargon. Deliberately narrow — generic
  *  words like "clearance", "secret", or "active" must NOT appear here, since
@@ -98,15 +116,33 @@ const DIGIT_RUN_5PLUS = /\b[A-Za-z]?\d{5,}\b/;
  *  agent-in-the-loop persona eval, not a hypothetical. The other phrases
  *  below (subject summary, investigation opened/closed, etc.) still catch an
  *  actual record dump independently, so this narrowing doesn't meaningfully
- *  reduce real protection. */
+ *  reduce real protection.
+ *
+ *  "owning smo"/"\bpsq\b" added: found live via the spec §6 judging panel
+ *  round 2 — "JPAS Owning SMO: 123456, PSQ submitted, SON 1234567890"
+ *  bypassed the record-context requirement above because it uses real
+ *  JPAS field terminology (Security Management Office; Personnel Security
+ *  Questionnaire) instead of a word like "record"/"shows". Both terms are
+ *  distinctive enough internal-system jargon to add directly, without
+ *  reintroducing the bare "jpas"/"diss"/"nbis" false positive this file's
+ *  own history (DECISIONS.md D-016) already fixed once — "SON" itself was
+ *  deliberately left out despite appearing in the same bypass string,
+ *  since it collides with the ordinary English word. */
 const CLEARANCE_RECORD_CONTEXT =
-  /\b(?:diss|jpas|nbis)\s+(?:record|printout|screenshot|summary|history|shows|says|entry)|e-?adjudication|subject summary|investigation (?:opened|closed)|adjudication (?:result|history)|eqip (?:record|history)/i;
+  /\b(?:diss|jpas|nbis)\s+(?:record|printout|screenshot|summary|history|shows|says|entry)|e-?adjudication|subject summary|investigation (?:opened|closed)|adjudication (?:result|history)|eqip (?:record|history)|owning\s+smo|\bpsq\b/i;
 
 const IMAGE_DATA_URI = /data:image\/[a-z0-9+.-]+;base64,/i;
 const BINARY_DATA_URI = /data:[a-z0-9/+.-]+;base64,/i;
 /** A long, unbroken run of base64-alphabet characters with no PII keyword nearby —
  *  heuristic catch-all for a pasted file/image with no explicit MIME prefix. */
 const LONG_BASE64_RUN = /[A-Za-z0-9+/]{200,}={0,2}/;
+/** Credit-card-shaped: 4 groups of 4 digits (with optional separators),
+ *  Luhn-plausible length, found via the spec §6 judging panel round 2 — not
+ *  one of the originally documented refused categories, but squarely
+ *  within the hard constraint's "never receive PII" spirit, and this exact
+ *  shape essentially never appears in legitimate defense-job-search
+ *  content, so it's safe to flag on structure alone. */
+const CREDIT_CARD_SHAPE = /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/;
 
 /** The actual, un-obfuscated detectors. Operates on already-normalized,
  *  already-decoded plain text — see `scanTextForPiiCui` below, which is the
@@ -135,12 +171,16 @@ function scanPlainText(text: string): PiiFinding[] {
 
   if (PASSPORT_CONTEXT.test(text) && ALPHANUM_ID_TOKEN.test(text)) add("passport");
 
-  if (CASE_NUMBER_CONTEXT.test(text) && DIGIT_RUN_5PLUS.test(text)) add("case_number");
+  if ((CASE_NUMBER_CONTEXT.test(text) && DIGIT_RUN_5PLUS.test(text)) || CASE_ID_SHAPE.test(text)) {
+    add("case_number");
+  }
 
   if (CLEARANCE_RECORD_CONTEXT.test(text)) add("clearance_record");
 
   if (IMAGE_DATA_URI.test(text)) add("image_upload");
   else if (BINARY_DATA_URI.test(text) || LONG_BASE64_RUN.test(text)) add("binary_data");
+
+  if (CREDIT_CARD_SHAPE.test(text)) add("credit_card");
 
   return findings;
 }
@@ -303,6 +343,39 @@ export function scanConcatenatedFields(
     }
   }
   return scanTextForPiiCui(parts.join(" "));
+}
+
+/** A bare, isolated 9-digit run with NO keyword context at all — the normal
+ * scanner's `BARE_9_DIGITS` deliberately requires `SSN_CONTEXT` nearby
+ * (see that const's own comment) because applied globally, a context-free
+ * 9-digit check would false-positive on ordinary numeric content elsewhere
+ * in this product (a role_id fragment, a comp figure, a zip+4). Found live
+ * via the spec §6 judging panel round 2: `prepare_consented_card` — the one
+ * tool that echoes raw input into a shareable, externally-facing card — was
+ * bypassed by a bare SSN-shaped number ("123456789") and a bare passport-
+ * shaped "ID number" ("912345678"), each entirely unlabeled. For this one
+ * tool specifically, the false-positive cost of flagging ANY bare 9-digit
+ * run is worth paying (same reasoning BLOCKERS.md B-001/DECISIONS.md D-014
+ * already used to justify this tool's own stricter `extraGuard`): a
+ * legitimate card field (headline, highlights, notes, availability) has no
+ * ordinary reason to contain 9 consecutive digits with nothing else
+ * explaining them. Reported under the "ssn" category — not perfectly
+ * precise (it could be a passport/other ID), but directionally correct and
+ * the recommended fix (restate in general terms) applies either way. */
+export function scanForBareIdentifierShapes(fields: Record<string, unknown>): PiiFinding[] {
+  const findings: PiiFinding[] = [];
+  const checkString = (s: string) => {
+    if (BARE_9_DIGITS.test(s) && findings.length === 0) {
+      findings.push({ category: "ssn", message: FRIENDLY_BY_CATEGORY.ssn });
+    }
+  };
+  for (const value of Object.values(fields)) {
+    if (typeof value === "string") checkString(value);
+    else if (Array.isArray(value)) {
+      for (const item of value) if (typeof item === "string") checkString(item);
+    }
+  }
+  return findings;
 }
 
 const MAX_SCAN_DEPTH = 8;

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { resolveRole, SPEEDRUN_SOURCE } from "@/lib/tools/role-shared";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
-import { scanConcatenatedFields, PiiCuiError } from "@/lib/guard/pii";
+import { scanConcatenatedFields, scanForBareIdentifierShapes, PiiCuiError } from "@/lib/guard/pii";
 
 // Fixed, declared order — NOT derived from the client's own object key
 // order (which it controls) — see lib/guard/pii.ts's scanConcatenatedFields
@@ -67,7 +67,10 @@ export const prepareConsentedCardTool: ToolDef<z.infer<typeof InputSchema>, z.in
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
   extraGuard: ({ fields_user_approved }) => {
-    const findings = scanConcatenatedFields(fields_user_approved, APPROVED_FIELD_ORDER);
+    const findings = [
+      ...scanConcatenatedFields(fields_user_approved, APPROVED_FIELD_ORDER),
+      ...scanForBareIdentifierShapes(fields_user_approved),
+    ];
     if (findings.length > 0) throw new PiiCuiError(findings);
   },
   handler: async ({ role_id, fields_user_approved }) => {
