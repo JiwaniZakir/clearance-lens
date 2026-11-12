@@ -1,5 +1,27 @@
-import { describe, it, expect } from "vitest";
-import { InMemorySignalStore, getAggregate, MIN_CONTRIBUTORS } from "@/lib/signal/store";
+import { describe, it, expect, vi } from "vitest";
+import { InMemorySignalStore, getAggregate, MIN_CONTRIBUTORS, COOLDOWN_MS } from "@/lib/signal/store";
+
+describe("tryAcquireCooldown (anti-burst safeguard, D-037)", () => {
+  it("allows the first acquisition, rejects an immediate second one, and allows a third after the window passes", async () => {
+    const store = new InMemorySignalStore();
+    expect(await store.tryAcquireCooldown("role-a")).toBe(true);
+    expect(await store.tryAcquireCooldown("role-a")).toBe(false);
+
+    vi.useFakeTimers();
+    try {
+      await vi.advanceTimersByTimeAsync(COOLDOWN_MS);
+      expect(await store.tryAcquireCooldown("role-a")).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("tracks cooldowns independently per role id", async () => {
+    const store = new InMemorySignalStore();
+    expect(await store.tryAcquireCooldown("role-a")).toBe(true);
+    expect(await store.tryAcquireCooldown("role-b")).toBe(true);
+  });
+});
 
 describe("signal store aggregation (k-anonymity floor)", () => {
   it("reports meetsFloor:false and no breakdown below MIN_CONTRIBUTORS total", async () => {

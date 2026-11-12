@@ -98,6 +98,19 @@ describe("explain_rule", () => {
     },
   );
 
+  // Regression for DECISIONS.md (judging panel round 7, trust_skeptic):
+  // "permanent_resident" (underscore, no "clearance" suffix) and the plain
+  // "permanent resident" still missed itar-us-person even after round 6's
+  // keyword fix added several OTHER close variants.
+  it.each(["permanent_resident", "permanent resident", "PERMANENT_RESIDENT"])(
+    "resolves the natural-language synonym %s to itar-us-person via its keywords list",
+    async (topic) => {
+      const result = await explainRuleTool.handler({ topic });
+      expect(result.found).toBe(true);
+      expect(result.topic?.id).toBe("itar-us-person");
+    },
+  );
+
   it("itar-us-person's own content points a reader toward the separate, stricter LAA rule", async () => {
     const result = await explainRuleTool.handler({ topic: "itar-us-person" });
     expect(result.found).toBe(true);

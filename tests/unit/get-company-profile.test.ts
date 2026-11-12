@@ -45,6 +45,17 @@ describe("get_company_profile", () => {
     expect(result.gaps.some((g) => g.includes("not independently sourced"))).toBe(true);
   });
 
+  // Regression for DECISIONS.md (judging panel round 7, candidate_user): the
+  // existing "not independently sourced" gap above is scoped to hiring-
+  // criteria/"fit" claims specifically -- company.stage/size/industries
+  // themselves had no caveat at all, so a reader could mistake a possibly
+  // stale upstream field (e.g. funding stage) for a freshly-verified fact.
+  it("always includes a freshness caveat for the company-profile fields themselves (stage/size/industries), not just hiring criteria", async () => {
+    vi.mocked(getCompany).mockResolvedValueOnce(company([{}]));
+    const result = await getCompanyProfileTool.handler({ company_slug: "acme-defense" });
+    expect(result.gaps.some((g) => g.toLowerCase().includes("stage") && g.toLowerCase().includes("lag"))).toBe(true);
+  });
+
   // Regression for DECISIONS.md (judging panel round 2): the "fit"/criteria
   // sentence was split out of the shared noDemographicInference disclaimer
   // (since it was a non-sequitur on verify_evidence) — this tool is the one

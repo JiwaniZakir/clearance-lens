@@ -136,6 +136,18 @@ export const getCompanyProfileTool: ToolDef<z.infer<typeof InputSchema>, z.infer
         "Clearance Lens has not independently sourced published hiring criteria for this company. Treat any \"culture fit\" claims you see elsewhere with skepticism — ask the recruiter directly what they evaluate for and why, and ask for a source.",
       );
     }
+    // Found live via the spec §6 judging panel round 7 (candidate_user):
+    // the EXISTING caveat above is scoped to hiring-criteria/"fit" claims,
+    // not to the company.stage/size fields themselves — a reader skimming
+    // for exactly "how early/risky is this startup" could walk away with a
+    // wrong read if that field has gone stale upstream since this was last
+    // refreshed. These fields are relayed as-is from the upstream network
+    // (not computed/invented by this tool), so the fix is saying so
+    // plainly, not inventing a "corrected" value this tool has no way to
+    // independently verify.
+    gaps.push(
+      "Fields like stage/size/industries above reflect this network's own published data as of this call, not a live, continuously-verified source — a fast-moving fact like funding stage can lag a company's real, current status. Verify anything time-sensitive directly with the company.",
+    );
     gaps.push(
       isFullRoster
         ? `Work realities below reflect all ${sample.length} currently open role(s) at this company.`

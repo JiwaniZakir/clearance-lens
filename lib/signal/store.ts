@@ -74,13 +74,31 @@ export interface SignalStore {
   readonly backend: "upstash" | "in-memory";
   addContribution(scope: SignalScope, contribution: SignalContribution): Promise<void>;
   getRawContributions(key: "role" | "company", id: string): Promise<SignalContribution[]>;
+  /** Found live via the spec §6 judging panel round 7 (recruiter_user,
+   * directly demonstrated): with no accounts or auth of any kind, nothing
+   * stopped one script from pushing a role's pool from 0 to 10
+   * contributions in under 2 seconds, producing a plausible-looking but
+   * entirely fabricated aggregate. A per-identity rate limit isn't
+   * possible here (there is no identity), but a short, scope-level
+   * cooldown directly defeats that exact burst pattern — returns false
+   * (reject) if a contribution to this same role was accepted within the
+   * last COOLDOWN_MS, true (allow) otherwise. Not a complete fix for a
+   * sufficiently patient adversary submitting one every few seconds — see
+   * DECISIONS.md for why a stronger fix isn't built here, and the
+   * disclaimer this gates is honest about that remaining limit. */
+  tryAcquireCooldown(roleId: string): Promise<boolean>;
 }
+
+export const COOLDOWN_MS = 2000;
 
 function roleKey(roleId: string): string {
   return `clearance-lens:signal:role:${roleId}`;
 }
 function companyKey(companySlug: string): string {
   return `clearance-lens:signal:company:${companySlug}`;
+}
+function cooldownKey(roleId: string): string {
+  return `clearance-lens:signal:cooldown:${roleId}`;
 }
 
 class UpstashSignalStore implements SignalStore {
@@ -103,6 +121,13 @@ class UpstashSignalStore implements SignalStore {
     const raw = await this.redis.lrange<string>(redisKey, 0, -1);
     return raw.map((r) => (typeof r === "string" ? (JSON.parse(r) as SignalContribution) : (r as SignalContribution)));
   }
+  async tryAcquireCooldown(roleId: string): Promise<boolean> {
+    // SET ... NX EX: atomically set-if-absent with a TTL in one round trip
+    // — the standard Redis lock/cooldown pattern, no separate read+write
+    // race window.
+    const result = await this.redis.set(cooldownKey(roleId), "1", { nx: true, px: COOLDOWN_MS });
+    return result !== null;
+  }
 }
 
 /** Not durable across separate serverless invocations in production — see
@@ -111,6 +136,7 @@ class UpstashSignalStore implements SignalStore {
 export class InMemorySignalStore implements SignalStore {
   readonly backend = "in-memory" as const;
   private data = new Map<string, SignalContribution[]>();
+  private cooldowns = new Map<string, number>();
   async addContribution(scope: SignalScope, contribution: SignalContribution): Promise<void> {
     const rk = roleKey(scope.roleId);
     this.data.set(rk, [...(this.data.get(rk) ?? []), contribution]);
@@ -122,6 +148,13 @@ export class InMemorySignalStore implements SignalStore {
   async getRawContributions(key: "role" | "company", id: string): Promise<SignalContribution[]> {
     const redisKey = key === "role" ? roleKey(id) : companyKey(id);
     return this.data.get(redisKey) ?? [];
+  }
+  async tryAcquireCooldown(roleId: string): Promise<boolean> {
+    const key = cooldownKey(roleId);
+    const expiresAt = this.cooldowns.get(key);
+    if (expiresAt !== undefined && Date.now() < expiresAt) return false;
+    this.cooldowns.set(key, Date.now() + COOLDOWN_MS);
+    return true;
   }
 }
 

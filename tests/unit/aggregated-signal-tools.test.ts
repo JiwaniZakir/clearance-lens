@@ -9,16 +9,31 @@ vi.mock("@/lib/signal/store", async (importActual) => {
 });
 
 import { getJob, getCompany } from "@/lib/speedrun/client";
-import { InMemorySignalStore, MIN_CONTRIBUTORS } from "@/lib/signal/store";
+import { InMemorySignalStore, MIN_CONTRIBUTORS, COOLDOWN_MS } from "@/lib/signal/store";
 import { contributeAnonymousSignalTool } from "@/lib/tools/contribute-anonymous-signal";
 import { getAggregatedSignalTool } from "@/lib/tools/get-aggregated-signal";
 
 beforeEach(() => {
   testStore = new InMemorySignalStore();
+  jobsById.clear();
+});
+
+// mockImplementation keyed by id (not mockResolvedValue, which sets a
+// single persistent default regardless of the id argument passed in) --
+// needed so two different job ids registered via two mockJob() calls in
+// the same test each resolve by their own id, instead of the later call's
+// response silently winning for every subsequent call regardless of which
+// id was actually requested.
+type MockedJobResponse = Awaited<ReturnType<typeof getJob>>;
+const jobsById = new Map<string, MockedJobResponse>();
+vi.mocked(getJob).mockImplementation(async (id: string) => {
+  const found = jobsById.get(id);
+  if (!found) throw new Error(`mockJob() was never called for id "${id}"`);
+  return found;
 });
 
 function mockJob(id: string, companySlug: string | null = "acme-defense") {
-  vi.mocked(getJob).mockResolvedValue({
+  jobsById.set(id, {
     job: {
       id,
       title: "Autonomy Engineer",
@@ -57,6 +72,58 @@ describe("contribute_anonymous_signal", () => {
     // disclaimer -- nothing shaped to hold a name, contact info, or any
     // other per-candidate identifier.
     expect(Object.keys(result).sort()).toEqual(["company", "disclaimer", "recorded", "roleTitle", "sources"]);
+  });
+
+  // Regression for DECISIONS.md (judging panel round 7, recruiter_user,
+  // directly demonstrated): with no accounts, nothing stopped one script
+  // from pushing a role's pool from 0 to 10 contributions in under 2
+  // seconds. This cooldown directly defeats that exact burst pattern.
+  it("rejects a second contribution to the same role within the cooldown window, without throwing an error", async () => {
+    mockJob("job-1");
+    const first = await contributeAnonymousSignalTool.handler({
+      role_id: "job-1",
+      contribution: { clearance_level: "secret" },
+    });
+    expect(first.recorded).toBe(true);
+
+    const second = await contributeAnonymousSignalTool.handler({
+      role_id: "job-1",
+      contribution: { clearance_level: "secret" },
+    });
+    expect(second.recorded).toBe(false);
+    expect(second.disclaimer).toMatch(/not recorded/i);
+
+    // The rejected attempt must not have been silently counted anyway.
+    const agg = await getAggregatedSignalTool.handler({ role_id: "job-1" });
+    expect(agg.totalContributions).toBe(1);
+  });
+
+  it("allows a new contribution once the cooldown window has passed", async () => {
+    mockJob("job-1");
+    await contributeAnonymousSignalTool.handler({ role_id: "job-1", contribution: { clearance_level: "secret" } });
+
+    vi.useFakeTimers();
+    try {
+      await vi.advanceTimersByTimeAsync(COOLDOWN_MS);
+      const afterCooldown = await contributeAnonymousSignalTool.handler({
+        role_id: "job-1",
+        contribution: { clearance_level: "secret" },
+      });
+      expect(afterCooldown.recorded).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a different role's cooldown is independent -- contributing to one role never blocks another", async () => {
+    mockJob("job-1");
+    mockJob("job-2");
+    await contributeAnonymousSignalTool.handler({ role_id: "job-1", contribution: { clearance_level: "secret" } });
+    const result = await contributeAnonymousSignalTool.handler({
+      role_id: "job-2",
+      contribution: { clearance_level: "secret" },
+    });
+    expect(result.recorded).toBe(true);
   });
 
   it("rejects a call with no buckets at all", () => {
@@ -105,8 +172,17 @@ describe("get_aggregated_signal", () => {
 
   it("reports rounded percentages once MIN_CONTRIBUTORS is reached for a role", async () => {
     mockJob("job-1");
-    for (let i = 0; i < MIN_CONTRIBUTORS; i++) {
-      await contributeAnonymousSignalTool.handler({ role_id: "job-1", contribution: { clearance_level: "secret" } });
+    vi.useFakeTimers();
+    try {
+      for (let i = 0; i < MIN_CONTRIBUTORS; i++) {
+        // Each role has a short anti-burst cooldown (D-037/round 7) --
+        // advance past it between contributions so this test exercises
+        // aggregation, not the cooldown (which has its own dedicated test).
+        if (i > 0) await vi.advanceTimersByTimeAsync(COOLDOWN_MS);
+        await contributeAnonymousSignalTool.handler({ role_id: "job-1", contribution: { clearance_level: "secret" } });
+      }
+    } finally {
+      vi.useRealTimers();
     }
     const result = await getAggregatedSignalTool.handler({ role_id: "job-1" });
     expect(result.meetsFloor).toBe(true);
@@ -117,11 +193,20 @@ describe("get_aggregated_signal", () => {
   it("aggregates at the company level across multiple roles there", async () => {
     mockJob("job-1", "acme-defense");
     mockJob("job-2", "acme-defense");
-    for (let i = 0; i < 3; i++) {
-      await contributeAnonymousSignalTool.handler({ role_id: "job-1", contribution: { clearance_level: "secret" } });
-    }
-    for (let i = 0; i < 2; i++) {
-      await contributeAnonymousSignalTool.handler({ role_id: "job-2", contribution: { clearance_level: "secret" } });
+    vi.useFakeTimers();
+    try {
+      for (let i = 0; i < 3; i++) {
+        if (i > 0) await vi.advanceTimersByTimeAsync(COOLDOWN_MS);
+        await contributeAnonymousSignalTool.handler({ role_id: "job-1", contribution: { clearance_level: "secret" } });
+      }
+      // A different role_id has its own, independent cooldown bucket, so
+      // this one starts fresh without needing to advance time again.
+      for (let i = 0; i < 2; i++) {
+        if (i > 0) await vi.advanceTimersByTimeAsync(COOLDOWN_MS);
+        await contributeAnonymousSignalTool.handler({ role_id: "job-2", contribution: { clearance_level: "secret" } });
+      }
+    } finally {
+      vi.useRealTimers();
     }
     vi.mocked(getCompany).mockResolvedValueOnce({
       company: {

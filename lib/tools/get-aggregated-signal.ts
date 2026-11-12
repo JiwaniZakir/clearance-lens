@@ -106,7 +106,7 @@ export const getAggregatedSignalTool: ToolDef<z.infer<typeof InputSchema>, z.inf
         (breakdown.meetsFloor
           ? `Reflects ${breakdown.totalContributions} anonymous contributions for this ${scopeType}. Any individual bucket value with fewer than ${MIN_CONTRIBUTORS} contributors is folded into "otherBelowFloor" rather than shown on its own, so no reader can single out a small subgroup. `
           : `Fewer than ${MIN_CONTRIBUTORS} people have contributed for this ${scopeType} yet, so no breakdown is shown — this protects the few contributors who do exist from being identifiable. `) +
-        "This reflects unauthenticated, self-reported contributions with no protection against duplicates or bad-faith submissions — treat it as a rough, directional signal, never a rigorous survey, and never a ranking or score of any individual candidate." +
+        "This reflects unauthenticated, self-reported contributions. A short per-role cooldown blocks only the fastest burst-style fabrication (see contribute_anonymous_signal) — it is not a full anti-fabrication system, and nothing stops a slower, more patient bad-faith actor. Treat this as a rough, directional signal, never a rigorous survey, and never a ranking or score of any individual candidate." +
         notDurableNote +
         " " +
         DISCLAIMERS.noDemographicInference,
