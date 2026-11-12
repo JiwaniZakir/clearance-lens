@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:protocol": "vitest run --config vitest.protocol.config.ts",
+    "test:e2e": "playwright test",
+    "linkcheck": "tsx scripts/linkcheck.ts",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm linkcheck"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "^2.4.0",

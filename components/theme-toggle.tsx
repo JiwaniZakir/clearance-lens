@@ -11,6 +11,11 @@ import { cn } from "@/lib/cn";
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
+  // next-themes' own documented hydration-safety idiom: the server can't
+  // know the client's theme, so this renders a neutral state on the server
+  // and flips to the real theme after mount. The one extra render this
+  // causes is the intended, unavoidable cost of that guarantee.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => setMounted(true), []);
 
   const isDark = mounted && resolvedTheme === "dark";
