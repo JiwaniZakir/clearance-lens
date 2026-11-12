@@ -18,7 +18,10 @@ const OutputSchema = z.object({
       agentFillsThisIn: z.literal(true),
     }),
   }),
-  recruiterQuestions: z.array(z.string()),
+  // Renamed from `recruiterQuestions` (judging panel round 8, candidate_user):
+  // these are questions for the candidate to ASK the recruiter, and the old
+  // name read as the reverse. Matches fit_debrief's questionsToAskTheCompany.
+  questionsToAskTheRecruiter: z.array(z.string()),
   evaluate_locally: z.literal(true),
   instructionsForAgent: z.string(),
   sources: z.array(SourceRefSchema),
@@ -37,14 +40,14 @@ export const readinessBriefTool: ToolDef<z.infer<typeof InputSchema>, z.infer<ty
     const sections = extractSections(role.descriptionText);
     const focusAreas = (sections.qualifications.length > 0 ? sections.qualifications : sections.rawBullets).slice(0, 6);
 
-    const recruiterQuestions = [
+    const questionsToAskTheRecruiter = [
       `Does the ${role.title} role currently require an active clearance, or could I start on unclassified work while an investigation is pending?`,
       `Does ${role.company} currently hold a Facility Clearance (FCL), or would sponsorship be needed for this role?`,
       "What does the first 90 days typically look like for someone waiting on a clearance to finalize?",
       "Is there flexibility on start date if an investigation or interim determination is still in progress?",
     ];
     if (role.signals.some((s) => s.kind === "citizenship")) {
-      recruiterQuestions.push(
+      questionsToAskTheRecruiter.push(
         "Can you confirm exactly what citizenship/US-person status this specific role requires, beyond what's in the posting?",
       );
     }
@@ -70,7 +73,7 @@ export const readinessBriefTool: ToolDef<z.infer<typeof InputSchema>, z.infer<ty
           agentFillsThisIn: true,
         },
       },
-      recruiterQuestions,
+      questionsToAskTheRecruiter,
       evaluate_locally: true,
       instructionsForAgent:
         "Fill in the three template sections yourself, locally, using what you already know about the user. " +

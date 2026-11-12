@@ -71,7 +71,7 @@ describe("estimate_timeline", () => {
     expect(result.estimate.maxDays).toBe(modifier.typicalDaysMax);
   });
 
-  it("employer_has_fcl=no: adds a distinct, more specific FCL driver than the 'unknown' case, without changing the base estimate", async () => {
+  it("employer_has_fcl=no: adds a distinct, more specific FCL driver than the 'unknown' case, AND a longer structured estimate", async () => {
     // Both "unknown" and "no" each add exactly one FCL-related driver (same
     // count), but with meaningfully different content — "no" is specific and
     // actionable, "unknown" just flags the uncertainty.
@@ -85,7 +85,10 @@ describe("estimate_timeline", () => {
       current_status: "none",
       employer_has_fcl: "no",
     });
-    expect(withNoFcl.estimate).toEqual(withUnknownFcl.estimate);
+    // Inverted deliberately (judging panel round 8, DECISIONS.md): this used
+    // to assert the two estimates were EQUAL — exactly the behavior flagged
+    // as a defect, since the sourced no-FCL wait never reached the number.
+    expect(withNoFcl.estimate.maxDays).toBeGreaterThan(withUnknownFcl.estimate.maxDays as number);
     expect(withNoFcl.keyDrivers.some((d) => d.label.toLowerCase().includes("no facility clearance"))).toBe(true);
     expect(withUnknownFcl.keyDrivers.some((d) => d.label.toLowerCase().includes("fcl status unknown"))).toBe(true);
     expect(withNoFcl.keyDrivers.find((d) => d.label.toLowerCase().includes("facility clearance"))?.detail).not.toBe(
@@ -144,5 +147,43 @@ describe("estimate_timeline", () => {
     });
     expect(result.estimate.minDays).not.toBe(result.estimate.maxDays);
     expect(result.uncertaintyNote).not.toMatch(/single figure, not a min\/max range/);
+  });
+
+  // Regression for DECISIONS.md (judging panel round 8, candidate_user):
+  // "yes" and "no" used to return IDENTICAL minDays/maxDays — the sourced
+  // no-FCL sponsorship wait only ever appeared as prose.
+  describe("employer_has_fcl affects the structured estimate, not just prose", () => {
+    it("'no' adds the sourced sponsorship wait to the structured range and exposes it separately", async () => {
+      const yes = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "yes" });
+      const no = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "no" });
+      expect(no.employerFclWaitDays).not.toBeNull();
+      const wait = no.employerFclWaitDays as { minDays: number; maxDays: number };
+      expect(no.estimate.minDays).toBe((yes.estimate.minDays as number) + wait.minDays);
+      expect(no.estimate.maxDays).toBe((yes.estimate.maxDays as number) + wait.maxDays);
+    });
+
+    it("drops medianDays for the combined range rather than show an investigation-only median below its minimum", async () => {
+      const no = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "no" });
+      expect(no.estimate.medianDays).toBeNull();
+    });
+
+    it("'yes' and 'unknown' never include a sponsorship wait", async () => {
+      for (const fcl of ["yes", "unknown"] as const) {
+        const r = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: fcl });
+        expect(r.employerFclWaitDays).toBeNull();
+      }
+    });
+
+    it("still surfaces the wait as structured data even when the investigation itself has no day count (active clearance)", async () => {
+      const r = await estimateTimelineTool.handler({ target_level: "secret", current_status: "active", employer_has_fcl: "no" });
+      expect(r.estimate.minDays).toBeNull();
+      expect(r.employerFclWaitDays).not.toBeNull();
+    });
+
+    it("says in the driver text that the estimate already includes the wait", async () => {
+      const no = await estimateTimelineTool.handler({ target_level: "secret", current_status: "none", employer_has_fcl: "no" });
+      const driver = no.keyDrivers.find((d) => d.label.includes("no Facility Clearance"));
+      expect(driver?.detail).toMatch(/estimate above already includes this/i);
+    });
   });
 });

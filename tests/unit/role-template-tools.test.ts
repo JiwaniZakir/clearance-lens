@@ -75,11 +75,11 @@ describe("readiness_brief", () => {
     // reachable case for a role surfaced through this product.
     mockJob("Must be a U.S. Citizen for this role.");
     const withStated = await readinessBriefTool.handler({ role_id: "job-1" });
-    expect(withStated.recruiterQuestions.some((q) => q.includes("citizenship"))).toBe(true);
+    expect(withStated.questionsToAskTheRecruiter.some((q) => q.includes("citizenship"))).toBe(true);
 
     mockJob("A posting with no citizenship language at all.");
     const withInferred = await readinessBriefTool.handler({ role_id: "job-1" });
-    expect(withInferred.recruiterQuestions.some((q) => q.includes("citizenship/US-person"))).toBe(true);
+    expect(withInferred.questionsToAskTheRecruiter.some((q) => q.includes("citizenship/US-person"))).toBe(true);
   });
 });
 

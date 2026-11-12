@@ -296,3 +296,16 @@ export function InterviewGuideSkeleton() {
     </SkeletonCard>
   );
 }
+
+/** Mirrors the verify-attestation result: a verdict line, then a few detail lines. */
+export function VerifyAttestationSkeleton() {
+  return (
+    <SkeletonCard className="flex flex-col gap-3">
+      <div role="status" aria-label="Verifying credential" className="flex flex-col gap-3">
+        <Bone className="h-4 w-1/3" />
+        <Bone className="h-3 w-full" />
+        <Bone className="h-3 w-4/5" />
+      </div>
+    </SkeletonCard>
+  );
+}

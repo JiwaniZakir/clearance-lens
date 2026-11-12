@@ -85,3 +85,41 @@ describe("SOURCES.md cross-check", () => {
     expect(missing, `URLs missing from SOURCES.md: ${missing.join(", ")}`).toEqual([]);
   });
 });
+
+// Found via the spec §6 judging panel round 8 (trust_skeptic flagged one
+// tool-cited source missing from /sources; a systematic check then found the
+// a16z speedrun Talent Network — cited by nearly every tool — was missing
+// too). The /sources page keeps its own row list instead of generating from
+// SOURCES.md, so the two can drift silently. This walks every URL literal any
+// tool cites and requires it in BOTH places.
+describe("every URL a tool cites inline is listed on /sources and in SOURCES.md", () => {
+  const toolsDir = path.join(process.cwd(), "lib/tools");
+  const cited = new Map<string, string>();
+  for (const file of fs.readdirSync(toolsDir).filter((f) => f.endsWith(".ts"))) {
+    const text = fs.readFileSync(path.join(toolsDir, file), "utf8");
+    for (const m of text.matchAll(/url:\s*"(https?:\/\/[^"]+)"/g)) cited.set(m[1], file);
+  }
+  const sourcesMd = fs.readFileSync(path.join(process.cwd(), "SOURCES.md"), "utf8");
+  // What /sources actually renders: its own static rows, plus every rule
+  // and timeline source (rendered dynamically from these data files).
+  const pageRendered = [
+    fs.readFileSync(path.join(process.cwd(), "app/sources/page.tsx"), "utf8"),
+    ...RULES.flatMap((r) => r.sources.map((s) => s.url)),
+    ...Object.values(TIMELINES.investigations).map((i) => i.source.url),
+    ...TIMELINES.modifiers.map((m) => m.source.url),
+  ].join("\n");
+
+  it("finds a non-trivial number of cited URLs (guards against the scan silently matching nothing)", () => {
+    expect(cited.size).toBeGreaterThanOrEqual(5);
+  });
+
+  it("every tool-cited URL appears in SOURCES.md", () => {
+    const missing = [...cited].filter(([url]) => !sourcesMd.includes(url)).map(([url, f]) => `${url} (${f})`);
+    expect(missing, `missing from SOURCES.md: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("every tool-cited URL is rendered on the /sources page", () => {
+    const missing = [...cited].filter(([url]) => !pageRendered.includes(url)).map(([url, f]) => `${url} (${f})`);
+    expect(missing, `missing from /sources: ${missing.join(", ")}`).toEqual([]);
+  });
+});

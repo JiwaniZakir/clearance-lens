@@ -59,6 +59,7 @@ import {
   AnonymousSignalSkeleton,
   AggregatedSignalSkeleton,
   InterviewGuideSkeleton,
+  VerifyAttestationSkeleton,
 } from "@/components/loading-skeleton";
 
 import { useToolCall } from "@/lib/use-tool-call";
@@ -108,6 +109,8 @@ import type {
   InterviewMinutes,
   GenerateInterviewGuideInput,
   GenerateInterviewGuideOutput,
+  VerifySignedAttestationInput,
+  VerifySignedAttestationOutput,
 } from "@/lib/try-tool-types";
 
 // Found live via the spec §6 judging panel (DECISIONS.md): 4 of 5 fresh
@@ -143,6 +146,7 @@ const TAB_DEFS = [
   { id: "contribute", label: "Contribute signal" },
   { id: "aggregate", label: "Aggregated signal" },
   { id: "interview", label: "Interview guide" },
+  { id: "verifyattestation", label: "Verify attestation" },
 ] as const;
 
 type TabId = (typeof TAB_DEFS)[number]["id"];
@@ -170,6 +174,7 @@ const TOOL_NAME_TO_TAB: Record<string, TabId> = {
   contribute_anonymous_signal: "contribute",
   get_aggregated_signal: "aggregate",
   generate_interview_guide: "interview",
+  verify_signed_attestation: "verifyattestation",
 };
 
 function tabFromToolParam(toolParam: string | null): TabId {
@@ -1102,7 +1107,7 @@ function ReadinessBriefTab() {
               Ready-to-ask recruiter/FSO questions
             </p>
             <ul className="flex flex-col gap-1.5 text-sm leading-[1.55] text-neutral-11">
-              {data.recruiterQuestions.map((q, i) => (
+              {data.questionsToAskTheRecruiter.map((q, i) => (
                 <li key={i} className="flex gap-2">
                   <span aria-hidden>·</span>
                   {q}
@@ -2012,6 +2017,96 @@ function InterviewGuideTab() {
 }
 
 /* ------------------------------------------------------------------------ */
+/* Verify attestation                                                       */
+/* ------------------------------------------------------------------------ */
+
+// The recipient's half of the Signed attestation tab: paste the JSON block a
+// candidate shared, see whether it verifies. Parsing happens client-side only
+// to pull out the three fields the tool needs; verification is server-side.
+function VerifyAttestationTab() {
+  const { data, error, loading, call, reset } = useToolCall<
+    VerifySignedAttestationInput,
+    VerifySignedAttestationOutput
+  >("verify_signed_attestation");
+  const [pasted, setPasted] = React.useState("");
+  const [parseError, setParseError] = React.useState<string | null>(null);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setParseError(null);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(pasted);
+    } catch {
+      setParseError("That isn't valid JSON — paste the json block from a shared credential, braces included.");
+      return;
+    }
+    const p = parsed as Partial<VerifySignedAttestationInput>;
+    if (typeof p.signed_payload !== "string" || typeof p.signature_base64 !== "string" || typeof p.public_key_base64 !== "string") {
+      setParseError("The pasted JSON needs signed_payload, signature_base64, and public_key_base64 — all three appear in a credential from the Signed attestation tab.");
+      return;
+    }
+    void call({ signed_payload: p.signed_payload, signature_base64: p.signature_base64, public_key_base64: p.public_key_base64 });
+  }
+
+  return (
+    <div className="flex max-w-xl flex-col gap-6">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <FieldLabel htmlFor="verify-attestation-json">Credential JSON you were given</FieldLabel>
+        <textarea
+          id="verify-attestation-json"
+          rows={8}
+          value={pasted}
+          onChange={(e) => setPasted(e.target.value)}
+          placeholder='{"signed_payload": "...", "signature_base64": "...", "public_key_base64": "..."}'
+          className="w-full rounded-sm border border-neutral-7 bg-neutral-1 px-3 py-2 font-mono text-[0.8125rem] text-neutral-12 focus-visible:outline-none focus-visible:border-accent-8 focus-visible:ring-2 focus-visible:ring-accent-8"
+        />
+        <Button type="submit" className="self-start" disabled={!pasted.trim()}>
+          Verify
+        </Button>
+      </form>
+
+      {parseError && <ErrorState error={{ code: "invalid_input", message: parseError }} />}
+      {!data && !loading && !error && !parseError && (
+        <EmptyState
+          icon={SearchX}
+          title="Paste a credential to check it"
+          description="Generate one in the Signed attestation tab, copy its json block, and paste it here to see what a recipient sees."
+        />
+      )}
+      {loading && <VerifyAttestationSkeleton />}
+      {!loading && error && <ErrorState error={error} onRetry={() => reset()} retryLabel="Edit and try again" />}
+      {!loading && !error && data && (
+        <div className="flex flex-col gap-3 rounded-lg border border-neutral-6 bg-neutral-1 p-4 sm:p-5">
+          <p className={cn("text-sm font-semibold", data.signatureValid ? "text-success-11" : "text-danger-11")}>
+            {data.signatureValid ? "Signature valid" : "Signature does NOT verify"}
+          </p>
+          <p className="text-sm text-neutral-12">{data.whatThisProves}</p>
+          {data.claims && (
+            <ul className="flex flex-col gap-1 text-sm text-neutral-11">
+              {Object.entries(data.claims).map(([k, v]) => (
+                <li key={k}>
+                  <span className="font-mono text-neutral-12">{k}</span>: {v}
+                </li>
+              ))}
+              {data.issuedAt && <li>Signed {data.issuedAt}</li>}
+            </ul>
+          )}
+          <p className="font-mono text-xs text-neutral-10">Key fingerprint: {data.keyFingerprint}</p>
+          <p className="text-[0.8125rem] leading-[1.4] text-neutral-10">{data.whatThisDoesNotProve}</p>
+          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-6 pt-3">
+            <span className="text-xs text-neutral-10">Sources:</span>
+            {data.sources.map((s, i) => (
+              <SourceCitationChip key={i} source={s} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
 /* Page                                                                      */
 /* ------------------------------------------------------------------------ */
 
@@ -2056,20 +2151,7 @@ function TryPageInner() {
     <div className="flex min-h-screen flex-col">
       <Nav />
       <main id="main-content" className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-6 px-6 py-10 sm:py-12">
-        <div className="flex flex-col gap-2">
-          <p className="text-[0.75rem] font-semibold uppercase tracking-wide text-accent-11">
-            Playground · no agent required
-          </p>
-          <h1 className="text-[1.875rem] font-semibold leading-[1.25] text-neutral-12">Try every tool, live</h1>
-          <p className="max-w-2xl text-[1.0625rem] leading-[1.6] text-neutral-11">
-            Each tab below calls Clearance Lens&rsquo;s real API directly — the same tools your agent would call, no
-            LLM key needed here.
-          </p>
-        </div>
-
-        <DisclaimerBanner href="/sources" linkLabel="See Sources.">
-          Role data is cached from public postings — see Sources for what&rsquo;s verified.
-        </DisclaimerBanner>
+        <TryPageIntro />
 
         <TabsPrimitive.Root value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)} className="flex flex-col gap-6">
           {/* The tab strip holds 11 tools and overflows well before mobile/
@@ -2163,6 +2245,10 @@ function TryPageInner() {
             <h2 className="sr-only">Interview guide</h2>
             <InterviewGuideTab />
           </TabsPrimitive.Content>
+          <TabsPrimitive.Content value="verifyattestation">
+            <h2 className="sr-only">Verify attestation</h2>
+            <VerifyAttestationTab />
+          </TabsPrimitive.Content>
         </TabsPrimitive.Root>
       </main>
       <Footer />
@@ -2171,9 +2257,66 @@ function TryPageInner() {
   );
 }
 
+/** The page's static intro, shared by the real page and its loading
+ * fallback so the two can never drift apart. */
+function TryPageIntro() {
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <p className="text-[0.75rem] font-semibold uppercase tracking-wide text-accent-11">
+          Playground · no agent required
+        </p>
+        <h1 className="text-[1.875rem] font-semibold leading-[1.25] text-neutral-12">Try every tool, live</h1>
+        <p className="max-w-2xl text-[1.0625rem] leading-[1.6] text-neutral-11">
+          Each tab below calls Clearance Lens&rsquo;s real API directly — the same tools your agent would call, no
+          LLM key needed here.
+        </p>
+      </div>
+
+      <DisclaimerBanner href="/sources" linkLabel="See Sources.">
+        Role data is cached from public postings — see Sources for what&rsquo;s verified.
+      </DisclaimerBanner>
+    </>
+  );
+}
+
+/** Found live via the spec §6 judging panel (round 7, then again in round 8,
+ * recruiter_user both times): this Suspense boundary's fallback used to be
+ * `null`, and it wraps the WHOLE page (TryPageInner reads useSearchParams,
+ * which requires the boundary) — so the server rendered no body content at
+ * all, and a visitor saw a blank, control-free page until JavaScript
+ * hydrated. This fallback is server-rendered instead: the real nav, intro,
+ * and the full list of tools on offer, plus a visible loading state and a
+ * no-JavaScript explanation. */
+function TryPageFallback() {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <Nav />
+      <main id="main-content" className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-6 px-6 py-10 sm:py-12">
+        <TryPageIntro />
+        <div role="status" aria-label="Loading the playground" className="flex flex-col gap-6">
+          <ul className="flex flex-wrap gap-x-4 gap-y-2 border-b border-neutral-6 pb-3 text-[0.9375rem] text-neutral-11">
+            {TAB_DEFS.map((t) => (
+              <li key={t.id}>{t.label}</li>
+            ))}
+          </ul>
+          <p className="text-sm text-neutral-10">Loading the playground…</p>
+          <noscript>
+            <p className="text-sm text-neutral-11">
+              This playground needs JavaScript to call each tool. Every tool listed above is also available to your own
+              AI agent at the MCP endpoint, https://clearance-lens.vercel.app/mcp — no JavaScript or browser required.
+            </p>
+          </noscript>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
 export default function TryPage() {
   return (
-    <React.Suspense fallback={null}>
+    <React.Suspense fallback={<TryPageFallback />}>
       <TryPageInner />
     </React.Suspense>
   );

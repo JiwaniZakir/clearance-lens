@@ -19,6 +19,7 @@ export const DISPLAY_CATEGORIES = [
   "Clearance process & timelines",
   "Hiring compliance & bias law",
   "Assessment science",
+  "Live data sources",
 ] as const;
 
 export type DisplayCategory = (typeof DISPLAY_CATEGORIES)[number];

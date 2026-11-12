@@ -127,13 +127,14 @@ Backs Hard Constraint #4 (no hire/no-hire scores, no ranking, no demographic inf
 
 ## Assessment science
 
-Backs `build_trial_assessment` and `run_job_preview`. Full design-guidance translation in [`research/R5-assessment-science.md`](./research/R5-assessment-science.md).
+Backs `build_trial_assessment`, `run_job_preview`, and `generate_interview_guide`. Full design-guidance translation in [`research/R5-assessment-science.md`](./research/R5-assessment-science.md).
 
 - [Sackett, Zhang, Berry & Lievens (2022) — revisited meta-analytic validity estimates, *J. Applied Psychology*](https://gwern.net/doc/statistics/meta-analysis/2021-sackett.pdf) — full text read
 - [Earnest, Allen & Landis (2011) — RJP mechanisms meta-analysis, *Personnel Psychology*](https://stevenmbrownportfolio.weebly.com/uploads/1/7/4/6/17469871/earnest_et_al._2011_rjp.pdf) — full text read
 - [Premack & Wanous (1985) — original RJP meta-analysis](https://www.researchgate.net/publication/232556638_A_Meta-Analysis_of_Realistic_Job_Preview_Experiments) — effect sizes relayed via Earnest et al. (2011)'s direct citation, not read as full primary text
 - [Campion, Palmer & Campion (1997) — structure in the selection interview, *Personnel Psychology*](https://core.ac.uk/download/234763785.pdf)
 - [Callinan & Robertson (2000) — work sample testing design principles](https://psychology.iresearchnet.com/industrial-organizational-psychology/individual-differences/work-samples/)
+- [Schmidt & Hunter (1998) — the validity and utility of selection methods in personnel psychology](https://stafforini.com/works/schmidt-1998-validity-and-utility/) — structured interviews .51 vs. unstructured .38; confirmed across multiple independent sources (backs `generate_interview_guide`)
 
 ---
 

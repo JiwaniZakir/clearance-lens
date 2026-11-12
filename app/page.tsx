@@ -54,7 +54,7 @@ const TOOL_CARD_META: Record<string, { blurb: string; fields: string[] }> = {
   },
   readiness_brief: {
     blurb: "A structured brief template for your agent to fill in locally: eligibility, gaps, and a 2-week prep plan.",
-    fields: ["role_id", "template", "recruiterQuestions"],
+    fields: ["role_id", "template", "questionsToAskTheRecruiter"],
   },
   fit_debrief: {
     blurb: "Turns loved/disliked work-reality tags into a summary template and concrete questions to ask the company.",
@@ -83,6 +83,11 @@ const TOOL_CARD_META: Record<string, { blurb: string; fields: string[] }> = {
     blurb:
       "A structured interview guide for a startup's own human panel, built only from the posting — traced questions and evaluation anchors, never a candidate score.",
     fields: ["role_id", "minutes", "questions"],
+  },
+  verify_signed_attestation: {
+    blurb:
+      "The recipient's side of a signed attestation: checks it was really signed by the key it names and hasn't been altered — never that the claim is true.",
+    fields: ["signed_payload", "signatureValid", "keyFingerprint"],
   },
 };
 

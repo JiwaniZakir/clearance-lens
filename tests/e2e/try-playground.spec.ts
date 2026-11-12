@@ -5,7 +5,7 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
  * 40 near-duplicate tests that mostly differ by persona backstory — which
  * doesn't change UI behavior, since the UI doesn't know or care which
  * persona is typing — this covers the DISTINCT interaction paths the R3
- * personas actually exercise across all 15 tabs (all 15 tools, one each),
+ * personas actually exercise across all 16 tabs (all 16 tools, one each),
  * plus one chained integration journey.
  * Persona-specific judgment (should an agent broaden a search, how should
  * it phrase a debrief) was already exercised directly against the MCP
@@ -529,6 +529,39 @@ test.describe("/try — Aggregated signal", () => {
   });
 });
 
+// The full two-party flow judging panel round 8 found was half-built: sign
+// in one tab, hand over exactly what's shared, verify it as a recipient in
+// another — in a real browser, with a real in-browser Ed25519 keypair.
+test.describe("/try — Verify attestation", () => {
+  test("a credential generated in Signed attestation verifies when pasted into Verify attestation; an edited one doesn't", async ({
+    page,
+  }) => {
+    await page.goto("/try");
+    await switchToTab(page, "Signed attestation");
+    await page.getByRole("button", { name: "Generate a test keypair in this browser" }).click();
+    await page.getByLabel("Clearance level").selectOption("secret");
+    await page.getByRole("button", { name: "Sign and verify" }).click();
+
+    const card = page.locator("pre").filter({ hasText: "signed_payload" });
+    await expect(card).toBeVisible({ timeout: LONG_TIMEOUT });
+    const markdown = (await card.textContent()) ?? "";
+    const json = markdown.split("```json")[1].split("```")[0].trim();
+
+    await switchToTab(page, "Verify attestation");
+    await page.getByLabel("Credential JSON you were given").fill(json);
+    await page.getByRole("button", { name: "Verify", exact: true }).click();
+    await expect(page.getByText("Signature valid", { exact: true })).toBeVisible({ timeout: LONG_TIMEOUT });
+    await expect(page.getByText(/Key fingerprint:/)).toBeVisible();
+
+    // Tamper with the claim but keep the original signature.
+    const tampered = json.replace('\\"clearance_level\\":\\"secret\\"', '\\"clearance_level\\":\\"ts_sci\\"');
+    expect(tampered).not.toBe(json);
+    await page.getByLabel("Credential JSON you were given").fill(tampered);
+    await page.getByRole("button", { name: "Verify", exact: true }).click();
+    await expect(page.getByText("Signature does NOT verify", { exact: true })).toBeVisible({ timeout: LONG_TIMEOUT });
+  });
+});
+
 test.describe("/try — Interview guide", () => {
   test("picking a role renders posting-traced questions, panel guardrails, and an explicit never-a-score note", async ({
     page,
@@ -590,6 +623,8 @@ test.describe("/try — per-tool deep links (?tool=)", () => {
     await expect(page.getByRole("tab", { name: "Aggregated signal" })).toHaveAttribute("data-state", "active");
     await page.goto("/try?tool=generate_interview_guide");
     await expect(page.getByRole("tab", { name: "Interview guide" })).toHaveAttribute("data-state", "active");
+    await page.goto("/try?tool=verify_signed_attestation");
+    await expect(page.getByRole("tab", { name: "Verify attestation" })).toHaveAttribute("data-state", "active");
   });
 });
 

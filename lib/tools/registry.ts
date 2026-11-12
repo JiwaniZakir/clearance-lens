@@ -14,6 +14,7 @@ import { prepareSignedAttestationTool } from "@/lib/tools/prepare-signed-attesta
 import { contributeAnonymousSignalTool } from "@/lib/tools/contribute-anonymous-signal";
 import { getAggregatedSignalTool } from "@/lib/tools/get-aggregated-signal";
 import { generateInterviewGuideTool } from "@/lib/tools/generate-interview-guide";
+import { verifySignedAttestationTool } from "@/lib/tools/verify-signed-attestation";
 
 /**
  * The single list of every tool this server exposes. Both app/mcp/route.ts
@@ -44,6 +45,7 @@ export const TOOL_REGISTRY: ToolDef<any, any>[] = [
   contributeAnonymousSignalTool,
   getAggregatedSignalTool,
   generateInterviewGuideTool,
+  verifySignedAttestationTool,
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

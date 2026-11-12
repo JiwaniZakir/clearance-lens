@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createPublicKey, verify as verifyEd25519 } from "crypto";
+import { isValidEd25519Signature, publicKeyFingerprint } from "@/lib/attestation/ed25519";
 import { DISCLAIMERS } from "@/lib/disclaimers";
 import { SourceRefSchema, type ToolDef } from "@/lib/tools/wrap";
 
@@ -35,20 +35,6 @@ const CLAIM_LABELS: Record<keyof Claims, string> = {
   citizenship_status: "Citizenship status (self-attested)",
   available_from: "Available from",
 };
-
-/** True only if `signatureBase64` is a valid Ed25519 signature of
- *  `signedPayload`'s exact UTF-8 bytes, verified under `publicKeyBase64`
- *  (SPKI/DER, base64). This is pure math on caller-supplied values — no
- *  network call, no state, no custody of any private key. */
-function isValidEd25519Signature(publicKeyBase64: string, signedPayload: string, signatureBase64: string): boolean {
-  try {
-    const publicKey = createPublicKey({ key: Buffer.from(publicKeyBase64, "base64"), format: "der", type: "spki" });
-    if (publicKey.asymmetricKeyType !== "ed25519") return false;
-    return verifyEd25519(null, Buffer.from(signedPayload, "utf8"), publicKey, Buffer.from(signatureBase64, "base64"));
-  } catch {
-    return false;
-  }
-}
 
 /** `claims`/`issued_at` are accepted as separate, structured fields (so the
  *  rest of this tool can read them without re-parsing a string), but the
@@ -120,6 +106,13 @@ const OutputSchema = z.object({
       type: z.string(),
       verificationMethod: z.string(),
       signatureValue: z.string(),
+      // The exact bytes that were signed. Found via the spec §6 judging panel
+      // round 8 (candidate_user): without this, a recipient could not verify
+      // the credential — a signature covers exact bytes, and this tool
+      // deliberately accepts any caller serialization of {claims, issued_at},
+      // so those bytes can't be reliably rebuilt from the parsed fields.
+      signedPayload: z.string(),
+      keyFingerprint: z.string(),
     }),
   }),
   shareableMarkdown: z.string(),
@@ -141,15 +134,16 @@ export const prepareSignedAttestationTool: ToolDef<z.infer<typeof InputSchema>, 
     "Proves WHO signed the claim and WHEN, and that it hasn't been altered since — never that the claim itself is true. Reusing the same keypair lets a recruiter recognize repeat signals from the same pseudonymous source without ever learning who you are. Loosely modeled on the W3C Verifiable Credentials data shape, not a certified implementation of it.",
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
-  handler: async ({ claims, issued_at, signature_base64, public_key_base64 }) => {
+  handler: async ({ claims, issued_at, signed_payload, signature_base64, public_key_base64 }) => {
     const claimEntries = Object.entries(claims).filter(([, v]) => v !== undefined) as [keyof Claims, string][];
     const claimLines = claimEntries.map(([key, value]) => `- **${CLAIM_LABELS[key]}:** ${value}`).join("\n");
-    const shortKey = `${public_key_base64.slice(0, 12)}…`;
+    const keyFingerprint = publicKeyFingerprint(public_key_base64);
 
     const shareableMarkdown =
       `# Signed self-attestation\n\n${claimLines}\n\n` +
-      `Signed ${issued_at} by key \`${shortKey}\`.\n\n` +
-      `\`\`\`json\n${JSON.stringify({ claims, issued_at, public_key_base64, signature_base64 }, null, 2)}\n\`\`\``;
+      `Signed ${issued_at} by key fingerprint \`${keyFingerprint}\`.\n\n` +
+      "To verify: pass signed_payload, signature_base64, and public_key_base64 below to Clearance Lens's verify_signed_attestation tool — or check the Ed25519 signature yourself. A valid signature proves who signed this and when, never that the claim is true.\n\n" +
+      `\`\`\`json\n${JSON.stringify({ claims, issued_at, signed_payload, signature_base64, public_key_base64 }, null, 2)}\n\`\`\``;
 
     return {
       credential: {
@@ -162,6 +156,8 @@ export const prepareSignedAttestationTool: ToolDef<z.infer<typeof InputSchema>, 
           type: "Ed25519Signature2020",
           verificationMethod: public_key_base64,
           signatureValue: signature_base64,
+          signedPayload: signed_payload,
+          keyFingerprint,
         },
       },
       shareableMarkdown,

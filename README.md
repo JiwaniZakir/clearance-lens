@@ -45,7 +45,7 @@ No agent handy? Try every tool directly at **[/try](https://clearance-lens.verce
 
 | Tool | What it's for |
 |---|---|
-| `search_defense_roles` | Live defense/hard-tech roles, with requirement signals labeled **stated** (quoted from the posting) vs **inferred** (a judgment call to confirm) |
+| `search_defense_roles` | Live defense/hard-tech roles from the a16z speedrun Talent Network's companies (not the whole defense market), with requirement signals labeled **stated** (quoted from the posting) vs **inferred** (a judgment call to confirm) |
 | `get_role_rubric` | An eligibility checklist + skills rubric for your agent to evaluate **privately** |
 | `estimate_timeline` | How long a clearance might realistically take — a real range where the data supports one, a single sourced figure where it doesn't, never an invented number |
 | `readiness_brief` | A template your agent fills in locally: eligibility, gaps, a 2-week prep plan, recruiter questions |
@@ -60,6 +60,7 @@ No agent handy? Try every tool directly at **[/try](https://clearance-lens.verce
 | `contribute_anonymous_signal` | Opts one role-interest into an anonymous, aggregated signal pool — no name, contact info, or identifier of any kind |
 | `get_aggregated_signal` | Reads that pool back as rounded percentages for a role or company — never an individual record, never before at least 5 people have contributed |
 | `generate_interview_guide` | A structured interview guide for a startup's own human panel, built only from the posting — traced questions and evaluation anchors, never a candidate score |
+| `verify_signed_attestation` | The recipient's side of a signed attestation — checks it was really signed by the key it names and hasn't been altered, with a key fingerprint to recognize repeat signers. Never that the claim is true |
 
 Every tool call returns `sources[]` and, where relevant, a `disclaimer`. Full specs: [`PLAN.md`](./PLAN.md) §2.
 
@@ -87,7 +88,7 @@ flowchart TB
     end
 
     Wrap --> Registry["lib/tools/registry.ts<br/>(the one shared list — adding a tool here\nexposes it on BOTH surfaces)"]
-    Registry --> Handlers["lib/tools/*.ts — 15 tool handlers"]
+    Registry --> Handlers["lib/tools/*.ts — 16 tool handlers"]
 
     Handlers --> Speedrun["a16z speedrun Talent\nNetwork public API"]
     Handlers --> GitHub["GitHub / GitLab public REST APIs"]
@@ -96,7 +97,7 @@ flowchart TB
     style Wrap fill:#2273c3,color:#fff
 ```
 
-**Stateless by design, with one explicit, opt-in exception:** no database, no user accounts, no stored queries for 13 of 15 tools (see [`DECISIONS.md`](./DECISIONS.md) D-001/D-002). The one exception is `contribute_anonymous_signal`/`get_aggregated_signal` (D-037) — a candidate's agent can opt one role-interest into an anonymous, k-anonymity-floored aggregate pool (no identifier of any kind), which anyone can read back as a rounded percentage. Calling neither tool means none of this applies. The MCP route and the `/try` playground call the **exact same** `lib/tools/*` implementations through the same `callTool()` pipeline — there is no second copy of any tool's logic.
+**Stateless by design, with one explicit, opt-in exception:** no database, no user accounts, no stored queries for 14 of 16 tools (see [`DECISIONS.md`](./DECISIONS.md) D-001/D-002). The one exception is `contribute_anonymous_signal`/`get_aggregated_signal` (D-037) — a candidate's agent can opt one role-interest into an anonymous, k-anonymity-floored aggregate pool (no identifier of any kind), which anyone can read back as a rounded percentage. Calling neither tool means none of this applies. The MCP route and the `/try` playground call the **exact same** `lib/tools/*` implementations through the same `callTool()` pipeline — there is no second copy of any tool's logic.
 
 ---
 

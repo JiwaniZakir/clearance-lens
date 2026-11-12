@@ -93,6 +93,7 @@ export interface EstimateTimelineInput {
 
 export interface EstimateTimelineOutput {
   estimate: { minDays: number | null; maxDays: number | null; medianDays: number | null };
+  employerFclWaitDays: { minDays: number; maxDays: number } | null;
   keyDrivers: { label: string; detail: string }[];
   uncertaintyNote: string;
   sources: SourceRef[];
@@ -323,7 +324,7 @@ export interface ReadinessBriefOutput {
     gaps: { prompt: string; agentFillsThisIn: true };
     twoWeekPrepPlan: { prompt: string; suggestedFocusAreas: string[]; agentFillsThisIn: true };
   };
-  recruiterQuestions: string[];
+  questionsToAskTheRecruiter: string[];
   evaluate_locally: true;
   instructionsForAgent: string;
   sources: SourceRef[];
@@ -499,6 +500,27 @@ export interface GenerateInterviewGuideOutput {
   itarSafetyNote: string;
   limitsNote: string;
   neverAScoreNote: string;
+  sources: SourceRef[];
+  disclaimer: string;
+}
+
+/* ---------------------------------------------------------------------- */
+/* verify_signed_attestation (lib/tools/verify-signed-attestation.ts)     */
+/* ---------------------------------------------------------------------- */
+
+export interface VerifySignedAttestationInput {
+  signed_payload: string;
+  signature_base64: string;
+  public_key_base64: string;
+}
+
+export interface VerifySignedAttestationOutput {
+  signatureValid: boolean;
+  claims: { clearance_level?: string; citizenship_status?: string; available_from?: string } | null;
+  issuedAt: string | null;
+  keyFingerprint: string;
+  whatThisProves: string;
+  whatThisDoesNotProve: string;
   sources: SourceRef[];
   disclaimer: string;
 }

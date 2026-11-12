@@ -16,6 +16,11 @@ const OutputSchema = z.object({
     maxDays: z.number().nullable(),
     medianDays: z.number().nullable(),
   }),
+  // The employer-side Facility Clearance sponsorship wait, as its own
+  // structured, separately-sourced component (null unless employer_has_fcl
+  // is "no"). When present it is ALSO folded into `estimate` above — this
+  // field exists so a caller can still tell the two waits apart.
+  employerFclWaitDays: z.object({ minDays: z.number(), maxDays: z.number() }).nullable(),
   keyDrivers: z.array(z.object({ label: z.string(), detail: z.string() })),
   uncertaintyNote: z.string(),
   sources: z.array(SourceRefSchema),
@@ -154,14 +159,41 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
       }
     }
 
+    // Found live via the spec §6 judging panel round 8 (candidate_user):
+    // employer_has_fcl "yes" and "no" returned IDENTICAL minDays/maxDays —
+    // the no-FCL sponsorship wait (sourced, with a real typical range) only
+    // appeared as prose in keyDrivers, never in the structured number a
+    // caller or a downstream agent reads first, even though this tool's own
+    // description says the estimate is "given... whether the employer has a
+    // Facility Clearance." The modifier's own text says it is "in addition
+    // to, not instead of" the investigation time, so it's added on, and
+    // medianDays becomes null: there is no sourced median for the combined
+    // total, and keeping the investigation-only median would place it
+    // below the new range's minimum.
+    let employerFclWaitDays: Output["employerFclWaitDays"] = null;
     if (employer_has_fcl === "no") {
       const fclModifier = findModifier("no_fcl");
       const fclRule = findRule("fcl-sponsorship") ?? findRule("fcl");
+      let folded = false;
+      if (fclModifier && fclModifier.typicalDaysMin !== null && fclModifier.typicalDaysMax !== null) {
+        employerFclWaitDays = { minDays: fclModifier.typicalDaysMin, maxDays: fclModifier.typicalDaysMax };
+        if (estimate.minDays !== null && estimate.maxDays !== null) {
+          estimate = {
+            minDays: estimate.minDays + fclModifier.typicalDaysMin,
+            maxDays: estimate.maxDays + fclModifier.typicalDaysMax,
+            medianDays: null,
+          };
+          folded = true;
+        }
+      }
       drivers.push({
         label: "Employer has no Facility Clearance (FCL) yet",
         detail:
-          fclModifier?.effectDescription ??
-          "Your prospective employer would need to sponsor and obtain an FCL before you could start on classified work. This step is highly variable (often months) and isn't included in the estimate above — ask the employer directly about their FCL sponsorship timeline.",
+          (fclModifier?.effectDescription ??
+            "Your prospective employer would need to sponsor and obtain an FCL before you could start on classified work. This step is highly variable (often months) — ask the employer directly about their FCL sponsorship timeline.") +
+          (folded
+            ? ` The estimate above already includes this ${employerFclWaitDays?.minDays}–${employerFclWaitDays?.maxDays}-day sponsorship wait on top of the investigation time, so it's a combined range with no single sourced median.`
+            : ""),
       });
       if (fclModifier) sources.push(fclModifier.source);
       if (fclRule) sources.push(...fclRule.sources);
@@ -192,6 +224,7 @@ export const estimateTimelineTool: ToolDef<z.infer<typeof InputSchema>, Output> 
 
     return {
       estimate,
+      employerFclWaitDays,
       keyDrivers: drivers,
       uncertaintyNote,
       sources: dedupeSources(sources),
