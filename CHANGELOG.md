@@ -256,3 +256,28 @@ Round 8: trimmed mean **7.61**, median **7.90** (highest median yet), capped at 
 ### test
 - A test now requires every URL any tool cites to appear on `/sources` and in `SOURCES.md` (mutation-checked).
 - Unit suite 374 → 409. E2E 88 passed / 2 skipped, including a real-browser sign → share → verify round trip. Protocol 14/14.
+
+## [Unreleased] — judging panel round 9 response (2026-11-12)
+
+Round 9: **FAIL**, trimmed mean 5.42 from four judges (the fifth never returned); all four reported hard-constraint findings. Full results `panel/round-9/`; responses DECISIONS.md D-043 through D-051.
+
+### fix
+- **Security clearances require U.S. citizenship — green card holders were told otherwise**, including on the homepage's flagship example. Rules corrected and a `clearance-citizenship` rule added (EO 12968; 32 CFR 117.10(k)); a stated clearance now implies a citizenship signal; `get_role_rubric` asks citizenship first; `estimate_timeline` takes an optional `citizenship_status` and returns the rule, not a day count, for non-citizens (D-046).
+- **`prepare_consented_card` no longer receives field values.** It takes the names of approved fields and returns a template the user's own agent fills in locally. Breaking change: `fields_user_approved` → `approved_fields`; output `card` → `cardTemplate` (D-047).
+- **Every MCP request is scanned** — tool names, prompt arguments, resource URIs, JSON keys — and no error or note echoes input. About 40 new payload shapes rejected (CUI and abbreviated markings, legends, Unicode digits, homoglyphs, HTML entities, bare SSNs, tokens and private keys, first-person sensitive disclosures); questions about those subjects still pass (D-043, D-047).
+- **Timeline data:** three day-ranges that no cited source contains were removed (lapsed > 2 years, lapsed ≤ 2 years minimum, no-FCL wait); a wrong-quarter figure and a wrong attribution corrected. `employer_has_fcl: "no"` no longer changes the number (D-049).
+- Requirement quotes no longer cut off at "U.S."; clearance signals say whether a clearance must already be held, be obtainable, or may be required; "TS clearance" is detected (D-046).
+- `contribute_anonymous_signal` no longer claims to be read-only; `get_aggregated_signal` hides exact counts below 5 contributors; "no database" copy corrected (D-048).
+- Interview questions, trial rubrics, prep plans, and skills come from job content only — never eligibility or degree lines; the trial brief states a task; the job preview fits non-software roles (D-050).
+- `search_defense_roles`: per-request timeouts and one 13s budget (19.9s → 2.8–5.5s live); signal counts exclude failed fetches (D-045).
+- `/try` on phones: stacking search form that submits on Enter, a tool picker, tap-to-open evidence chips, formatted results, a branded 404 (D-051).
+- Signed attestations: payloads must contain exactly `claims` and `issued_at`; future timestamps rejected; notes on claim combinations the rules make rare or impossible (D-046).
+
+### feat
+- Server `instructions`, per-tool annotations, described `role_id`/`company_slug`, and a normalized `Accept` header, so agents that don't surface MCP prompts (Grok, Grok Bot, Muse) can still work the flow (D-048).
+
+### docs
+- `research/R6-agent-connectors.md` (Grok / Grok Bot / Muse), `research/R7-3d-site-stack.md`, `research/jit/timeline-source-verification.md`.
+
+### test
+- Unit suite 409 → 670. E2E 88 → 96 passed. Link check now covers `SOURCES.md`, `/sources`, and tool-cited URLs. New invariants: every tool schema converts to JSON Schema; no HTML-injection sink exists.

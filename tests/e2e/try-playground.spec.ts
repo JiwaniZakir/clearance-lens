@@ -19,8 +19,20 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
 
 const LONG_TIMEOUT = 20_000; // live upstream search + per-job detail fetches
 
+async function expectActiveTab(page: Page, label: string) {
+  const picker = page.getByLabel("Tool", { exact: true });
+  if (await picker.isVisible()) {
+    await expect(picker.locator("option:checked")).toHaveText(label);
+  } else {
+    await expect(page.getByRole("tab", { name: label })).toHaveAttribute("data-state", "active");
+  }
+}
+
 async function switchToTab(page: Page, label: string) {
-  await page.getByRole("tab", { name: label }).click();
+  // Phones get a native picker instead of the 16-tab strip (D-051).
+  const picker = page.getByLabel("Tool", { exact: true });
+  if (await picker.isVisible()) await picker.selectOption({ label });
+  else await page.getByRole("tab", { name: label }).click();
 }
 
 /** Shared by Trial assessment / Role rubric / Job preview: each embeds a
@@ -48,7 +60,9 @@ test.describe("/try — tab switching is robust to a bare click (not just a real
   test("a bare element.click(), with no pointerdown/mousedown first, still switches the active tab", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 1280, height: 800 }); // the tab strip is the ≥sm control (D-051)
     await page.goto("/try");
+    await expect(page.getByRole("tab", { name: "Search roles", selected: true })).toBeVisible(); // hydrated
     await page.evaluate(() => {
       const trigger = Array.from(document.querySelectorAll('[role="tab"]')).find((el) =>
         el.textContent?.includes("Timeline"),
@@ -103,7 +117,7 @@ test.describe("/try — Search roles", () => {
     await expect(page.getByText(/Scanned \d+ posting/).first()).toBeVisible({ timeout: LONG_TIMEOUT });
   });
 
-  test("a requirement chip reveals its stated/inferred evidence on focus, without navigating or opening the company dialog", async ({
+  test("a requirement chip reveals its stated/inferred evidence on tap or click, without navigating or opening the company dialog", async ({
     page,
   }) => {
     await page.goto("/try");
@@ -117,9 +131,13 @@ test.describe("/try — Search roles", () => {
       .getByRole("button", { name: /clearance|secret|citizen|person|sponsorship|polygraph|scif/i })
       .first();
     if ((await chipTrigger.count()) === 0) test.skip(true, "no requirement signals on the current live postings");
-    await chipTrigger.focus();
-    await expect(page.getByText(/Stated directly in the posting\.|Inferred from the job post/).first()).toBeVisible();
-    // Focusing a chip must not have triggered the company dialog.
+    // A popover since D-051 (tooltips never opened on touch): tap on a
+    // phone, click on desktop.
+    await chipTrigger.click();
+    await expect(page.getByRole("dialog").getByText(/Stated directly in the posting\.|Inferred from the job post/)).toBeVisible();
+    // Opening a chip must not have opened the company dialog: once the
+    // chip's own popover (also role="dialog") is closed, none remain.
+    await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
@@ -472,9 +490,11 @@ test.describe("/try — tab strip overflow affordance", () => {
   // strip's native scrollbar is hidden for a cleaner look, which previously
   // removed the only visual cue that more tabs exist off-screen at mobile/
   // tablet widths, with zero replacement affordance.
-  test("the tablist has a non-trivial mask-image fade at mobile width", async ({ page }) => {
+  test("the tablist has a non-trivial mask-image fade at a narrow-tablet width, and phones get a tool picker instead", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/try");
+    await expect(page.getByLabel("Tool", { exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 700, height: 900 });
     const list = page.getByRole("tablist");
     const maskImage = await list.evaluate(
       (el) => getComputedStyle(el).maskImage || getComputedStyle(el).webkitMaskImage,
@@ -607,12 +627,12 @@ test.describe("/try — Interview guide", () => {
 test.describe("/try — per-tool deep links (?tool=)", () => {
   test("?tool=estimate_timeline pre-selects the Timeline tab", async ({ page }) => {
     await page.goto("/try?tool=estimate_timeline");
-    await expect(page.getByRole("tab", { name: "Timeline" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Timeline");
   });
 
   test("?tool=prepare_consented_card pre-selects the Consented card tab", async ({ page }) => {
     await page.goto("/try?tool=prepare_consented_card");
-    await expect(page.getByRole("tab", { name: "Consented card" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Consented card");
   });
 
   // Regression for DECISIONS.md (judging panel round 3, D-029): these two
@@ -620,16 +640,16 @@ test.describe("/try — per-tool deep links (?tool=)", () => {
   // Search roles, where they were embedded) -- now each gets its own.
   test("?tool=fit_debrief and ?tool=get_company_profile pre-select their own dedicated tabs", async ({ page }) => {
     await page.goto("/try?tool=fit_debrief");
-    await expect(page.getByRole("tab", { name: "Fit debrief" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Fit debrief");
     await page.goto("/try?tool=get_company_profile");
-    await expect(page.getByRole("tab", { name: "Company profile" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Company profile");
   });
 
   test("an unrecognized or absent ?tool= value falls back to the default Search roles tab", async ({ page }) => {
     await page.goto("/try?tool=not_a_real_tool");
-    await expect(page.getByRole("tab", { name: "Search roles" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Search roles");
     await page.goto("/try");
-    await expect(page.getByRole("tab", { name: "Search roles" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Search roles");
   });
 
   // Regression for DECISIONS.md (judging panel round 7, trust_skeptic):
@@ -640,15 +660,15 @@ test.describe("/try — per-tool deep links (?tool=)", () => {
     page,
   }) => {
     await page.goto("/try?tool=prepare_signed_attestation");
-    await expect(page.getByRole("tab", { name: "Signed attestation" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Signed attestation");
     await page.goto("/try?tool=contribute_anonymous_signal");
-    await expect(page.getByRole("tab", { name: "Contribute signal" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Contribute signal");
     await page.goto("/try?tool=get_aggregated_signal");
-    await expect(page.getByRole("tab", { name: "Aggregated signal" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Aggregated signal");
     await page.goto("/try?tool=generate_interview_guide");
-    await expect(page.getByRole("tab", { name: "Interview guide" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Interview guide");
     await page.goto("/try?tool=verify_signed_attestation");
-    await expect(page.getByRole("tab", { name: "Verify attestation" })).toHaveAttribute("data-state", "active");
+    await expectActiveTab(page, "Verify attestation");
   });
 });
 
@@ -683,3 +703,31 @@ test.describe("/try — chained persona journey", () => {
     await expect(page.getByText(/not legal advice/i).first()).toBeVisible();
   });
 });
+
+// D-051 (judging panel round 9, product_designer): at 390px the search
+// filters were a 1,293px horizontal scroller with the button off-screen, the
+// page overflowed at 320px (WCAG 1.4.10), and Enter didn't submit.
+test.describe("/try — narrow screens (D-051)", () => {
+  for (const width of [320, 390]) {
+    test(`no horizontal overflow at ${width}px, and the Search button is on screen`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/try");
+      await expect(page.getByRole("button", { name: "Search roles" })).toBeVisible({ timeout: LONG_TIMEOUT });
+      await page.waitForTimeout(500);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+      const box = await page.getByRole("button", { name: "Search roles" }).boundingBox();
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+    });
+  }
+
+  test("pressing Enter in the keyword field runs the search", async ({ page }) => {
+    await page.goto("/try");
+    await page.waitForLoadState("networkidle");
+    const requestPromise = page.waitForRequest((r) => r.url().includes("/api/tools/search_defense_roles") && (r.postData() ?? "").includes("autonomy"));
+    await page.getByLabel("Keyword").fill("autonomy");
+    await page.getByLabel("Keyword").press("Enter");
+    await requestPromise;
+  });
+});
+

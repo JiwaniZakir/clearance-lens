@@ -132,7 +132,7 @@ lib/
   speedrun/  github/            typed API clients
 data/                           rules.json, timelines.json, companies.json, fit-tags.ts, job-preview-scenes.ts
 components/                     design-system components (see research/R2-design-system.md)
-research/                       Phase R research reports (R1–R5), each fully cited
+research/                       Phase R research reports (R1–R7), each fully cited
 tests/
   unit/      protocol/      e2e/
 ```

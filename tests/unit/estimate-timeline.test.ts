@@ -140,7 +140,7 @@ describe("estimate_timeline", () => {
     expect(result.uncertaintyNote).toMatch(/a mean, not a median/);
   });
 
-  // D-049 (judging panel round 9, function_engineer; confirmed against the
+  // D-049 (judging panel round 9, trust_skeptic and recruiter_user; confirmed against the
   // NISPPAC slides): lapsed_gt_2y returned 180–270 for every level, a range
   // no cited source contains. It's processed as a new initial investigation,
   // so the target level's own published baseline applies.

@@ -1,6 +1,6 @@
 "use client";
 
-import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Building2, MapPin, Globe } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
@@ -54,35 +54,37 @@ function signalPriority(signal: RequirementSignal): number {
   return 2;
 }
 
+/** A popover, not a tooltip: found via the spec §6 judging panel round 9
+ *  follow-up — Radix tooltips don't open on touch, so on a phone a chip's
+ *  "stated vs inferred" evidence (the whole point of the chip) was
+ *  unreachable; tapping just closed it. A popover opens on tap, click, Enter,
+ *  or Space, and closes on Escape or tapping elsewhere (D-051). */
 function RequirementChip({ signal }: { signal: RequirementSignal }) {
   const stated = signal.basis === "stated";
   return (
-    <TooltipPrimitive.Provider delayDuration={200}>
-      <TooltipPrimitive.Root>
-        <TooltipPrimitive.Trigger asChild>
-          <button type="button" className="focus-visible:outline-none">
-            <Chip border={stated ? "solid" : "dashed"} tone="neutral" className="cursor-default">
-              {humanizeSignal(signal)}
-            </Chip>
-          </button>
-        </TooltipPrimitive.Trigger>
-        <TooltipPrimitive.Portal>
-          <TooltipPrimitive.Content
-            sideOffset={6}
-            className="z-50 max-w-xs rounded-md bg-neutral-12 px-3 py-2 text-xs text-neutral-1 shadow-elevation-3"
-          >
-            <p className="font-medium">
-              {stated ? "Stated directly in the posting." : "Inferred from the job post, not stated."}
-            </p>
-            <p className="mt-1 opacity-85">
-              {stated ? `"${signal.evidence}"` : signal.evidence}
-            </p>
-            {!stated && <p className="mt-1 opacity-70">Confirm this directly with the employer.</p>}
-            <TooltipPrimitive.Arrow className="fill-neutral-12" />
-          </TooltipPrimitive.Content>
-        </TooltipPrimitive.Portal>
-      </TooltipPrimitive.Root>
-    </TooltipPrimitive.Provider>
+    <PopoverPrimitive.Root>
+      <PopoverPrimitive.Trigger asChild>
+        <button type="button" className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8">
+          <Chip border={stated ? "solid" : "dashed"} tone="neutral" className="cursor-pointer">
+            {humanizeSignal(signal)}
+          </Chip>
+        </button>
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          sideOffset={6}
+          collisionPadding={12}
+          className="z-50 max-w-[min(20rem,calc(100vw-24px))] rounded-md bg-neutral-12 px-3 py-2 text-xs text-neutral-1 shadow-elevation-3"
+        >
+          <p className="font-medium">
+            {stated ? "Stated directly in the posting." : "Inferred from the job post, not stated."}
+          </p>
+          <p className="mt-1 break-words opacity-85">{stated ? `"${signal.evidence}"` : signal.evidence}</p>
+          {!stated && <p className="mt-1 opacity-70">Confirm this directly with the employer.</p>}
+          <PopoverPrimitive.Arrow className="fill-neutral-12" />
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 }
 

@@ -188,7 +188,7 @@ function tabFromToolParam(toolParam: string | null): TabId {
 const tabTriggerClass =
   "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3.5 py-2.5 text-sm font-medium text-neutral-11 transition-colors duration-150 ease-out hover:text-neutral-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8 data-[state=active]:border-accent-9 data-[state=active]:text-neutral-12";
 
-const filterFieldClass = "flex shrink-0 flex-col gap-1.5 min-w-[160px] lg:min-w-0 lg:w-full";
+const filterFieldClass = "flex min-w-0 flex-col gap-1.5 lg:w-full";
 
 /* ------------------------------------------------------------------------ */
 /* Small shared bits                                                        */
@@ -369,7 +369,14 @@ function SearchRolesTab({ onViewCompany }: { onViewCompany: (companySlug: string
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
-      <aside className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] lg:w-[240px] lg:flex-none lg:flex-col lg:gap-4 lg:overflow-visible lg:pb-0">
+      <form
+        aria-label="Search filters"
+        onSubmit={(e) => {
+          e.preventDefault();
+          runSearch();
+        }}
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:w-[240px] lg:flex-none lg:flex-col lg:gap-4"
+      >
         <div className={filterFieldClass}>
           <FieldLabel htmlFor="search-query">Keyword</FieldLabel>
           <Input
@@ -413,10 +420,10 @@ function SearchRolesTab({ onViewCompany }: { onViewCompany: (companySlug: string
             <option value="25">25</option>
           </Select>
         </div>
-        <Button onClick={runSearch} className="shrink-0 lg:mt-1 lg:w-full">
+        <Button type="submit" className="w-full sm:col-span-2 lg:mt-1">
           Search roles
         </Button>
-      </aside>
+      </form>
 
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         {loading && <RoleResultsSkeleton rows={3} />}
@@ -1734,7 +1741,16 @@ function SignedAttestationTab() {
               ))}
             </div>
           )}
-          <pre className="whitespace-pre-wrap rounded-md bg-neutral-2 p-3 font-mono text-[0.8125rem] leading-[1.5] text-neutral-12">
+          <ul className="flex flex-col gap-1 text-sm text-neutral-11">
+            {Object.entries(data.credential.credentialSubject).map(([k, v]) => (
+              <li key={k}>
+                <span className="font-medium text-neutral-12">{CLAIM_KEY_LABEL[k] ?? k}</span>: {CLAIM_VALUE_LABEL[String(v)] ?? String(v)}
+              </li>
+            ))}
+            <li className="font-mono text-xs text-neutral-10">Key fingerprint: {data.credential.proof.keyFingerprint}</li>
+          </ul>
+          <p className="text-[0.75rem] font-semibold uppercase tracking-wide text-neutral-10">Shareable text — copy and send this</p>
+          <pre className="whitespace-pre-wrap break-all rounded-md bg-neutral-2 p-3 font-mono text-[0.8125rem] leading-[1.5] text-neutral-12">
             {data.shareableMarkdown}
           </pre>
           <div className="flex flex-wrap items-center gap-2 border-t border-neutral-6 pt-3">
@@ -2115,6 +2131,23 @@ function InterviewGuideTab() {
 // The recipient's half of the Signed attestation tab: paste the JSON block a
 // candidate shared, see whether it verifies. Parsing happens client-side only
 // to pull out the three fields the tool needs; verification is server-side.
+const CLAIM_KEY_LABEL: Record<string, string> = {
+  clearance_level: "Clearance level",
+  citizenship_status: "Citizenship status",
+  available_from: "Available from",
+};
+const CLAIM_VALUE_LABEL: Record<string, string> = {
+  none: "None",
+  interim: "Interim",
+  secret: "Secret",
+  ts: "Top Secret",
+  ts_sci: "Top Secret/SCI",
+  us_citizen: "U.S. citizen",
+  green_card: "Green card holder",
+  other_protected_individual: "Asylee or refugee (protected individual)",
+  not_us_person: "Not a U.S. person",
+};
+
 function VerifyAttestationTab() {
   const { data, error, loading, call, reset } = useToolCall<
     VerifySignedAttestationInput,
@@ -2178,7 +2211,7 @@ function VerifyAttestationTab() {
             <ul className="flex flex-col gap-1 text-sm text-neutral-11">
               {Object.entries(data.claims).map(([k, v]) => (
                 <li key={k}>
-                  <span className="font-mono text-neutral-12">{k}</span>: {v}
+                  <span className="font-medium text-neutral-12">{CLAIM_KEY_LABEL[k] ?? k}</span>: {CLAIM_VALUE_LABEL[v] ?? v}
                 </li>
               ))}
               {data.issuedAt && <li>Signed {data.issuedAt}</li>}
@@ -2255,7 +2288,20 @@ function TryPageInner() {
            * partial-tab peek). A fixed edge mask-image signals "there's more
            * here, scroll" at both ends regardless of scroll position — the
            * standard, JS-free fix for this pattern. */}
-          <TabsPrimitive.List className="flex gap-1 overflow-x-auto border-b border-neutral-6 [-webkit-mask-image:linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)] [mask-image:linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)] [scrollbar-width:none]">
+          {/* Round 9 (product_designer): 16 tabs in one horizontal strip is the
+           * only navigation on a phone. Below `sm`, a labeled native select
+           * drives the same state; the strip takes over from `sm` up. */}
+          <div className="flex flex-col gap-1.5 sm:hidden">
+            <FieldLabel htmlFor="try-tool-picker">Tool</FieldLabel>
+            <Select id="try-tool-picker" value={activeTab} onChange={(e) => setActiveTab(e.target.value as TabId)}>
+              {TAB_DEFS.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <TabsPrimitive.List className="hidden gap-1 overflow-x-auto border-b border-neutral-6 sm:flex [-webkit-mask-image:linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)] [mask-image:linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)] [scrollbar-width:none]">
             {TAB_DEFS.map((t) => (
               <TabsPrimitive.Trigger
                 key={t.id}

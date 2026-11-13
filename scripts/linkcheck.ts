@@ -113,6 +113,19 @@ const MAX_ATTEMPTS = 3;
 // GET per the MCP spec — 405 proves the endpoint is live and responding
 // correctly, not that the link is dead.
 const NOT_NECESSARILY_DEAD_CODES = [401, 403, 405, 406, 419, 429, 999];
+// Host-specific: www.meta.com answers a non-browser GET with 400 even for
+// live pages (verified 2026-11-12 — both cited Brand Resource Center URLs
+// return 200 in a real browser). Scoped to that host rather than treating
+// 400 as "not dead" everywhere, which would hide genuinely malformed links.
+const BOT_BLOCKING_400_HOSTS = new Set(["www.meta.com"]);
+function notNecessarilyDead(url: string, status: number): boolean {
+  if (NOT_NECESSARILY_DEAD_CODES.includes(status)) return true;
+  try {
+    return status === 400 && BOT_BLOCKING_400_HOSTS.has(new URL(url).host);
+  } catch {
+    return false;
+  }
+}
 
 async function curlOnce(url: string): Promise<number> {
   const { stdout } = await execFileAsync("curl", [
@@ -151,11 +164,11 @@ async function checkUrl(url: string): Promise<CheckResult> {
       const status = await curlOnce(url);
       lastStatus = status;
       if (status >= 200 && status < 400) return { url, status: "PASS", detail: String(status) };
-      if (NOT_NECESSARILY_DEAD_CODES.includes(status) && attempt < MAX_ATTEMPTS) {
+      if (notNecessarilyDead(url, status) && attempt < MAX_ATTEMPTS) {
         await sleep(1500 * attempt);
         continue;
       }
-      if (NOT_NECESSARILY_DEAD_CODES.includes(status)) {
+      if (notNecessarilyDead(url, status)) {
         const reason = status === 405 ? "live API endpoint, bare GET not supported" : "likely bot-blocked";
         return { url, status: "WARN", detail: `${status} (${reason}, not necessarily dead)` };
       }
@@ -176,7 +189,7 @@ async function checkUrl(url: string): Promise<CheckResult> {
   // because of which attempt happened to be last, not because the link is
   // actually dead. Trust an earlier real HTTP response in the
   // "not necessarily dead" bucket over a later transient network blip.
-  if (lastStatus !== null && NOT_NECESSARILY_DEAD_CODES.includes(lastStatus)) {
+  if (lastStatus !== null && notNecessarilyDead(url, lastStatus)) {
     const reason = lastStatus === 405 ? "live API endpoint, bare GET not supported" : "likely bot-blocked";
     return { url, status: "WARN", detail: `${lastStatus} (${reason}, not necessarily dead; final retry hit a network error)` };
   }

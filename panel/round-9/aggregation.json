@@ -1,0 +1,39 @@
+{
+  "roundNumber": 9,
+  "personaIndexUsed": 0,
+  "nonRespondingJudges": [
+    "function_engineer"
+  ],
+  "discardedForNoEvidence": [],
+  "overalls": [
+    {
+      "judge": "trust_skeptic",
+      "overall": 6.05
+    },
+    {
+      "judge": "product_designer",
+      "overall": 5.75
+    },
+    {
+      "judge": "recruiter_user",
+      "overall": 4.75
+    },
+    {
+      "judge": "candidate_user",
+      "overall": 5.75
+    }
+  ],
+  "droppedJudge": {
+    "judge": "trust_skeptic",
+    "overall": 6.05
+  },
+  "trimmedMean": 5.4167,
+  "median": 5.75,
+  "anyHardConstraintViolation": true,
+  "anyJudgeBelow9": true,
+  "effectiveScore": 5.4167,
+  "allFiveValid": false,
+  "inconclusive": false,
+  "passed": false,
+  "note": "Computed by hand with the frozen script's own formula: the workflow never returned an aggregation because the session ended while function_engineer was on its fourth attempt."
+}

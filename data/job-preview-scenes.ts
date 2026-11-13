@@ -24,7 +24,7 @@ export interface SceneChoice {
   whatRealTeamsReport: string;
 }
 
-/** Round 9 (function_engineer): a Senior Manufacturing Engineer got a
+/** Round 9 (three judges): a Senior Manufacturing Engineer got a
  *  standup about a "telemetry ingest fix". The only role-specific detail in
  *  any scene is scene 1's pair of competing priorities, so that pair now
  *  comes from the role's family; every other scene fits any role (D-050). */
